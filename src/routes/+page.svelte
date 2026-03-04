@@ -6,6 +6,14 @@
 		text: string;
 	}
 
+	interface ContextFile {
+		name: string;
+		content: string;
+	}
+
+	const MAX_FILE_BYTES = 80_000; // ~80 KB per file
+	const ACCEPTED = '.txt,.md,.csv,.json';
+
 	let topic = $state('Is free will an illusion?');
 	let turns = $state(12);
 	let messages = $state<ChatMessage[]>([]);
@@ -13,6 +21,45 @@
 	let done = $state(false);
 	let errorMsg = $state('');
 	let chatEl = $state<HTMLElement | null>(null);
+
+	// Files
+	let contextFiles = $state<ContextFile[]>([]);
+	let dragging = $state(false);
+	let fileError = $state('');
+
+	function buildContext(): string | undefined {
+		if (contextFiles.length === 0) return undefined;
+		return contextFiles
+			.map((f) => `--- ${f.name} ---\n${f.content}`)
+			.join('\n\n');
+	}
+
+	async function readFile(file: File): Promise<void> {
+		if (contextFiles.find((f) => f.name === file.name)) return;
+		if (file.size > MAX_FILE_BYTES) {
+			fileError = `"${file.name}" is too large (max 80 KB).`;
+			return;
+		}
+		const content = await file.text();
+		contextFiles = [...contextFiles, { name: file.name, content }];
+		fileError = '';
+	}
+
+	async function onFileInput(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		for (const file of Array.from(input.files ?? [])) await readFile(file);
+		input.value = '';
+	}
+
+	async function onDrop(e: DragEvent) {
+		dragging = false;
+		e.preventDefault();
+		for (const file of Array.from(e.dataTransfer?.files ?? [])) await readFile(file);
+	}
+
+	function removeFile(name: string) {
+		contextFiles = contextFiles.filter((f) => f.name !== name);
+	}
 
 	function exportDebate(format: 'md' | 'txt') {
 		const date = new Date().toISOString().slice(0, 10);
@@ -24,9 +71,7 @@
 
 		if (format === 'md') {
 			content = `# Debate: ${topic}\n\n_Exported ${date}_\n\n---\n\n`;
-			content += messages
-				.map((m) => `### ${m.agentName}\n\n${m.text}`)
-				.join('\n\n---\n\n');
+			content += messages.map((m) => `### ${m.agentName}\n\n${m.text}`).join('\n\n---\n\n');
 			mime = 'text/markdown';
 			ext = 'md';
 		} else {
@@ -51,41 +96,65 @@
 		errorMsg = '';
 		running = true;
 
-		const params = new URLSearchParams({ topic, turns: String(turns) });
-		const es = new EventSource(`/api/chat?${params}`);
+		try {
+			const response = await fetch('/api/chat', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ topic, turns, context: buildContext() })
+			});
 
-		es.onmessage = (e) => {
-			const data = JSON.parse(e.data);
-
-			if (data.type === 'message') {
-				messages = [
-					...messages,
-					{ agentId: data.agentId, agentName: data.agentName, color: data.color, text: data.text }
-				];
-				setTimeout(() => chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' }), 50);
-			} else if (data.type === 'done') {
-				done = true;
+			if (!response.ok || !response.body) {
+				errorMsg = `Server error: ${response.status}`;
 				running = false;
-				es.close();
-			} else if (data.type === 'error') {
-				errorMsg = data.message || `${data.agentName ?? 'An AI'} failed to respond.`;
-				running = false;
-				es.close();
+				return;
 			}
-		};
 
-		es.onerror = () => {
-			if (running) {
-				errorMsg = 'Connection lost. The debate ended unexpectedly.';
-				running = false;
+			const reader = response.body.getReader();
+			const decoder = new TextDecoder();
+			let buffer = '';
+
+			while (true) {
+				const { done: streamDone, value } = await reader.read();
+				if (streamDone) break;
+
+				buffer += decoder.decode(value, { stream: true });
+
+				// Parse complete SSE events (delimited by \n\n)
+				const parts = buffer.split('\n\n');
+				buffer = parts.pop() ?? '';
+
+				for (const part of parts) {
+					const line = part.trim();
+					if (!line.startsWith('data: ')) continue;
+					const data = JSON.parse(line.slice(6));
+
+					if (data.type === 'message') {
+						messages = [...messages, {
+							agentId: data.agentId,
+							agentName: data.agentName,
+							color: data.color,
+							text: data.text
+						}];
+						setTimeout(() => chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' }), 50);
+					} else if (data.type === 'done') {
+						done = true;
+						running = false;
+					} else if (data.type === 'error') {
+						errorMsg = data.message || 'An AI failed to respond.';
+						running = false;
+					}
+				}
 			}
-			es.close();
-		};
+		} catch (err) {
+			errorMsg = `Connection error: ${String(err)}`;
+		} finally {
+			running = false;
+		}
 	}
 </script>
 
 <div class="min-h-dvh flex flex-col items-center px-4 py-12 sm:py-16">
-	<div class="w-full max-w-2xl flex flex-col gap-10">
+	<div class="w-full max-w-2xl flex flex-col gap-8">
 
 		<!-- Header -->
 		<header class="text-center flex flex-col items-center gap-2">
@@ -144,13 +213,84 @@
 			{/if}
 		</div>
 
+		<!-- Context files -->
+		<div class="flex flex-col gap-3">
+			<div class="flex items-center justify-between">
+				<span class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
+					Context files
+				</span>
+				<span class="text-[10px] text-[--color-muted]">.txt · .md · .csv · .json · max 80 KB each</span>
+			</div>
+
+			<!-- Drop zone -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<label
+				for="file-input"
+				class="relative flex flex-col items-center justify-center gap-2 border border-dashed rounded-xl px-6 py-5 cursor-pointer transition-colors
+					{dragging
+						? 'border-[--color-accent] bg-[#7c6af7]/5'
+						: 'border-[--color-border] hover:border-[--color-muted] bg-[--color-panel]'}"
+				ondragover={(e) => { e.preventDefault(); dragging = true; }}
+				ondragleave={() => { dragging = false; }}
+				ondrop={onDrop}
+			>
+				<svg class="w-5 h-5 text-[--color-muted]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+						d="M12 16v-8m0 0-3 3m3-3 3 3M4 16v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1" />
+				</svg>
+				<span class="text-xs text-[--color-muted-fg]">
+					Drop files here or <span class="text-[--color-accent]">browse</span>
+				</span>
+				<input
+					id="file-input"
+					type="file"
+					accept={ACCEPTED}
+					multiple
+					class="sr-only"
+					onchange={onFileInput}
+					disabled={running}
+				/>
+			</label>
+
+			{#if fileError}
+				<p class="text-xs text-red-400">{fileError}</p>
+			{/if}
+
+			<!-- File chips -->
+			{#if contextFiles.length > 0}
+				<div class="flex flex-wrap gap-2">
+					{#each contextFiles as file (file.name)}
+						<div class="flex items-center gap-2 bg-[--color-panel] border border-[--color-border] rounded-lg pl-3 pr-2 py-1.5">
+							<svg class="w-3.5 h-3.5 text-[--color-accent] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+									d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z" />
+							</svg>
+							<span class="text-xs text-[--color-muted-fg] max-w-[160px] truncate">{file.name}</span>
+							<span class="text-[10px] text-[--color-muted]">
+								{(file.content.length / 1024).toFixed(1)} KB
+							</span>
+							<button
+								onclick={() => removeFile(file.name)}
+								disabled={running}
+								class="text-[--color-muted] hover:text-red-400 transition-colors disabled:opacity-40 cursor-pointer ml-0.5"
+								aria-label="Remove {file.name}"
+							>
+								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12" />
+								</svg>
+							</button>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
 		<!-- Chat -->
 		<div
 			bind:this={chatEl}
 			class="flex flex-col gap-0 bg-[--color-panel] border border-[--color-border] rounded-2xl overflow-y-auto min-h-72 max-h-[68vh] scroll-smooth"
 		>
 			{#if messages.length === 0 && !running}
-				<!-- Empty state -->
 				<div class="flex flex-col items-center justify-center gap-6 flex-1 py-16 px-6">
 					<div class="flex items-center gap-5">
 						<div class="flex flex-col items-center gap-1.5">
@@ -159,9 +299,7 @@
 							</div>
 							<span class="text-xs font-semibold text-[--color-gemini] tracking-wide">Gemini</span>
 						</div>
-						<div class="flex flex-col items-center gap-1 text-[--color-muted]">
-							<span class="text-xl font-light">vs</span>
-						</div>
+						<span class="text-xl font-light text-[--color-muted]">vs</span>
 						<div class="flex flex-col items-center gap-1.5">
 							<div class="w-10 h-10 rounded-full bg-[--color-claude-dim] flex items-center justify-center">
 								<span class="text-[--color-claude] text-lg font-bold">C</span>
@@ -181,15 +319,12 @@
 					class="flex gap-3 px-5 py-4 {i > 0 ? 'border-t border-[--color-border-subtle]' : ''} {isGemini ? 'flex-row' : 'flex-row-reverse'}"
 					style="animation: fadeSlide 0.2s ease both"
 				>
-					<!-- Avatar -->
 					<div
 						class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mt-0.5"
 						style="background-color: {isGemini ? 'var(--color-gemini-dim)' : 'var(--color-claude-dim)'}; color: {isGemini ? 'var(--color-gemini)' : 'var(--color-claude)'}"
 					>
 						{isGemini ? 'G' : 'C'}
 					</div>
-
-					<!-- Bubble -->
 					<div class="flex flex-col gap-1 max-w-[82%] {isGemini ? 'items-start' : 'items-end'}">
 						<span
 							class="text-[10px] font-semibold uppercase tracking-widest"
@@ -198,9 +333,7 @@
 							{msg.agentName}
 						</span>
 						<p
-							class="text-sm leading-relaxed text-[#d4d4e0] {isGemini
-								? 'border-l-2 pl-3'
-								: 'border-r-2 pr-3 text-right'}"
+							class="text-sm leading-relaxed text-[#d4d4e0] {isGemini ? 'border-l-2 pl-3' : 'border-r-2 pr-3 text-right'}"
 							style="border-color: {isGemini ? 'var(--color-gemini)' : 'var(--color-claude)'}"
 						>
 							{msg.text}

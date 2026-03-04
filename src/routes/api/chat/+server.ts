@@ -4,9 +4,15 @@ import type { Message } from '$lib/agents';
 
 // Each SSE event is JSON: { type: 'message' | 'done' | 'error', ... }
 
-export const GET: RequestHandler = ({ url }) => {
-	const topic = url.searchParams.get('topic')?.trim() || 'What is consciousness?';
-	const totalTurns = Math.min(parseInt(url.searchParams.get('turns') || '12'), 30);
+export const POST: RequestHandler = async ({ request }) => {
+	const { topic, turns, context } = (await request.json()) as {
+		topic: string;
+		turns: number;
+		context?: string;
+	};
+
+	const safeTopic = topic?.trim() || 'What is consciousness?';
+	const totalTurns = Math.min(Number(turns) || 12, 30);
 
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -18,11 +24,9 @@ export const GET: RequestHandler = ({ url }) => {
 				const agents = buildAgents();
 				const history: Message[] = [];
 
-				// Rotate through active agents
 				for (let turn = 0; turn < totalTurns; turn++) {
 					const agent = agents[turn % agents.length];
-
-					const text = await generateReply(agent, history, topic);
+					const text = await generateReply(agent, history, safeTopic, context);
 
 					if (!text) {
 						send({ type: 'error', agentId: agent.id, message: `${agent.name} failed to respond.` });
@@ -32,15 +36,8 @@ export const GET: RequestHandler = ({ url }) => {
 					const msg: Message = { agentId: agent.id, agentName: agent.name, text };
 					history.push(msg);
 
-					send({
-						type: 'message',
-						agentId: agent.id,
-						agentName: agent.name,
-						color: agent.color,
-						text
-					});
+					send({ type: 'message', agentId: agent.id, agentName: agent.name, color: agent.color, text });
 
-					// Small pause between turns so the UI feels like a real chat
 					await new Promise((r) => setTimeout(r, 600));
 				}
 

@@ -48,7 +48,8 @@ export function formatHistory(messages: Message[]): string {
 export async function generateReply(
 	agent: Agent,
 	history: Message[],
-	topic: string
+	topic: string,
+	context?: string
 ): Promise<string | null> {
 	const historyText = formatHistory(history);
 
@@ -57,8 +58,12 @@ export async function generateReply(
 			? `The debate topic is: "${topic}"\n\nYou go first. Open the debate by staking out your position clearly.`
 			: `The debate topic is: "${topic}"\n\nDebate so far:\n${historyText}\n\nNow it's your turn. Respond directly to what was just said — challenge it, refute it, or reinforce your position.`;
 
+	const systemPrompt = context
+		? `${agent.systemPrompt}\n\n[REFERENCE MATERIAL]\nThe following documents have been provided. Draw on them where relevant to support or challenge arguments.\n\n${context}`
+		: agent.systemPrompt;
+
 	return agent.provider.generateText(prompt, {
-		systemPrompt: agent.systemPrompt,
+		systemPrompt,
 		temperature: 0.9,
 		maxTokens: 300
 	});
