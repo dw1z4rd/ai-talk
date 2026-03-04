@@ -5,13 +5,13 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview --host --port 3000"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.2.12",
     "@sveltejs/kit": "^2.21.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
-    "svelte": "^5.25.3",
+    "svelte": "^5.53.7",
     "svelte-check": "^4.1.4",
     "typescript": "^5.8.2",
     "vite": "^6.2.0"

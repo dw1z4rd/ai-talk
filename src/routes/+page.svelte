@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { $state, $derived } from 'svelte';
+
 	const MODEL_OPTIONS = [
 		{ group: 'Ollama — Cloud', options: [
 			{ id: 'deepseek-v3.1:671b-cloud', name: 'DeepSeek V3.1', color: '#4B8BF5' },
@@ -41,7 +43,7 @@
 		content: string;
 	}
 
-	const MAX_FILE_BYTES = 80_000; // ~80 KB per file
+	const MAX_FILE_BYTES = 80_000;
 	const ACCEPTED = '.txt,.md,.csv,.json';
 
 	let topic = $state('Is free will an illusion?');
@@ -55,11 +57,26 @@
 	let agentA = $state('deepseek-v3.1:671b-cloud');
 	let agentB = $state('llama3.3:70b-cloud');
 	let leftAgentId = $state('deepseek-v3.1:671b-cloud');
+	let typingAgentName = $state('');
+	let typingAgentColor = $state('');
 
 	// Files
 	let contextFiles = $state<ContextFile[]>([]);
 	let dragging = $state(false);
 	let fileError = $state('');
+
+	// Derived progress
+	let progress = $derived(turns > 0 ? Math.min((messages.length / turns) * 100, 100) : 0);
+
+	function swapAgents() {
+		[agentA, agentB] = [agentB, agentA];
+	}
+
+	function resetConversation() {
+		messages = [];
+		done = false;
+		errorMsg = '';
+	}
 
 	function buildContext(): string | undefined {
 		if (contextFiles.length === 0) return undefined;
@@ -132,6 +149,14 @@
 		}
 		running = false;
 		done = true;
+		typingAgentName = '';
+	}
+
+	function onTopicKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !running && topic.trim()) {
+			e.preventDefault();
+			startConversation();
+		}
 	}
 
 	async function startConversation() {
@@ -139,6 +164,8 @@
 		done = false;
 		errorMsg = '';
 		running = true;
+		typingAgentName = '';
+		typingAgentColor = '';
 		leftAgentId = agentA;
 		abortController = new AbortController();
 
@@ -166,7 +193,6 @@
 
 				buffer += decoder.decode(value, { stream: true });
 
-				// Parse complete SSE events (delimited by \n\n)
 				const parts = buffer.split('\n\n');
 				buffer = parts.pop() ?? '';
 
@@ -176,30 +202,42 @@
 					const data = JSON.parse(line.slice(6));
 
 					if (data.type === 'message') {
+						typingAgentName = '';
+						typingAgentColor = '';
 						messages = [...messages, {
 							agentId: data.agentId,
 							agentName: data.agentName,
 							color: data.color,
 							text: data.text
 						}];
+						// Set the next typing agent
+						if (messages.length < turns) {
+							const nextId = data.agentId === agentA ? agentB : agentA;
+							const next = getModelInfo(nextId);
+							typingAgentName = next.name;
+							typingAgentColor = next.color;
+						}
 						setTimeout(() => chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' }), 50);
 					} else if (data.type === 'done') {
 						done = true;
 						running = false;
+						typingAgentName = '';
 					} else if (data.type === 'error') {
 						errorMsg = data.message || 'An AI failed to respond.';
 						running = false;
+						typingAgentName = '';
 					}
 				}
 			}
 		} catch (err: any) {
 			if (err.name === 'AbortError') {
-				// User manually stopped the conversation
+				// User manually stopped
 			} else {
 				errorMsg = `Connection error: ${String(err)}`;
 			}
 		} finally {
 			running = false;
+			typingAgentName = '';
 		}
 	}
 </script>
