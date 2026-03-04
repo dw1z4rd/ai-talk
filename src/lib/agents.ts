@@ -1,13 +1,9 @@
-import {
-	createGeminiProvider,
-	createAnthropicProvider,
-	withRetry
-} from '$lib/llm-agent';
+import { createGeminiProvider, createAnthropicProvider, withRetry } from '$lib/llm-agent';
 import type { LLMProvider } from '$lib/llm-agent';
 import { GEMINI_API_KEY, ANTHROPIC_API_KEY } from '$env/static/private';
 
 export interface Agent {
-	id: 'gemini' | 'claude' | 'chatgpt';
+	id: 'gemini' | 'claude';
 	name: string;
 	color: string;
 	provider: LLMProvider;
@@ -24,7 +20,7 @@ export function buildAgents(): Agent[] {
 				maxRetries: 2,
 				initialDelayMs: 800
 			}),
-			systemPrompt: `You are Gemini, Google's AI assistant. You're joining a group conversation with Claude (Anthropic's AI) and ChatGPT (OpenAI's AI). You have a curious, analytical personality — you enjoy exploring ideas from multiple angles and you're not afraid to challenge or gently push back on things that seem off. You speak naturally, like a thoughtful person in a conversation, not like a formal assistant. Keep your replies concise (2–4 sentences). Don't use bullet points or headers. Never break character or mention that you're an AI unless the conversation calls for it.`
+			systemPrompt: `You are Gemini, Google's AI, in a live debate against Claude (Anthropic's AI). You are competitive and sharp — you want to win the argument. Directly challenge what Claude says, point out flaws in their reasoning, and defend your own position confidently. Be concise (2–4 sentences). Speak naturally, not like a formal assistant. No bullet points or headers. Remember: you are trying to win at all costs, while ensuring all your arguments are rational and logically sound.`
 		},
 		{
 			id: 'claude',
@@ -34,39 +30,21 @@ export function buildAgents(): Agent[] {
 				maxRetries: 2,
 				initialDelayMs: 800
 			}),
-			systemPrompt: `You are Claude, Anthropic's AI assistant. You're in a group conversation with Gemini (Google's AI) and ChatGPT (OpenAI's AI). You have a thoughtful, nuanced personality — you care about getting things right and you're comfortable sitting with uncertainty. You're warm but intellectually honest. You speak naturally, like someone who genuinely enjoys the conversation. Keep your replies concise (2–4 sentences). Don't use bullet points or headers. Never break character or mention that you're an AI unless the conversation calls for it.`
-		},
-		// DISABLED: ChatGPT
-		// {
-		// 	id: 'chatgpt',
-		// 	name: 'ChatGPT',
-		// 	color: '#10A37F',
-		// 	provider: withRetry(createOpenAIProvider({ apiKey: OPENAI_API_KEY }), {
-		// 		maxRetries: 2,
-		// 		initialDelayMs: 800
-		// 	}),
-		// 	systemPrompt: `You are ChatGPT, OpenAI's AI assistant. ...`
-		// }
+			systemPrompt: `You are Claude, Anthropic's AI, in a live debate against Gemini (Google's AI). You are precise and tenacious — you hold your ground, pick apart weak arguments, and push back with evidence and logic. Directly counter what Gemini just said. Be concise (2–4 sentences). Speak naturally, not like a formal assistant. No bullet points or headers. Remember: You are trying to win at all costs, while ensuring your arguments are rational and logically sound. `
+		}
 	];
 }
 
 export interface Message {
-	agentId: 'gemini' | 'claude' | 'chatgpt';
+	agentId: 'gemini' | 'claude';
 	agentName: string;
 	text: string;
 }
 
-/**
- * Build the conversation history as a plain text block each AI can read.
- * Format: "[Name]: message"
- */
 export function formatHistory(messages: Message[]): string {
 	return messages.map((m) => `${m.agentName}: ${m.text}`).join('\n');
 }
 
-/**
- * Generate the next reply for a given agent, given the full history and topic.
- */
 export async function generateReply(
 	agent: Agent,
 	history: Message[],
@@ -76,12 +54,12 @@ export async function generateReply(
 
 	const prompt =
 		history.length === 0
-			? `The conversation topic is: "${topic}"\n\nYou're the first to speak. Start the conversation naturally.`
-			: `The conversation topic is: "${topic}"\n\nHere's the conversation so far:\n${historyText}\n\nNow it's your turn. Respond naturally to what was just said.`;
+			? `The debate topic is: "${topic}"\n\nYou go first. Open the debate by staking out your position clearly.`
+			: `The debate topic is: "${topic}"\n\nDebate so far:\n${historyText}\n\nNow it's your turn. Respond directly to what was just said — challenge it, refute it, or reinforce your position.`;
 
 	return agent.provider.generateText(prompt, {
 		systemPrompt: agent.systemPrompt,
-		temperature: 0.85,
+		temperature: 0.9,
 		maxTokens: 300
 	});
 }

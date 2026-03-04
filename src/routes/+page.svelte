@@ -1,6 +1,6 @@
 <script lang="ts">
 	interface ChatMessage {
-		agentId: 'gemini' | 'claude' | 'chatgpt';
+		agentId: 'gemini' | 'claude';
 		agentName: string;
 		color: string;
 		text: string;
@@ -16,8 +16,7 @@
 
 	const AVATARS: Record<string, string> = {
 		gemini: '✦',
-		claude: '◆',
-		chatgpt: '⬡'
+		claude: '◆'
 	};
 
 	async function startConversation() {
@@ -68,7 +67,7 @@
 <main>
 	<header>
 		<h1>AI<span class="accent">talk</span></h1>
-		<p class="subtitle">Make Gemini, Claude, and ChatGPT talk to each other</p>
+		<p class="subtitle">Watch Gemini and Claude debate each other</p>
 	</header>
 
 	<section class="controls">
@@ -100,10 +99,9 @@
 			<div class="empty-state">
 				<div class="ai-trio">
 					<span style="color: #4285F4">✦ Gemini</span>
-					<span class="vs">·</span>
+					<span class="vs">vs</span>
 					<span style="color: #D97706">◆ Claude</span>
-					<span class="vs">·</span>
-					<span style="color: #10A37F">⬡ ChatGPT</span>
+	
 				</div>
 				<p>Set a topic and hit Start to watch them go.</p>
 			</div>
