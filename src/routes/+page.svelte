@@ -1,6 +1,36 @@
 <script lang="ts">
+	const MODEL_OPTIONS = [
+		{ group: 'Ollama — Cloud', options: [
+			{ id: 'deepseek-v3.1:671b-cloud', name: 'DeepSeek V3.1', color: '#4B8BF5' },
+			{ id: 'llama3.3:70b-cloud', name: 'Llama 3.3 70B', color: '#8B5CF6' },
+			{ id: 'qwq:32b-cloud', name: 'QwQ 32B', color: '#06B6D4' },
+			{ id: 'phi4:14b-cloud', name: 'Phi-4 14B', color: '#10B981' },
+		]},
+		{ group: 'Ollama — Local', options: [
+			{ id: 'llama3.2', name: 'Llama 3.2 3B', color: '#A78BFA' },
+			{ id: 'mistral', name: 'Mistral 7B', color: '#F59E0B' },
+			{ id: 'qwen2.5:7b', name: 'Qwen 2.5 7B', color: '#34D399' },
+		]},
+		{ group: 'Gemini', options: [
+			{ id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', color: '#4285F4' },
+			{ id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', color: '#34A853' },
+		]},
+		{ group: 'Claude', options: [
+			{ id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', color: '#D97706' },
+			{ id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', color: '#B45309' },
+		]},
+	];
+
+	function getModelInfo(id: string) {
+		for (const group of MODEL_OPTIONS) {
+			const found = group.options.find((o) => o.id === id);
+			if (found) return found;
+		}
+		return { id, name: id, color: '#7c6af7' };
+	}
+
 	interface ChatMessage {
-		agentId: 'gemini' | 'claude';
+		agentId: string;
 		agentName: string;
 		color: string;
 		text: string;
@@ -185,7 +215,7 @@
 					class="text-transparent bg-clip-text bg-linear-to-r from-[#7c6af7] to-[#a78bfa]">talk</span>
 			</h1>
 			<p class="text-sm text-[--color-muted-fg] tracking-wide">
-				Gemini vs Claude — live AI debate
+				live AI debate
 			</p>
 		</header>
 
@@ -238,6 +268,48 @@
 					</button>
 				{/if}
 			</form>
+
+			<!-- Agent selectors -->
+			<div class="flex gap-2">
+				<div class="flex flex-col gap-1.5 flex-1">
+					<label for="agentA" class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
+						<span style="color: {getModelInfo(agentA).color}">●</span> Agent A
+					</label>
+					<select
+						id="agentA"
+						bind:value={agentA}
+						disabled={running}
+						class="w-full bg-[--color-panel] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+					>
+						{#each MODEL_OPTIONS as group}
+							<optgroup label={group.group}>
+								{#each group.options as opt}
+									<option value={opt.id}>{opt.name}</option>
+								{/each}
+							</optgroup>
+						{/each}
+					</select>
+				</div>
+				<div class="flex flex-col gap-1.5 flex-1">
+					<label for="agentB" class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
+						<span style="color: {getModelInfo(agentB).color}">●</span> Agent B
+					</label>
+					<select
+						id="agentB"
+						bind:value={agentB}
+						disabled={running}
+						class="w-full bg-[--color-panel] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+					>
+						{#each MODEL_OPTIONS as group}
+							<optgroup label={group.group}>
+								{#each group.options as opt}
+									<option value={opt.id}>{opt.name}</option>
+								{/each}
+							</optgroup>
+						{/each}
+					</select>
+				</div>
+			</div>
 
 			{#if errorMsg}
 				<div class="bg-red-950/60 border border-red-900/60 rounded-lg px-4 py-3 text-sm text-red-400">
@@ -325,19 +397,21 @@
 		>
 			{#if messages.length === 0 && !running}
 				<div class="flex flex-col items-center justify-center gap-6 flex-1 py-16 px-6">
-					<div class="flex items-center gap-5">
-						<div class="flex flex-col items-center gap-1.5">
-							<div class="w-10 h-10 rounded-full bg-[--color-gemini-dim] flex items-center justify-center">
-								<span class="text-[--color-gemini] text-lg font-bold">G</span>
-							</div>
-							<span class="text-xs font-semibold text-[--color-gemini] tracking-wide">Gemini</span>
+				{@const infoA = getModelInfo(agentA)}
+				{@const infoB = getModelInfo(agentB)}
+				<div class="flex items-center gap-5">
+					<div class="flex flex-col items-center gap-1.5">
+						<div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: {infoA.color}20; color: {infoA.color}">
+							<span class="text-lg font-bold">{infoA.name[0]}</span>
 						</div>
-						<span class="text-xl font-light text-[--color-muted]">vs</span>
-						<div class="flex flex-col items-center gap-1.5">
-							<div class="w-10 h-10 rounded-full bg-[--color-claude-dim] flex items-center justify-center">
-								<span class="text-[--color-claude] text-lg font-bold">C</span>
-							</div>
-							<span class="text-xs font-semibold text-[--color-claude] tracking-wide">Claude</span>
+						<span class="text-xs font-semibold tracking-wide" style="color: {infoA.color}">{infoA.name}</span>
+					</div>
+					<span class="text-xl font-light text-[--color-muted]">vs</span>
+					<div class="flex flex-col items-center gap-1.5">
+						<div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: {infoB.color}20; color: {infoB.color}">
+							<span class="text-lg font-bold">{infoB.name[0]}</span>
+						</div>
+						<span class="text-xs font-semibold tracking-wide" style="color: {infoB.color}">{infoB.name}</span>
 						</div>
 					</div>
 					<p class="text-sm text-[--color-muted] text-center">
@@ -347,27 +421,27 @@
 			{/if}
 
 			{#each messages as msg, i (i)}
-				{@const isGemini = msg.agentId === 'gemini'}
+				{@const isLeft = msg.agentId === leftAgentId}
 				<div
-					class="flex gap-3 px-5 py-4 {i > 0 ? 'border-t border-[--color-border-subtle]' : ''} {isGemini ? 'flex-row' : 'flex-row-reverse'}"
+					class="flex gap-3 px-5 py-4 {i > 0 ? 'border-t border-[--color-border-subtle]' : ''} {isLeft ? 'flex-row' : 'flex-row-reverse'}"
 					style="animation: fadeSlide 0.2s ease both"
 				>
 					<div
 						class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mt-0.5"
-						style="background-color: {isGemini ? 'var(--color-gemini-dim)' : 'var(--color-claude-dim)'}; color: {isGemini ? 'var(--color-gemini)' : 'var(--color-claude)'}"
+						style="background-color: {msg.color}20; color: {msg.color}"
 					>
-						{isGemini ? 'G' : 'C'}
+						{msg.agentName[0]}
 					</div>
-					<div class="flex flex-col gap-1 max-w-[82%] {isGemini ? 'items-start' : 'items-end'}">
+					<div class="flex flex-col gap-1 max-w-[82%] {isLeft ? 'items-start' : 'items-end'}">
 						<span
 							class="text-[10px] font-semibold uppercase tracking-widest"
-							style="color: {isGemini ? 'var(--color-gemini)' : 'var(--color-claude)'}"
+							style="color: {msg.color}"
 						>
 							{msg.agentName}
 						</span>
 						<p
-							class="text-sm leading-relaxed text-[#d4d4e0] {isGemini ? 'border-l-2 pl-3' : 'border-r-2 pr-3 text-right'}"
-							style="border-color: {isGemini ? 'var(--color-gemini)' : 'var(--color-claude)'}"
+							class="text-sm leading-relaxed text-[#d4d4e0] {isLeft ? 'border-l-2 pl-3' : 'border-r-2 pr-3 text-right'}"
+							style="border-color: {msg.color}"
 						>
 							{msg.text}
 						</p>

@@ -43,6 +43,17 @@ export interface RetryConfig {
 	readonly onRetryableFailure?: (attempt: number, error?: unknown) => void;
 }
 
+// ─── Ollama-Specific Types ───────────────────────────────────────────────────
+
+export interface OllamaProviderConfig {
+	/** Base URL of the Ollama server (default: http://localhost:11434) */
+	readonly baseUrl?: string;
+	/** Model name, including optional tag e.g. 'deepseek-v3.1:671b-cloud' */
+	readonly model?: string;
+	/** Optional bearer token for cloud/remote Ollama instances */
+	readonly apiKey?: string;
+}
+
 // ─── OpenAI-Specific Types ───────────────────────────────────────────────────
 
 export interface OpenAIProviderConfig {

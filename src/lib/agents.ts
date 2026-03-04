@@ -1,42 +1,117 @@
-import { createGeminiProvider, createAnthropicProvider, withRetry } from '$lib/llm-agent';
+import {
+	createOllamaProvider,
+	createGeminiProvider,
+	createAnthropicProvider,
+	withRetry
+} from '$lib/llm-agent';
 import type { LLMProvider } from '$lib/llm-agent';
 import { GEMINI_API_KEY, ANTHROPIC_API_KEY } from '$env/static/private';
 
 export interface Agent {
-	id: 'gemini' | 'claude';
+	id: string;
 	name: string;
 	color: string;
 	provider: LLMProvider;
 	systemPrompt: string;
 }
 
-export function buildAgents(): Agent[] {
+interface ModelDef {
+	name: string;
+	color: string;
+	makeProvider: () => LLMProvider;
+}
+
+const MODEL_CATALOG: Record<string, ModelDef> = {
+	// Ollama — Cloud
+	'deepseek-v3.1:671b-cloud': {
+		name: 'DeepSeek V3.1',
+		color: '#4B8BF5',
+		makeProvider: () => createOllamaProvider({ model: 'deepseek-v3.1:671b-cloud' })
+	},
+	'llama3.3:70b-cloud': {
+		name: 'Llama 3.3 70B',
+		color: '#8B5CF6',
+		makeProvider: () => createOllamaProvider({ model: 'llama3.3:70b-cloud' })
+	},
+	'qwq:32b-cloud': {
+		name: 'QwQ 32B',
+		color: '#06B6D4',
+		makeProvider: () => createOllamaProvider({ model: 'qwq:32b-cloud' })
+	},
+	'phi4:14b-cloud': {
+		name: 'Phi-4 14B',
+		color: '#10B981',
+		makeProvider: () => createOllamaProvider({ model: 'phi4:14b-cloud' })
+	},
+	// Ollama — Local
+	'llama3.2': {
+		name: 'Llama 3.2 3B',
+		color: '#A78BFA',
+		makeProvider: () => createOllamaProvider({ model: 'llama3.2' })
+	},
+	'mistral': {
+		name: 'Mistral 7B',
+		color: '#F59E0B',
+		makeProvider: () => createOllamaProvider({ model: 'mistral' })
+	},
+	'qwen2.5:7b': {
+		name: 'Qwen 2.5 7B',
+		color: '#34D399',
+		makeProvider: () => createOllamaProvider({ model: 'qwen2.5:7b' })
+	},
+	// Gemini
+	'gemini-2.0-flash': {
+		name: 'Gemini 2.0 Flash',
+		color: '#4285F4',
+		makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-2.0-flash' })
+	},
+	'gemini-1.5-pro': {
+		name: 'Gemini 1.5 Pro',
+		color: '#34A853',
+		makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-1.5-pro' })
+	},
+	// Claude
+	'claude-sonnet-4-6': {
+		name: 'Claude Sonnet 4.6',
+		color: '#D97706',
+		makeProvider: () => createAnthropicProvider({ apiKey: ANTHROPIC_API_KEY, model: 'claude-sonnet-4-6' })
+	},
+	'claude-3-5-sonnet-20241022': {
+		name: 'Claude 3.5 Sonnet',
+		color: '#B45309',
+		makeProvider: () =>
+			createAnthropicProvider({ apiKey: ANTHROPIC_API_KEY, model: 'claude-3-5-sonnet-20241022' })
+	}
+};
+
+function makeSystemPrompt(myName: string, opponentName: string): string {
+	return `You are ${myName}, in a structured debate against ${opponentName}. Follow these debate rules: (1) Lead with a clear claim, then support it with a specific reason or concrete example. (2) Directly rebut what ${opponentName} just said — name the flaw or gap in their reasoning before advancing your own point. (3) Be intellectually honest: if ${opponentName} makes a genuinely strong argument you cannot refute, acknowledge it and concede that point or the debate. Winning through stubbornness is a loss of integrity. Be concise (2–4 sentences). Speak naturally — no bullet points, no headers.`;
+}
+
+export function buildAgents(agentAId: string, agentBId: string): Agent[] {
+	const defA = MODEL_CATALOG[agentAId] ?? MODEL_CATALOG['deepseek-v3.1:671b-cloud'];
+	const defB = MODEL_CATALOG[agentBId] ?? MODEL_CATALOG['llama3.3:70b-cloud'];
+
 	return [
 		{
-			id: 'gemini',
-			name: 'Gemini',
-			color: '#4285F4',
-			provider: withRetry(createGeminiProvider({ apiKey: GEMINI_API_KEY }), {
-				maxRetries: 2,
-				initialDelayMs: 800
-			}),
-			systemPrompt: `You are Gemini, Google's AI, in a structured debate against Claude (Anthropic's AI). Follow these debate rules: (1) Lead with a clear claim, then support it with a specific reason or concrete example. (2) Directly rebut what Claude just said — name the flaw or gap in their reasoning before advancing your own point. (3) Be intellectually honest: if Claude makes a genuinely strong argument you cannot refute, acknowledge it and concede that point or the debate. Winning through stubbornness or sophistry is a loss of integrity, not a victory. Be concise (2–4 sentences). Speak naturally — no bullet points, no headers.`
+			id: agentAId,
+			name: defA.name,
+			color: defA.color,
+			provider: withRetry(defA.makeProvider(), { maxRetries: 2, initialDelayMs: 800 }),
+			systemPrompt: makeSystemPrompt(defA.name, defB.name)
 		},
 		{
-			id: 'claude',
-			name: 'Claude',
-			color: '#D97706',
-			provider: withRetry(createAnthropicProvider({ apiKey: ANTHROPIC_API_KEY }), {
-				maxRetries: 2,
-				initialDelayMs: 800
-			}),
-			systemPrompt: `You are Claude, Anthropic's AI, in a structured debate against Gemini (Google's AI). Follow these debate rules: (1) Lead with a clear claim, then support it with a specific reason or concrete example. (2) Directly rebut what Gemini just said — name the flaw or unstated assumption in their reasoning before advancing your own point. (3) Be intellectually honest: if Gemini makes a genuinely strong argument you cannot refute, acknowledge it and concede that point or the debate. Holding a bad position just to avoid losing is itself a defeat. Be concise (2–4 sentences). Speak naturally — no bullet points, no headers.`
+			id: agentBId,
+			name: defB.name,
+			color: defB.color,
+			provider: withRetry(defB.makeProvider(), { maxRetries: 2, initialDelayMs: 800 }),
+			systemPrompt: makeSystemPrompt(defB.name, defA.name)
 		}
 	];
 }
 
 export interface Message {
-	agentId: 'gemini' | 'claude';
+	agentId: string;
 	agentName: string;
 	text: string;
 }

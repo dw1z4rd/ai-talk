@@ -5,10 +5,12 @@ import type { Message } from '$lib/agents';
 // Each SSE event is JSON: { type: 'message' | 'done' | 'error', ... }
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { topic, turns, context } = (await request.json()) as {
+	const { topic, turns, context, agentA, agentB } = (await request.json()) as {
 		topic: string;
 		turns: number;
 		context?: string;
+		agentA?: string;
+		agentB?: string;
 	};
 
 	const safeTopic = topic?.trim() || 'What is consciousness?';
@@ -21,7 +23,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			};
 
 			try {
-				const agents = buildAgents();
+				const agents = buildAgents(
+					agentA ?? 'deepseek-v3.1:671b-cloud',
+					agentB ?? 'llama3.3:70b-cloud'
+				);
 				const history: Message[] = [];
 
 				for (let turn = 0; turn < totalTurns; turn++) {
