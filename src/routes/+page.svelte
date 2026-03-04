@@ -401,21 +401,19 @@
 		>
 			{#if messages.length === 0 && !running}
 				<div class="flex flex-col items-center justify-center gap-6 flex-1 py-16 px-6">
-				{@const infoA = getModelInfo(agentA)}
-				{@const infoB = getModelInfo(agentB)}
 				<div class="flex items-center gap-5">
 					<div class="flex flex-col items-center gap-1.5">
-						<div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: {infoA.color}20; color: {infoA.color}">
-							<span class="text-lg font-bold">{infoA.name[0]}</span>
+						<div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: {getModelInfo(agentA).color}20; color: {getModelInfo(agentA).color}">
+							<span class="text-lg font-bold">{getModelInfo(agentA).name[0]}</span>
 						</div>
-						<span class="text-xs font-semibold tracking-wide" style="color: {infoA.color}">{infoA.name}</span>
+						<span class="text-xs font-semibold tracking-wide" style="color: {getModelInfo(agentA).color}">{getModelInfo(agentA).name}</span>
 					</div>
 					<span class="text-xl font-light text-[--color-muted]">vs</span>
 					<div class="flex flex-col items-center gap-1.5">
-						<div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: {infoB.color}20; color: {infoB.color}">
-							<span class="text-lg font-bold">{infoB.name[0]}</span>
+						<div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: {getModelInfo(agentB).color}20; color: {getModelInfo(agentB).color}">
+							<span class="text-lg font-bold">{getModelInfo(agentB).name[0]}</span>
 						</div>
-						<span class="text-xs font-semibold tracking-wide" style="color: {infoB.color}">{infoB.name}</span>
+						<span class="text-xs font-semibold tracking-wide" style="color: {getModelInfo(agentB).color}">{getModelInfo(agentB).name}</span>
 						</div>
 					</div>
 					<p class="text-sm text-[--color-muted] text-center">
