@@ -46,7 +46,7 @@
 	const ACCEPTED = '.txt,.md,.csv,.json';
 
 	let topic = $state('Is free will an illusion?');
-	let turns = $state(12);
+	let turns = $state(20);
 	let messages = $state<ChatMessage[]>([]);
 	let running = $state(false);
 	let done = $state(false);
@@ -243,11 +243,11 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="min-h-dvh flex flex-col items-center px-6 py-16 sm:py-24"
+	class="min-h-dvh flex flex-col items-center px-6 py-16 sm:py-20"
 	ondragover={(e) => e.preventDefault()}
 	ondrop={(e) => e.preventDefault()}
 >
-	<div class="w-full max-w-2xl flex flex-col gap-8">
+	<div class="w-full max-w-3xl flex flex-col gap-10">
 
 		<!-- Header -->
 		<header class="text-center flex flex-col items-center gap-3">
@@ -255,73 +255,41 @@
 				<span class="text-white">ai</span><span
 					class="text-transparent bg-clip-text bg-linear-to-r from-[#7c6af7] to-[#a78bfa]">talk</span>
 			</h1>
-			<p class="text-base text-[--color-muted-fg] tracking-wide">
-				live AI debate
-			</p>
-			<div class="h-px w-24 bg-linear-to-r from-transparent via-[#7c6af7]/40 to-transparent"></div>
+			<p class="text-base text-[--color-muted-fg]">watch two AIs argue</p>
+			<div class="h-px w-20 bg-linear-to-r from-transparent via-[#7c6af7]/50 to-transparent mt-1"></div>
 		</header>
 
-		<!-- Controls -->
-		<div class="flex flex-col gap-5 bg-[--color-panel] border border-[--color-border] rounded-2xl p-7">
-			<form onsubmit={(e) => { e.preventDefault(); startConversation(); }} class="flex gap-2 items-end">
-				<div class="flex flex-col gap-1.5 flex-1">
-					<label for="topic" class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
-						Topic
-					</label>
-					<!-- svelte-ignore a11y_autofocus -->
-					<input
-						id="topic"
-						type="text"
-						bind:value={topic}
-						placeholder="What should they debate?"
-						disabled={running}
-						autofocus
-						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-4 py-3 text-base text-white placeholder:text-[--color-muted] outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
-					/>
-				</div>
-				<div class="flex flex-col gap-1.5 w-20">
-					<label for="turns" class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
-						Turns
-					</label>
-					<input
-						id="turns"
-						type="number"
-						bind:value={turns}
-						min="2"
-						max="30"
-						disabled={running}
-						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-4 py-3 text-base text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
-					/>
-				</div>
-				{#if running}
-					<button
-						type="button"
-						onclick={stopConversation}
-						class="bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 font-semibold text-base px-6 py-3 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-					>
-						Stop
-					</button>
-				{:else}
-					<button
-						type="submit"
-						class="bg-[--color-accent] hover:bg-[--color-accent-hover] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base px-6 py-3 rounded-lg transition-colors cursor-pointer whitespace-nowrap shadow-[0_0_16px_#7c6af740]"
-					>
-						Start
-					</button>
-				{/if}
-			</form>
+		<!-- Setup -->
+		<div class="flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-8">
 
-			<!-- Agent selectors -->
-			<div class="flex gap-2">
-				<div class="flex flex-col gap-1.5 flex-1">
-					<label for="agentA" class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
-						<span style="color: {getModelInfo(agentA).color}">●</span> Agent A
+			<!-- Topic -->
+			<div class="flex flex-col gap-2">
+				<label for="topic" class="text-xs font-semibold uppercase tracking-widest text-[--color-muted]">Topic</label>
+				<!-- svelte-ignore a11y_autofocus -->
+				<input
+					id="topic"
+					type="text"
+					bind:value={topic}
+					onkeydown={onTopicKeydown}
+					placeholder="What should they debate?"
+					disabled={running}
+					autofocus
+					class="w-full bg-[--color-surface] border border-[--color-border] rounded-xl px-5 py-4 text-lg text-white placeholder:text-[--color-muted] outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+				/>
+			</div>
+
+			<!-- Agents -->
+			<div class="grid grid-cols-[1fr_44px_1fr] items-end gap-3">
+				<div class="flex flex-col gap-2">
+					<label for="agentA" class="text-xs font-semibold uppercase tracking-widest flex items-center gap-1.5" style="color: {getModelInfo(agentA).color}">
+						● Agent A
 					</label>
 					<select
 						id="agentA"
 						bind:value={agentA}
 						disabled={running}
-						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-4 py-3 text-base text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						class="w-full bg-[--color-surface] border border-[--color-border] rounded-xl px-4 py-3.5 text-base text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						style="border-left: 3px solid {getModelInfo(agentA).color}"
 					>
 						{#each MODEL_OPTIONS as group}
 							<optgroup label={group.group}>
@@ -332,15 +300,25 @@
 						{/each}
 					</select>
 				</div>
-				<div class="flex flex-col gap-1.5 flex-1">
-					<label for="agentB" class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
-						<span style="color: {getModelInfo(agentB).color}">●</span> Agent B
+
+				<button
+					type="button"
+					onclick={swapAgents}
+					disabled={running}
+					title="Swap agents"
+					class="h-[50px] flex items-center justify-center rounded-xl bg-[--color-surface] border border-[--color-border] hover:border-[--color-accent] text-[--color-muted] hover:text-white text-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+				>⇄</button>
+
+				<div class="flex flex-col gap-2">
+					<label for="agentB" class="text-xs font-semibold uppercase tracking-widest flex items-center gap-1.5" style="color: {getModelInfo(agentB).color}">
+						● Agent B
 					</label>
 					<select
 						id="agentB"
 						bind:value={agentB}
 						disabled={running}
-						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-4 py-3 text-base text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						class="w-full bg-[--color-surface] border border-[--color-border] rounded-xl px-4 py-3.5 text-base text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						style="border-right: 3px solid {getModelInfo(agentB).color}"
 					>
 						{#each MODEL_OPTIONS as group}
 							<optgroup label={group.group}>
@@ -353,75 +331,69 @@
 				</div>
 			</div>
 
+			<!-- Turns + Submit -->
+			<div class="flex items-center gap-4 pt-2">
+				<label for="turns" class="text-xs font-semibold uppercase tracking-widest text-[--color-muted] whitespace-nowrap">Turns</label>
+				<input
+					id="turns"
+					type="number"
+					bind:value={turns}
+					min="2"
+					max="30"
+					disabled={running}
+					class="w-20 bg-[--color-surface] border border-[--color-border] rounded-xl px-3 py-3 text-base text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed text-center"
+				/>
+				<div class="flex-1"></div>
+				{#if running}
+					<button
+						type="button"
+						onclick={stopConversation}
+						class="bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 font-semibold text-base px-8 py-3 rounded-xl transition-colors cursor-pointer"
+					>Stop</button>
+				{:else}
+					<button
+						type="button"
+						onclick={() => { if (!running && topic.trim()) startConversation(); }}
+						disabled={!topic.trim()}
+						class="bg-[--color-accent] hover:bg-[--color-accent-hover] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-base px-10 py-3 rounded-xl transition-colors cursor-pointer shadow-[0_0_28px_#7c6af755]"
+					>Start debate</button>
+				{/if}
+			</div>
+
 			{#if errorMsg}
-				<div class="bg-red-950/60 border border-red-900/60 rounded-lg px-4 py-3 text-sm text-red-400">
-					{errorMsg}
-				</div>
+				<div class="bg-red-950/60 border border-red-900/60 rounded-xl px-5 py-3 text-sm text-red-400">{errorMsg}</div>
 			{/if}
 		</div>
 
 		<!-- Context files -->
 		<div class="flex flex-col gap-3">
 			<div class="flex items-center justify-between">
-				<span class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
-					Context files
-				</span>
-				<span class="text-[10px] text-[--color-muted]">.txt · .md · .csv · .json · max 80 KB each</span>
+				<span class="text-xs font-semibold uppercase tracking-widest text-[--color-muted]">Context files</span>
+				<span class="text-xs text-[--color-muted]">.txt · .md · .csv · .json · max 80 KB each</span>
 			</div>
-
-			<!-- Drop zone -->
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<label
 				for="file-input"
-				class="relative flex flex-col items-center justify-center gap-2 border border-dashed rounded-xl px-6 py-5 cursor-pointer transition-colors
-					{dragging
-						? 'border-[--color-accent] bg-[#7c6af7]/5'
-						: 'border-[--color-border] hover:border-[--color-muted] bg-[--color-panel]'}"
+				class="flex items-center justify-center gap-3 border border-dashed rounded-xl px-6 py-4 cursor-pointer transition-colors
+					{dragging ? 'border-[--color-accent] bg-[#7c6af7]/5' : 'border-[--color-border] hover:border-[--color-muted] bg-[--color-panel]'}"
 				ondragover={(e) => { e.preventDefault(); dragging = true; }}
 				ondragleave={() => { dragging = false; }}
 				ondrop={onDrop}
 			>
-				<svg class="w-5 h-5 text-[--color-muted]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-						d="M12 16v-8m0 0-3 3m3-3 3 3M4 16v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1" />
+				<svg class="w-4 h-4 text-[--color-muted] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 16v-8m0 0-3 3m3-3 3 3M4 16v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1" />
 				</svg>
-				<span class="text-xs text-[--color-muted-fg]">
-					Drop files here or <span class="text-[--color-accent]">browse</span>
-				</span>
-				<input
-					id="file-input"
-					type="file"
-					accept={ACCEPTED}
-					multiple
-					class="sr-only"
-					onchange={onFileInput}
-					disabled={running}
-				/>
+				<span class="text-sm text-[--color-muted-fg]">Drop files here or <span class="text-[--color-accent]">browse</span></span>
+				<input id="file-input" type="file" accept={ACCEPTED} multiple class="sr-only" onchange={onFileInput} disabled={running} />
 			</label>
-
-			{#if fileError}
-				<p class="text-xs text-red-400">{fileError}</p>
-			{/if}
-
-			<!-- File chips -->
+			{#if fileError}<p class="text-xs text-red-400">{fileError}</p>{/if}
 			{#if contextFiles.length > 0}
 				<div class="flex flex-wrap gap-2">
 					{#each contextFiles as file (file.name)}
 						<div class="flex items-center gap-2 bg-[--color-panel] border border-[--color-border] rounded-lg pl-3 pr-2 py-1.5">
-							<svg class="w-3.5 h-3.5 text-[--color-accent] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-									d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z" />
-							</svg>
 							<span class="text-xs text-[--color-muted-fg] max-w-[160px] truncate">{file.name}</span>
-							<span class="text-[10px] text-[--color-muted]">
-								{(file.content.length / 1024).toFixed(1)} KB
-							</span>
-							<button
-								onclick={() => removeFile(file.name)}
-								disabled={running}
-								class="text-[--color-muted] hover:text-red-400 transition-colors disabled:opacity-40 cursor-pointer ml-0.5"
-								aria-label="Remove {file.name}"
-							>
+							<span class="text-[10px] text-[--color-muted]">{(file.content.length / 1024).toFixed(1)} KB</span>
+							<button onclick={() => removeFile(file.name)} disabled={running} class="text-[--color-muted] hover:text-red-400 transition-colors disabled:opacity-40 cursor-pointer" aria-label="Remove {file.name}">
 								<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12" />
 								</svg>
@@ -434,15 +406,13 @@
 
 		<!-- Progress -->
 		{#if running || (done && messages.length > 0)}
-			<div class="flex flex-col gap-1.5">
+			<div class="flex flex-col gap-2">
 				<div class="flex justify-between items-center">
-					<span class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">Progress</span>
-					<span class="text-[10px] text-[--color-muted]">{messages.length} / {turns} turns</span>
+					<span class="text-xs font-semibold uppercase tracking-widest text-[--color-muted]">Progress</span>
+					<span class="text-xs text-[--color-muted]">{messages.length} / {turns} turns</span>
 				</div>
-				<div class="h-1 bg-[--color-border] rounded-full overflow-hidden">
-					<div class="h-full rounded-full transition-all duration-500"
-						 style="width: {progress}%; background: linear-gradient(to right, #7c6af7, #a78bfa)">
-					</div>
+				<div class="h-1.5 bg-[--color-border] rounded-full overflow-hidden">
+					<div class="h-full rounded-full transition-all duration-500" style="width: {progress}%; background: linear-gradient(to right, #7c6af7, #a78bfa)"></div>
 				</div>
 			</div>
 		{/if}
@@ -450,58 +420,45 @@
 		<!-- Chat -->
 		<div
 			bind:this={chatEl}
-			class="flex flex-col gap-0 bg-[--color-panel] border border-[--color-border] rounded-2xl overflow-y-auto min-h-80 max-h-[68vh] scroll-smooth"
+			class="flex flex-col bg-[--color-panel] border border-[--color-border] rounded-2xl overflow-y-auto min-h-96 max-h-[72vh] scroll-smooth"
 		>
 			{#if messages.length === 0 && !running}
-				<div class="flex flex-col items-center justify-center gap-8 flex-1 py-16 px-6">
-					<div class="flex items-center gap-6">
-						<div class="flex flex-col items-center gap-2">
-							<div class="w-14 h-14 rounded-full flex items-center justify-center ring-2 ring-offset-2 ring-offset-[--color-panel] shadow-lg"
-								 style="background-color: {getModelInfo(agentA).color}20; color: {getModelInfo(agentA).color}; ring-color: {getModelInfo(agentA).color}40">
-								<span class="text-2xl font-bold">{getModelInfo(agentA).name[0]}</span>
+				<div class="flex flex-col items-center justify-center gap-10 flex-1 py-20 px-8">
+					<div class="flex items-center gap-10">
+						<div class="flex flex-col items-center gap-3">
+							<div class="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold"
+								style="background-color: {getModelInfo(agentA).color}18; color: {getModelInfo(agentA).color}; box-shadow: 0 0 0 1px {getModelInfo(agentA).color}35">
+								{getModelInfo(agentA).name[0]}
 							</div>
-							<span class="text-xs font-semibold tracking-wide max-w-[100px] text-center leading-tight" style="color: {getModelInfo(agentA).color}">{getModelInfo(agentA).name}</span>
+							<span class="text-sm font-semibold text-center max-w-[120px] leading-snug" style="color: {getModelInfo(agentA).color}">{getModelInfo(agentA).name}</span>
 						</div>
-						<div class="flex flex-col items-center gap-1">
-							<span class="text-xs font-semibold uppercase tracking-[0.25em] text-[--color-muted]">vs</span>
-						</div>
-						<div class="flex flex-col items-center gap-2">
-							<div class="w-14 h-14 rounded-full flex items-center justify-center ring-2 ring-offset-2 ring-offset-[--color-panel] shadow-lg"
-								 style="background-color: {getModelInfo(agentB).color}20; color: {getModelInfo(agentB).color}; ring-color: {getModelInfo(agentB).color}40">
-								<span class="text-2xl font-bold">{getModelInfo(agentB).name[0]}</span>
+						<span class="text-xs font-bold uppercase tracking-[0.3em] text-[--color-muted]">vs</span>
+						<div class="flex flex-col items-center gap-3">
+							<div class="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold"
+								style="background-color: {getModelInfo(agentB).color}18; color: {getModelInfo(agentB).color}; box-shadow: 0 0 0 1px {getModelInfo(agentB).color}35">
+								{getModelInfo(agentB).name[0]}
 							</div>
-							<span class="text-xs font-semibold tracking-wide max-w-[100px] text-center leading-tight" style="color: {getModelInfo(agentB).color}">{getModelInfo(agentB).name}</span>
+							<span class="text-sm font-semibold text-center max-w-[120px] leading-snug" style="color: {getModelInfo(agentB).color}">{getModelInfo(agentB).name}</span>
 						</div>
 					</div>
-					<p class="text-sm text-[--color-muted] text-center">
-						Set a topic and hit <span class="text-white font-medium">Start</span> to watch them argue.
-					</p>
+					<p class="text-base text-[--color-muted] text-center">Set a topic above and hit <span class="text-white font-semibold">Start debate</span>.</p>
 				</div>
 			{/if}
 
 			{#each messages as msg, i (i)}
 				{@const isLeft = msg.agentId === leftAgentId}
 				<div
-					class="flex gap-4 px-6 py-5 {i > 0 ? 'border-t border-[--color-border-subtle]' : ''} {isLeft ? 'flex-row' : 'flex-row-reverse'}"
-					style="animation: fadeSlide 0.2s ease both"
+					class="flex gap-4 px-7 py-6 {i > 0 ? 'border-t border-[--color-border-subtle]' : ''} {isLeft ? '' : 'flex-row-reverse'}"
+					style="animation: fadeSlide 0.25s ease both"
 				>
-					<div
-						class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mt-0.5"
-						style="background-color: {msg.color}20; color: {msg.color}"
-					>
+					<div class="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold mt-0.5"
+						style="background-color: {msg.color}18; color: {msg.color}; box-shadow: 0 0 0 1px {msg.color}30">
 						{msg.agentName[0]}
 					</div>
-					<div class="flex flex-col gap-1 max-w-[82%] {isLeft ? 'items-start' : 'items-end'}">
-						<span
-							class="text-[10px] font-semibold uppercase tracking-widest"
-							style="color: {msg.color}"
-						>
-							{msg.agentName}
-						</span>
-						<p
-							class="text-base leading-relaxed text-[#d4d4e0] px-5 py-4 rounded-2xl {isLeft ? 'rounded-tl-sm' : 'rounded-tr-sm text-right'}"
-							style="background-color: {msg.color}10; border: 1px solid {msg.color}28"
-						>
+					<div class="flex flex-col gap-2 max-w-[80%] {isLeft ? 'items-start' : 'items-end'}">
+						<span class="text-[11px] font-bold uppercase tracking-widest" style="color: {msg.color}">{msg.agentName}</span>
+						<p class="text-[15px] leading-relaxed text-[#d8d8e8] px-5 py-4 rounded-2xl {isLeft ? 'rounded-tl-md' : 'rounded-tr-md'}"
+							style="background-color: {msg.color}0d; border: 1px solid {msg.color}22">
 							{msg.text}
 						</p>
 					</div>
@@ -509,49 +466,42 @@
 			{/each}
 
 			{#if running}
-				<div class="flex items-center gap-3 px-5 py-4 {messages.length > 0 ? 'border-t border-[--color-border-subtle]' : ''}">
+				<div class="flex items-center gap-3 px-7 py-5 {messages.length > 0 ? 'border-t border-[--color-border-subtle]' : ''}">
 					{#if typingAgentName}
-						<div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
-							 style="background-color: {typingAgentColor}20; color: {typingAgentColor}">
+						<div class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0"
+							style="background-color: {typingAgentColor}18; color: {typingAgentColor}">
 							{typingAgentName[0]}
 						</div>
 					{/if}
 					<div class="flex gap-1.5 items-center">
-						<span class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0ms]"
-							 style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
-						<span class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:150ms]"
-							 style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
-						<span class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:300ms]"
-							 style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
+						<span class="w-2 h-2 rounded-full animate-bounce [animation-delay:0ms]" style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
+						<span class="w-2 h-2 rounded-full animate-bounce [animation-delay:150ms]" style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
+						<span class="w-2 h-2 rounded-full animate-bounce [animation-delay:300ms]" style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
 					</div>
 					{#if typingAgentName}
-						<span class="text-xs" style="color: {typingAgentColor}">{typingAgentName} is thinking…</span>
+						<span class="text-sm" style="color: {typingAgentColor}">{typingAgentName} is thinking…</span>
 					{/if}
 				</div>
 			{/if}
 
 			{#if done}
-				<div class="text-center text-[10px] tracking-widest text-[--color-muted] py-4 border-t border-[--color-border-subtle]">
-					— debate ended —
+				<div class="text-center text-xs tracking-widest uppercase text-[--color-muted] py-5 border-t border-[--color-border-subtle]">
+					debate ended
 				</div>
 			{/if}
 		</div>
 
 		<!-- Export -->
 		{#if messages.length > 0}
-			<div class="flex items-center gap-2">
-				<span class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted] mr-1">Export</span>
-				<button
-					onclick={() => exportDebate('md')}
-					class="flex items-center gap-1.5 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] text-[--color-muted-fg] hover:text-white text-xs font-medium px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
-				>
-					<span class="opacity-70">↓</span> Markdown
+			<div class="flex items-center gap-3">
+				<span class="text-xs font-semibold uppercase tracking-widest text-[--color-muted]">Export</span>
+				<button onclick={() => exportDebate('md')}
+					class="flex items-center gap-2 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] text-[--color-muted-fg] hover:text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors cursor-pointer">
+					↓ Markdown
 				</button>
-				<button
-					onclick={() => exportDebate('txt')}
-					class="flex items-center gap-1.5 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] text-[--color-muted-fg] hover:text-white text-xs font-medium px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
-				>
-					<span class="opacity-70">↓</span> Plain text
+				<button onclick={() => exportDebate('txt')}
+					class="flex items-center gap-2 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] text-[--color-muted-fg] hover:text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors cursor-pointer">
+					↓ Plain text
 				</button>
 			</div>
 		{/if}
@@ -561,7 +511,7 @@
 
 <style>
 	@keyframes fadeSlide {
-		from { opacity: 0; transform: translateY(5px); }
+		from { opacity: 0; transform: translateY(6px); }
 		to   { opacity: 1; transform: translateY(0); }
 	}
 </style>
