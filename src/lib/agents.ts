@@ -3,8 +3,8 @@ import {
 	createOpenAIProvider,
 	createAnthropicProvider,
 	withRetry
-} from '@llm/agent';
-import type { LLMProvider } from '@llm/agent';
+} from '$lib/llm-agent';
+import type { LLMProvider } from '$lib/llm-agent';
 import { GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY } from '$env/static/private';
 
 export interface Agent {

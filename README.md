@@ -20,17 +20,7 @@ OPENAI_API_KEY=...
 ANTHROPIC_API_KEY=...
 ```
 
-**3. Build `@llm/agent`**
-
-The GitHub package ships no pre-built output, so you need to build it once after install:
-
-```bash
-git clone https://github.com/dw1z4rd/llm-agent /tmp/llm-agent --depth=1
-cd /tmp/llm-agent && npm install && npx tsup src/index.ts --format esm,cjs --dts --out-dir dist
-cp -r /tmp/llm-agent/dist node_modules/@llm/agent/
-```
-
-**4. Start the dev server**
+**3. Start the dev server**
 
 ```bash
 npm run dev

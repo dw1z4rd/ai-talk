@@ -1,0 +1,123 @@
+// ─── Generic LLM Provider Interface ──────────────────────────────────────────
+
+/**
+ * Options for a text generation request.
+ * LLM-agnostic - works with any provider.
+ */
+export interface LLMOptions {
+	/** Maximum number of tokens in the response */
+	readonly maxTokens?: number;
+	/** Sampling temperature (higher = more creative) */
+	readonly temperature?: number;
+	/** System prompt to set context or behavior for the model */
+	readonly systemPrompt?: string;
+}
+
+/**
+ * Generic LLM provider interface.
+ * Implement this to plug in any LLM (Gemini, OpenAI, Anthropic, Ollama, etc.).
+ */
+export interface LLMProvider {
+	/**
+	 * Generate text from a prompt.
+	 * @param prompt - The full prompt text (system + user combined or user-only)
+	 * @param options - Generation options (maxTokens, temperature, etc.)
+	 * @returns The generated text, or null if the request failed
+	 */
+	generateText(prompt: string, options?: LLMOptions): Promise<string | null>;
+}
+
+// ─── Retry Configuration ────────────────────────────────────────────────────
+
+/**
+ * Configuration for the retry wrapper.
+ */
+export interface RetryConfig {
+	/** Maximum number of retry attempts (default: 3) */
+	readonly maxRetries: number;
+	/** Initial delay in ms before the first retry (default: 500) */
+	readonly initialDelayMs?: number;
+	/** Multiplier applied to the delay after each attempt (default: 2) */
+	readonly backoffFactor?: number;
+	/** Callback invoked on each failed attempt */
+	readonly onRetryableFailure?: (attempt: number, error?: unknown) => void;
+}
+
+// ─── OpenAI-Specific Types ───────────────────────────────────────────────────
+
+export interface OpenAIProviderConfig {
+	readonly apiKey: string;
+	readonly model?: string;
+}
+
+export interface OpenAIMessage {
+	readonly role: 'system' | 'user' | 'assistant';
+	readonly content: string;
+}
+
+export interface OpenAIChoice {
+	readonly message: { readonly content: string | null };
+}
+
+export interface OpenAIResponse {
+	readonly choices?: readonly OpenAIChoice[];
+}
+
+// ─── Anthropic-Specific Types ─────────────────────────────────────────────────
+
+export interface AnthropicProviderConfig {
+	readonly apiKey: string;
+	readonly model?: string;
+}
+
+export interface AnthropicContentBlock {
+	readonly type: string;
+	readonly text?: string;
+}
+
+export interface AnthropicResponse {
+	readonly content?: readonly AnthropicContentBlock[];
+}
+
+// ─── Gemini-Specific Types (for the built-in Gemini provider) ────────────────
+
+/**
+ * Gemini API content part
+ */
+export interface GeminiContentPart {
+	readonly text?: string;
+}
+
+/**
+ * Gemini API content block
+ */
+export interface GeminiContent {
+	readonly role?: string;
+	readonly parts: readonly GeminiContentPart[];
+}
+
+/**
+ * Gemini API response candidate
+ */
+export interface GeminiCandidate {
+	readonly content: {
+		readonly parts: readonly GeminiContentPart[];
+	};
+}
+
+/**
+ * Gemini API response
+ */
+export interface GeminiResponse {
+	readonly candidates?: readonly GeminiCandidate[];
+}
+
+/**
+ * Configuration for the Gemini provider factory
+ */
+export interface GeminiProviderConfig {
+	/** Gemini API key */
+	readonly apiKey: string;
+	/** Optional model name override (default: gemini-2.0-flash) */
+	readonly model?: string;
+}

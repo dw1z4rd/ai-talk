@@ -16,8 +16,5 @@
     "typescript": "^5.8.2",
     "vite": "^6.2.0"
   },
-  "dependencies": {
-    "@llm/agent": "github:dw1z4rd/llm-agent"
-  },
   "type": "module"
 }
