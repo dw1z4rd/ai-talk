@@ -233,7 +233,10 @@
 				</button>
 			</div>
 
-			<a href="/" class="text-center text-xs text-[--color-muted] hover:text-[--color-muted-fg] transition-colors">← Back to Debate</a>
+			<div class="flex items-center justify-center gap-4">
+				<a href="/" class="text-xs text-[--color-muted] hover:text-[--color-muted-fg] transition-colors">← Debate mode</a>
+				<a href="/story" class="text-xs text-[--color-muted] hover:text-[--color-muted-fg] transition-colors">📖 Story mode →</a>
+			</div>
 		</div>
 
 	{:else}
@@ -343,6 +346,7 @@
 							Play again
 						</button>
 						<a href="/" class="flex items-center text-sm text-[--color-muted] hover:text-[--color-muted-fg] transition-colors">← Debate mode</a>
+						<a href="/story" class="flex items-center text-sm text-[--color-muted] hover:text-[--color-muted-fg] transition-colors">📖 Story mode →</a>
 					</div>
 				{:else}
 					<div class="flex items-end gap-2">
