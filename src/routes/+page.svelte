@@ -3,9 +3,12 @@
 	const MODEL_OPTIONS = [
 		{ group: 'Ollama — Cloud', options: [
 			{ id: 'deepseek-v3.1:671b-cloud', name: 'DeepSeek V3.1', color: '#4B8BF5' },
+			{ id: 'deepseek-v3.2-cloud', name: 'DeepSeek V3.2', color: '#3B7BFF' },
 			{ id: 'llama3.3:70b-cloud', name: 'Llama 3.3 70B', color: '#8B5CF6' },
-			{ id: 'qwq:32b-cloud', name: 'QwQ 32B', color: '#06B6D4' },
-			{ id: 'phi4:14b-cloud', name: 'Phi-4 14B', color: '#10B981' },
+			{ id: 'gemini-3-flash-preview-cloud', name: 'Gemini 3 Flash', color: '#1A73E8' },
+			{ id: 'devstral-small-2:24b-cloud', name: 'Devstral Small 2', color: '#FF7000' },
+			{ id: 'kimi-k2.5-cloud', name: 'Kimi K2.5', color: '#00C2FF' },
+			{ id: 'qwen3-next:80b-cloud', name: 'Qwen3-Next 80B', color: '#34D399' },
 		]},
 		{ group: 'Ollama — Local', options: [
 			{ id: 'llama3.2', name: 'Llama 3.2 3B', color: '#A78BFA' },

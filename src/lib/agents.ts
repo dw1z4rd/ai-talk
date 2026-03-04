@@ -28,21 +28,37 @@ const MODEL_CATALOG: Record<string, ModelDef> = {
 		color: '#4B8BF5',
 		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.1:671b' })
 	},
+	'deepseek-v3.2-cloud': {
+		name: 'DeepSeek V3.2',
+		color: '#3B7BFF',
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.2' })
+	},
 	'llama3.3:70b-cloud': {
 		name: 'Llama 3.3 70B',
 		color: '#8B5CF6',
 		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'llama3.3:70b' })
 	},
-	'qwq:32b-cloud': {
-		name: 'QwQ 32B',
-		color: '#06B6D4',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwq:32b' })
+	'gemini-3-flash-preview-cloud': {
+		name: 'Gemini 3 Flash',
+		color: '#1A73E8',
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'gemini-3-flash-preview' })
 	},
-	'phi4:14b-cloud': {
-		name: 'Phi-4 14B',
-		color: '#10B981',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'phi4:14b' })
+	'devstral-small-2:24b-cloud': {
+		name: 'Devstral Small 2',
+		color: '#FF7000',
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'devstral-small-2:24b' })
 	},
+	'kimi-k2.5-cloud': {
+		name: 'Kimi K2.5',
+		color: '#00C2FF',
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'kimi-k2.5' })
+	},
+	'qwen3-next:80b-cloud': {
+		name: 'Qwen3-Next 80B',
+		color: '#34D399',
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwen3-next:80b' })
+	},
+
 	// Ollama — Local
 	'llama3.2': {
 		name: 'Llama 3.2 3B',
