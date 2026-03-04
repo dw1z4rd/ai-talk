@@ -262,14 +262,14 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="min-h-dvh flex flex-col items-center px-4 sm:px-6 py-12 sm:py-16"
+	class="min-h-dvh flex flex-col items-center px-5 sm:px-8 py-10 sm:py-14"
 	ondragover={(e) => e.preventDefault()}
 	ondrop={(e) => e.preventDefault()}
 >
-	<div class="w-full max-w-2xl flex flex-col gap-8">
+	<div class="w-full max-w-2xl flex flex-col gap-6">
 
 		<!-- Header -->
-		<header class="text-center flex flex-col items-center gap-2 pt-4">
+		<header class="text-center flex flex-col items-center gap-2">
 			<div class="relative">
 				<div class="absolute inset-0 blur-2xl opacity-30 bg-[#7c6af7] rounded-full scale-150"></div>
 				<h1 class="relative font-display text-5xl sm:text-6xl font-bold tracking-tight">
@@ -280,7 +280,7 @@
 		</header>
 
 		<!-- Setup card -->
-		<div class="flex flex-col gap-5 bg-[--color-panel] border border-[--color-border] rounded-2xl p-6">
+		<div class="flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-7">
 
 			<!-- Topic -->
 			<div class="flex flex-col gap-1.5">
@@ -459,7 +459,7 @@
 
 			<!-- Sticky progress bar -->
 			{#if running || (done && messages.length > 0)}
-				<div class="flex items-center gap-3 px-5 py-3 border-b border-[--color-border-subtle] bg-[--color-panel]/80 backdrop-blur-sm sticky top-0 z-10">
+				<div class="flex items-center gap-3 px-6 py-3 border-b border-[--color-border-subtle] bg-[--color-panel]/80 backdrop-blur-sm sticky top-0 z-10">
 					<div class="flex-1 h-1 bg-[--color-border] rounded-full overflow-hidden">
 						<div class="h-full rounded-full transition-all duration-500" style="width: {progress}%; background: linear-gradient(to right, #7c6af7, #c084fc)"></div>
 					</div>
@@ -519,7 +519,7 @@
 				{#each messages as msg, i (i)}
 					{@const isLeft = msg.agentId === leftAgentId}
 					<div
-						class="group flex gap-3 px-5 py-5 {i > 0 ? 'border-t border-[--color-border-subtle]' : ''} {isLeft ? '' : 'flex-row-reverse'}"
+						class="group flex gap-3 px-6 py-4 {i > 0 ? 'border-t border-[--color-border-subtle]' : ''} {isLeft ? '' : 'flex-row-reverse'}"
 						style="animation: fadeSlide 0.2s ease both; animation-delay: {Math.min(i * 20, 100)}ms"
 					>
 						<!-- Avatar -->
@@ -563,7 +563,7 @@
 							</div>
 						</div>
 					{:else}
-						<div class="flex items-center gap-3 px-5 py-4 {messages.length > 0 ? 'border-t border-[--color-border-subtle]' : ''}">
+						<div class="flex items-center gap-3 px-6 py-4 {messages.length > 0 ? 'border-t border-[--color-border-subtle]' : ''}">
 							{#if typingAgentName}
 								<div class="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold flex-shrink-0 ring-1"
 									style="background: {typingAgentColor}15; color: {typingAgentColor}; ring-color: {typingAgentColor}30">
@@ -583,7 +583,7 @@
 				{/if}
 
 				{#if done}
-					<div class="flex items-center gap-3 px-5 py-4 border-t border-[--color-border-subtle]">
+					<div class="flex items-center gap-3 px-6 py-4 border-t border-[--color-border-subtle]">
 						<div class="flex-1 h-px bg-[--color-border-subtle]"></div>
 						<span class="text-[11px] uppercase tracking-widest text-[--color-muted]">Debate ended · {messages.length} turns</span>
 						<div class="flex-1 h-px bg-[--color-border-subtle]"></div>
