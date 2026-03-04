@@ -251,7 +251,7 @@
 	<div class="w-full max-w-2xl flex flex-col gap-8">
 
 		<!-- Header -->
-		<header class="text-center flex flex-col items-center gap-2">
+		<header class="text-center flex flex-col items-center gap-3">
 			<h1 class="font-display text-5xl font-bold tracking-tight">
 				<span class="text-white">ai</span><span
 					class="text-transparent bg-clip-text bg-linear-to-r from-[#7c6af7] to-[#a78bfa]">talk</span>
@@ -259,10 +259,11 @@
 			<p class="text-sm text-[--color-muted-fg] tracking-wide">
 				live AI debate
 			</p>
+			<div class="h-px w-24 bg-linear-to-r from-transparent via-[#7c6af7]/40 to-transparent"></div>
 		</header>
 
 		<!-- Controls -->
-		<div class="flex flex-col gap-3">
+		<div class="flex flex-col gap-4 bg-[--color-panel] border border-[--color-border] rounded-2xl p-5">
 			<form onsubmit={(e) => { e.preventDefault(); startConversation(); }} class="flex gap-2 items-end">
 				<div class="flex flex-col gap-1.5 flex-1">
 					<label for="topic" class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
@@ -433,25 +434,44 @@
 		</div>
 
 		<!-- Chat -->
+		<!-- Progress -->
+		{#if running || (done && messages.length > 0)}
+			<div class="flex flex-col gap-1.5">
+				<div class="flex justify-between items-center">
+					<span class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">Progress</span>
+					<span class="text-[10px] text-[--color-muted]">{messages.length} / {turns} turns</span>
+				</div>
+				<div class="h-1 bg-[--color-border] rounded-full overflow-hidden">
+					<div class="h-full rounded-full transition-all duration-500"
+						 style="width: {progress}%; background: linear-gradient(to right, #7c6af7, #a78bfa)">
+					</div>
+				</div>
+			</div>
+		{/if}
+
 		<div
 			bind:this={chatEl}
 			class="flex flex-col gap-0 bg-[--color-panel] border border-[--color-border] rounded-2xl overflow-y-auto min-h-72 max-h-[68vh] scroll-smooth"
 		>
 			{#if messages.length === 0 && !running}
-				<div class="flex flex-col items-center justify-center gap-6 flex-1 py-16 px-6">
-				<div class="flex items-center gap-5">
-					<div class="flex flex-col items-center gap-1.5">
-						<div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: {getModelInfo(agentA).color}20; color: {getModelInfo(agentA).color}">
-							<span class="text-lg font-bold">{getModelInfo(agentA).name[0]}</span>
+				<div class="flex flex-col items-center justify-center gap-8 flex-1 py-16 px-6">
+					<div class="flex items-center gap-6">
+						<div class="flex flex-col items-center gap-2">
+							<div class="w-14 h-14 rounded-full flex items-center justify-center ring-2 ring-offset-2 ring-offset-[--color-panel] shadow-lg"
+								 style="background-color: {getModelInfo(agentA).color}20; color: {getModelInfo(agentA).color}; ring-color: {getModelInfo(agentA).color}40">
+								<span class="text-2xl font-bold">{getModelInfo(agentA).name[0]}</span>
+							</div>
+							<span class="text-xs font-semibold tracking-wide max-w-[100px] text-center leading-tight" style="color: {getModelInfo(agentA).color}">{getModelInfo(agentA).name}</span>
 						</div>
-						<span class="text-xs font-semibold tracking-wide" style="color: {getModelInfo(agentA).color}">{getModelInfo(agentA).name}</span>
-					</div>
-					<span class="text-xl font-light text-[--color-muted]">vs</span>
-					<div class="flex flex-col items-center gap-1.5">
-						<div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: {getModelInfo(agentB).color}20; color: {getModelInfo(agentB).color}">
-							<span class="text-lg font-bold">{getModelInfo(agentB).name[0]}</span>
+						<div class="flex flex-col items-center gap-1">
+							<span class="text-xs font-semibold uppercase tracking-[0.25em] text-[--color-muted]">vs</span>
 						</div>
-						<span class="text-xs font-semibold tracking-wide" style="color: {getModelInfo(agentB).color}">{getModelInfo(agentB).name}</span>
+						<div class="flex flex-col items-center gap-2">
+							<div class="w-14 h-14 rounded-full flex items-center justify-center ring-2 ring-offset-2 ring-offset-[--color-panel] shadow-lg"
+								 style="background-color: {getModelInfo(agentB).color}20; color: {getModelInfo(agentB).color}; ring-color: {getModelInfo(agentB).color}40">
+								<span class="text-2xl font-bold">{getModelInfo(agentB).name[0]}</span>
+							</div>
+							<span class="text-xs font-semibold tracking-wide max-w-[100px] text-center leading-tight" style="color: {getModelInfo(agentB).color}">{getModelInfo(agentB).name}</span>
 						</div>
 					</div>
 					<p class="text-sm text-[--color-muted] text-center">
@@ -490,10 +510,24 @@
 			{/each}
 
 			{#if running}
-				<div class="flex gap-1.5 px-6 py-4 {messages.length > 0 ? 'border-t border-[--color-border-subtle]' : ''}">
-					<span class="w-1.5 h-1.5 rounded-full bg-[--color-muted] animate-bounce [animation-delay:0ms]"></span>
-					<span class="w-1.5 h-1.5 rounded-full bg-[--color-muted] animate-bounce [animation-delay:150ms]"></span>
-					<span class="w-1.5 h-1.5 rounded-full bg-[--color-muted] animate-bounce [animation-delay:300ms]"></span>
+				<div class="flex items-center gap-3 px-5 py-4 {messages.length > 0 ? 'border-t border-[--color-border-subtle]' : ''}">
+					{#if typingAgentName}
+						<div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+							 style="background-color: {typingAgentColor}20; color: {typingAgentColor}">
+							{typingAgentName[0]}
+						</div>
+					{/if}
+					<div class="flex gap-1.5 items-center">
+						<span class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0ms]"
+							 style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
+						<span class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:150ms]"
+							 style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
+						<span class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:300ms]"
+							 style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
+					</div>
+					{#if typingAgentName}
+						<span class="text-xs" style="color: {typingAgentColor}">{typingAgentName} is thinking…</span>
+					{/if}
 				</div>
 			{/if}
 
