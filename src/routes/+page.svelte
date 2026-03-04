@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { $state, $derived } from 'svelte';
 
 	const MODEL_OPTIONS = [
 		{ group: 'Ollama — Cloud', options: [
@@ -244,7 +243,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="min-h-dvh flex flex-col items-center px-4 py-12 sm:py-16"
+	class="min-h-dvh flex flex-col items-center px-6 py-16 sm:py-24"
 	ondragover={(e) => e.preventDefault()}
 	ondrop={(e) => e.preventDefault()}
 >
@@ -252,18 +251,18 @@
 
 		<!-- Header -->
 		<header class="text-center flex flex-col items-center gap-3">
-			<h1 class="font-display text-5xl font-bold tracking-tight">
+			<h1 class="font-display text-6xl font-bold tracking-tight">
 				<span class="text-white">ai</span><span
 					class="text-transparent bg-clip-text bg-linear-to-r from-[#7c6af7] to-[#a78bfa]">talk</span>
 			</h1>
-			<p class="text-sm text-[--color-muted-fg] tracking-wide">
+			<p class="text-base text-[--color-muted-fg] tracking-wide">
 				live AI debate
 			</p>
 			<div class="h-px w-24 bg-linear-to-r from-transparent via-[#7c6af7]/40 to-transparent"></div>
 		</header>
 
 		<!-- Controls -->
-		<div class="flex flex-col gap-4 bg-[--color-panel] border border-[--color-border] rounded-2xl p-5">
+		<div class="flex flex-col gap-5 bg-[--color-panel] border border-[--color-border] rounded-2xl p-7">
 			<form onsubmit={(e) => { e.preventDefault(); startConversation(); }} class="flex gap-2 items-end">
 				<div class="flex flex-col gap-1.5 flex-1">
 					<label for="topic" class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
@@ -277,7 +276,7 @@
 						placeholder="What should they debate?"
 						disabled={running}
 						autofocus
-						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white placeholder:text-[--color-muted] outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-4 py-3 text-base text-white placeholder:text-[--color-muted] outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
 					/>
 				</div>
 				<div class="flex flex-col gap-1.5 w-20">
@@ -291,21 +290,21 @@
 						min="2"
 						max="30"
 						disabled={running}
-						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-4 py-3 text-base text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
 					/>
 				</div>
 				{#if running}
 					<button
 						type="button"
 						onclick={stopConversation}
-						class="bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+						class="bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 font-semibold text-base px-6 py-3 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
 					>
 						Stop
 					</button>
 				{:else}
 					<button
 						type="submit"
-						class="bg-[--color-accent] hover:bg-[--color-accent-hover] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shadow-[0_0_16px_#7c6af740]"
+						class="bg-[--color-accent] hover:bg-[--color-accent-hover] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-base px-6 py-3 rounded-lg transition-colors cursor-pointer whitespace-nowrap shadow-[0_0_16px_#7c6af740]"
 					>
 						Start
 					</button>
@@ -322,7 +321,7 @@
 						id="agentA"
 						bind:value={agentA}
 						disabled={running}
-						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-4 py-3 text-base text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
 					>
 						{#each MODEL_OPTIONS as group}
 							<optgroup label={group.group}>
@@ -341,7 +340,7 @@
 						id="agentB"
 						bind:value={agentB}
 						disabled={running}
-						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-4 py-3 text-base text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
 					>
 						{#each MODEL_OPTIONS as group}
 							<optgroup label={group.group}>
@@ -451,7 +450,7 @@
 		<!-- Chat -->
 		<div
 			bind:this={chatEl}
-			class="flex flex-col gap-0 bg-[--color-panel] border border-[--color-border] rounded-2xl overflow-y-auto min-h-72 max-h-[68vh] scroll-smooth"
+			class="flex flex-col gap-0 bg-[--color-panel] border border-[--color-border] rounded-2xl overflow-y-auto min-h-80 max-h-[68vh] scroll-smooth"
 		>
 			{#if messages.length === 0 && !running}
 				<div class="flex flex-col items-center justify-center gap-8 flex-1 py-16 px-6">
@@ -483,7 +482,7 @@
 			{#each messages as msg, i (i)}
 				{@const isLeft = msg.agentId === leftAgentId}
 				<div
-					class="flex gap-3 px-5 py-4 {i > 0 ? 'border-t border-[--color-border-subtle]' : ''} {isLeft ? 'flex-row' : 'flex-row-reverse'}"
+					class="flex gap-4 px-6 py-5 {i > 0 ? 'border-t border-[--color-border-subtle]' : ''} {isLeft ? 'flex-row' : 'flex-row-reverse'}"
 					style="animation: fadeSlide 0.2s ease both"
 				>
 					<div
@@ -500,7 +499,7 @@
 							{msg.agentName}
 						</span>
 						<p
-							class="text-sm leading-relaxed text-[#d4d4e0] px-4 py-3 rounded-2xl {isLeft ? 'rounded-tl-sm' : 'rounded-tr-sm text-right'}"
+							class="text-base leading-relaxed text-[#d4d4e0] px-5 py-4 rounded-2xl {isLeft ? 'rounded-tl-sm' : 'rounded-tr-sm text-right'}"
 							style="background-color: {msg.color}10; border: 1px solid {msg.color}28"
 						>
 							{msg.text}
