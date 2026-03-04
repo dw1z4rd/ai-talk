@@ -52,6 +52,9 @@
 	let errorMsg = $state('');
 	let chatEl = $state<HTMLElement | null>(null);
 	let abortController = $state<AbortController | null>(null);
+	let agentA = $state('deepseek-v3.1:671b-cloud');
+	let agentB = $state('llama3.3:70b-cloud');
+	let leftAgentId = $state('deepseek-v3.1:671b-cloud');
 
 	// Files
 	let contextFiles = $state<ContextFile[]>([]);
@@ -136,13 +139,14 @@
 		done = false;
 		errorMsg = '';
 		running = true;
+		leftAgentId = agentA;
 		abortController = new AbortController();
 
 		try {
 			const response = await fetch('/api/chat', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ topic, turns, context: buildContext() }),
+				body: JSON.stringify({ topic, turns, context: buildContext(), agentA, agentB }),
 				signal: abortController.signal
 			});
 
