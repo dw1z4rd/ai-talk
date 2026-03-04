@@ -315,7 +315,7 @@ export function pickRandomWhoseLineCast(): {
 	aliases: { [id: string]: string };
 	colors: { [id: string]: string };
 } {
-	const ids = Object.keys(MODEL_CATALOG);
+	const ids = Object.keys(MODEL_CATALOG).filter(id => id.endsWith('-cloud') || id.startsWith('gemini') || id.startsWith('claude'));
 	const shuffled = [...ids].sort(() => Math.random() - 0.5);
 	const [hostId, c1Id, c2Id] = shuffled;
 	const [hostAlias, c1Alias, c2Alias] = pickRandomAliases(3);
