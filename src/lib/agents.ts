@@ -26,22 +26,22 @@ const MODEL_CATALOG: Record<string, ModelDef> = {
 	'deepseek-v3.1:671b-cloud': {
 		name: 'DeepSeek V3.1',
 		color: '#4B8BF5',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.1:671b-cloud' })
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.1:671b' })
 	},
 	'llama3.3:70b-cloud': {
 		name: 'Llama 3.3 70B',
 		color: '#8B5CF6',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'llama3.3:70b-cloud' })
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'llama3.3:70b' })
 	},
 	'qwq:32b-cloud': {
 		name: 'QwQ 32B',
 		color: '#06B6D4',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwq:32b-cloud' })
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwq:32b' })
 	},
 	'phi4:14b-cloud': {
 		name: 'Phi-4 14B',
 		color: '#10B981',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'phi4:14b-cloud' })
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'phi4:14b' })
 	},
 	// Ollama — Local
 	'llama3.2': {
