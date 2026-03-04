@@ -210,7 +210,8 @@
 							typingAgentName = '';
 							typingAgentColor = '';
 						} else {
-							streamingMessage = { ...streamingMessage, text: streamingMessage.text + data.text };
+							const cur = streamingMessage!;
+							streamingMessage = { agentId: cur.agentId, agentName: cur.agentName, color: cur.color, text: cur.text + data.text };
 						}
 						setTimeout(() => chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' }), 20);
 					} else if (data.type === 'message') {
