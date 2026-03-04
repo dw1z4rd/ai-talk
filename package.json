@@ -16,5 +16,9 @@
     "typescript": "^5.8.2",
     "vite": "^6.2.0"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "tailwindcss": "^4.2.1"
+  }
 }

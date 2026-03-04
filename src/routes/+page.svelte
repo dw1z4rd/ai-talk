@@ -6,18 +6,13 @@
 		text: string;
 	}
 
-	let topic = $state('What is consciousness?');
+	let topic = $state('Is free will an illusion?');
 	let turns = $state(12);
 	let messages = $state<ChatMessage[]>([]);
 	let running = $state(false);
 	let done = $state(false);
 	let errorMsg = $state('');
 	let chatEl = $state<HTMLElement | null>(null);
-
-	const AVATARS: Record<string, string> = {
-		gemini: '✦',
-		claude: '◆'
-	};
 
 	function exportDebate(format: 'md' | 'txt') {
 		const date = new Date().toISOString().slice(0, 10);
@@ -30,7 +25,7 @@
 		if (format === 'md') {
 			content = `# Debate: ${topic}\n\n_Exported ${date}_\n\n---\n\n`;
 			content += messages
-				.map((m) => `### ${AVATARS[m.agentId]} ${m.agentName}\n\n${m.text}`)
+				.map((m) => `### ${m.agentName}\n\n${m.text}`)
 				.join('\n\n---\n\n');
 			mime = 'text/markdown';
 			ext = 'md';
@@ -65,14 +60,8 @@
 			if (data.type === 'message') {
 				messages = [
 					...messages,
-					{
-						agentId: data.agentId,
-						agentName: data.agentName,
-						color: data.color,
-						text: data.text
-					}
+					{ agentId: data.agentId, agentName: data.agentName, color: data.color, text: data.text }
 				];
-				// Scroll to bottom
 				setTimeout(() => chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' }), 50);
 			} else if (data.type === 'done') {
 				done = true;
@@ -87,7 +76,7 @@
 
 		es.onerror = () => {
 			if (running) {
-				errorMsg = 'Connection lost. The conversation ended unexpectedly.';
+				errorMsg = 'Connection lost. The debate ended unexpectedly.';
 				running = false;
 			}
 			es.close();
@@ -95,382 +84,171 @@
 	}
 </script>
 
-<main>
-	<header>
-		<h1>AI<span class="accent">talk</span></h1>
-		<p class="subtitle">Watch Gemini and Claude debate each other</p>
-	</header>
+<div class="min-h-dvh flex flex-col items-center px-4 py-12 sm:py-16">
+	<div class="w-full max-w-2xl flex flex-col gap-10">
 
-	<section class="controls">
-		<div class="field">
-			<label for="topic">Topic</label>
-			<input
-				id="topic"
-				type="text"
-				bind:value={topic}
-				placeholder="What should they discuss?"
-				disabled={running}
-			/>
-		</div>
-		<div class="field field-narrow">
-			<label for="turns">Turns</label>
-			<input id="turns" type="number" bind:value={turns} min="3" max="30" disabled={running} />
-		</div>
-		<button class="start-btn" onclick={startConversation} disabled={running}>
-			{running ? 'Conversing…' : 'Start'}
-		</button>
-	</section>
+		<!-- Header -->
+		<header class="text-center flex flex-col items-center gap-2">
+			<h1 class="font-display text-5xl font-bold tracking-tight">
+				<span class="text-white">ai</span><span
+					class="text-transparent bg-clip-text bg-linear-to-r from-[#7c6af7] to-[#a78bfa]">talk</span>
+			</h1>
+			<p class="text-sm text-[--color-muted-fg] tracking-wide">
+				Gemini vs Claude — live AI debate
+			</p>
+		</header>
 
-	{#if errorMsg}
-		<div class="error">{errorMsg}</div>
-	{/if}
-
-	<section class="chat" bind:this={chatEl}>
-		{#if messages.length === 0 && !running}
-			<div class="empty-state">
-				<div class="ai-trio">
-					<span style="color: #4285F4">✦ Gemini</span>
-					<span class="vs">vs</span>
-					<span style="color: #D97706">◆ Claude</span>
-	
+		<!-- Controls -->
+		<div class="flex flex-col gap-3">
+			<div class="flex gap-2 items-end">
+				<div class="flex flex-col gap-1.5 flex-1">
+					<label for="topic" class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
+						Topic
+					</label>
+					<input
+						id="topic"
+						type="text"
+						bind:value={topic}
+						placeholder="What should they debate?"
+						disabled={running}
+						class="w-full bg-[--color-panel] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white placeholder:text-[--color-muted] outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+					/>
 				</div>
-				<p>Set a topic and hit Start to watch them go.</p>
+				<div class="flex flex-col gap-1.5 w-20">
+					<label for="turns" class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
+						Turns
+					</label>
+					<input
+						id="turns"
+						type="number"
+						bind:value={turns}
+						min="2"
+						max="30"
+						disabled={running}
+						class="w-full bg-[--color-panel] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+					/>
+				</div>
+				<button
+					onclick={startConversation}
+					disabled={running}
+					class="bg-[--color-accent] hover:bg-[--color-accent-hover] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+				>
+					{running ? 'Debating…' : 'Start'}
+				</button>
+			</div>
+
+			{#if errorMsg}
+				<div class="bg-red-950/60 border border-red-900/60 rounded-lg px-4 py-3 text-sm text-red-400">
+					{errorMsg}
+				</div>
+			{/if}
+		</div>
+
+		<!-- Chat -->
+		<div
+			bind:this={chatEl}
+			class="flex flex-col gap-0 bg-[--color-panel] border border-[--color-border] rounded-2xl overflow-y-auto min-h-72 max-h-[68vh] scroll-smooth"
+		>
+			{#if messages.length === 0 && !running}
+				<!-- Empty state -->
+				<div class="flex flex-col items-center justify-center gap-6 flex-1 py-16 px-6">
+					<div class="flex items-center gap-5">
+						<div class="flex flex-col items-center gap-1.5">
+							<div class="w-10 h-10 rounded-full bg-[--color-gemini-dim] flex items-center justify-center">
+								<span class="text-[--color-gemini] text-lg font-bold">G</span>
+							</div>
+							<span class="text-xs font-semibold text-[--color-gemini] tracking-wide">Gemini</span>
+						</div>
+						<div class="flex flex-col items-center gap-1 text-[--color-muted]">
+							<span class="text-xl font-light">vs</span>
+						</div>
+						<div class="flex flex-col items-center gap-1.5">
+							<div class="w-10 h-10 rounded-full bg-[--color-claude-dim] flex items-center justify-center">
+								<span class="text-[--color-claude] text-lg font-bold">C</span>
+							</div>
+							<span class="text-xs font-semibold text-[--color-claude] tracking-wide">Claude</span>
+						</div>
+					</div>
+					<p class="text-sm text-[--color-muted] text-center">
+						Set a topic and hit <span class="text-white font-medium">Start</span> to watch them argue.
+					</p>
+				</div>
+			{/if}
+
+			{#each messages as msg, i (i)}
+				{@const isGemini = msg.agentId === 'gemini'}
+				<div
+					class="flex gap-3 px-5 py-4 {i > 0 ? 'border-t border-[--color-border-subtle]' : ''} {isGemini ? 'flex-row' : 'flex-row-reverse'}"
+					style="animation: fadeSlide 0.2s ease both"
+				>
+					<!-- Avatar -->
+					<div
+						class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mt-0.5"
+						style="background-color: {isGemini ? 'var(--color-gemini-dim)' : 'var(--color-claude-dim)'}; color: {isGemini ? 'var(--color-gemini)' : 'var(--color-claude)'}"
+					>
+						{isGemini ? 'G' : 'C'}
+					</div>
+
+					<!-- Bubble -->
+					<div class="flex flex-col gap-1 max-w-[82%] {isGemini ? 'items-start' : 'items-end'}">
+						<span
+							class="text-[10px] font-semibold uppercase tracking-widest"
+							style="color: {isGemini ? 'var(--color-gemini)' : 'var(--color-claude)'}"
+						>
+							{msg.agentName}
+						</span>
+						<p
+							class="text-sm leading-relaxed text-[#d4d4e0] {isGemini
+								? 'border-l-2 pl-3'
+								: 'border-r-2 pr-3 text-right'}"
+							style="border-color: {isGemini ? 'var(--color-gemini)' : 'var(--color-claude)'}"
+						>
+							{msg.text}
+						</p>
+					</div>
+				</div>
+			{/each}
+
+			{#if running}
+				<div class="flex gap-1.5 px-6 py-4 {messages.length > 0 ? 'border-t border-[--color-border-subtle]' : ''}">
+					<span class="w-1.5 h-1.5 rounded-full bg-[--color-muted] animate-bounce [animation-delay:0ms]"></span>
+					<span class="w-1.5 h-1.5 rounded-full bg-[--color-muted] animate-bounce [animation-delay:150ms]"></span>
+					<span class="w-1.5 h-1.5 rounded-full bg-[--color-muted] animate-bounce [animation-delay:300ms]"></span>
+				</div>
+			{/if}
+
+			{#if done}
+				<div class="text-center text-[10px] tracking-widest text-[--color-muted] py-4 border-t border-[--color-border-subtle]">
+					— debate ended —
+				</div>
+			{/if}
+		</div>
+
+		<!-- Export -->
+		{#if messages.length > 0}
+			<div class="flex items-center gap-2">
+				<span class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted] mr-1">Export</span>
+				<button
+					onclick={() => exportDebate('md')}
+					class="flex items-center gap-1.5 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] text-[--color-muted-fg] hover:text-white text-xs font-medium px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+				>
+					<span class="opacity-70">↓</span> Markdown
+				</button>
+				<button
+					onclick={() => exportDebate('txt')}
+					class="flex items-center gap-1.5 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] text-[--color-muted-fg] hover:text-white text-xs font-medium px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+				>
+					<span class="opacity-70">↓</span> Plain text
+				</button>
 			</div>
 		{/if}
 
-		{#each messages as msg, i (i)}
-			<div class="bubble" style="--agent-color: {msg.color}">
-				<div class="avatar" style="background: {msg.color}">
-					{AVATARS[msg.agentId]}
-				</div>
-				<div class="bubble-body">
-					<span class="agent-name" style="color: {msg.color}">{msg.agentName}</span>
-					<p>{msg.text}</p>
-				</div>
-			</div>
-		{/each}
-
-		{#if running}
-			<div class="typing-indicator">
-				<span></span><span></span><span></span>
-			</div>
-		{/if}
-
-		{#if done}
-			<div class="done-badge">— debate ended —</div>
-		{/if}
-	</section>
-
-	{#if messages.length > 0}
-		<div class="export-bar">
-			<span class="export-label">Export</span>
-			<button class="export-btn" onclick={() => exportDebate('md')}>↓ Markdown</button>
-			<button class="export-btn" onclick={() => exportDebate('txt')}>↓ Plain text</button>
-		</div>
-	{/if}
-</main>
+	</div>
+</div>
 
 <style>
-	:global(*, *::before, *::after) {
-		box-sizing: border-box;
-		margin: 0;
-		padding: 0;
-	}
-
-	:global(body) {
-		font-family: 'Inter', system-ui, sans-serif;
-		background: #0e0e10;
-		color: #e8e8ed;
-		min-height: 100vh;
-	}
-
-	main {
-		max-width: 760px;
-		margin: 0 auto;
-		padding: 2rem 1.25rem 4rem;
-		display: flex;
-		flex-direction: column;
-		gap: 2rem;
-	}
-
-	header {
-		text-align: center;
-	}
-
-	h1 {
-		font-size: 2.4rem;
-		font-weight: 700;
-		letter-spacing: -0.03em;
-		color: #f0f0f5;
-	}
-
-	.accent {
-		color: #7c6af7;
-	}
-
-	.subtitle {
-		margin-top: 0.4rem;
-		color: #888;
-		font-size: 0.95rem;
-	}
-
-	/* Controls */
-	.controls {
-		display: flex;
-		gap: 0.75rem;
-		align-items: flex-end;
-		flex-wrap: wrap;
-	}
-
-	.field {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-		flex: 1;
-	}
-
-	.field-narrow {
-		flex: 0 0 80px;
-	}
-
-	label {
-		font-size: 0.75rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: #888;
-	}
-
-	input[type='text'],
-	input[type='number'] {
-		background: #1a1a1e;
-		border: 1px solid #2e2e34;
-		border-radius: 8px;
-		color: #e8e8ed;
-		padding: 0.6rem 0.85rem;
-		font-size: 0.95rem;
-		outline: none;
-		transition: border-color 0.15s;
-		width: 100%;
-	}
-
-	input:focus {
-		border-color: #7c6af7;
-	}
-
-	input:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.start-btn {
-		background: #7c6af7;
-		color: #fff;
-		border: none;
-		border-radius: 8px;
-		padding: 0.65rem 1.5rem;
-		font-size: 0.95rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: background 0.15s, opacity 0.15s;
-		white-space: nowrap;
-		align-self: flex-end;
-	}
-
-	.start-btn:hover:not(:disabled) {
-		background: #6859e8;
-	}
-
-	.start-btn:disabled {
-		opacity: 0.55;
-		cursor: not-allowed;
-	}
-
-	/* Error */
-	.error {
-		background: #2a1010;
-		border: 1px solid #6b2020;
-		border-radius: 8px;
-		padding: 0.75rem 1rem;
-		color: #f87171;
-		font-size: 0.9rem;
-	}
-
-	/* Chat */
-	.chat {
-		display: flex;
-		flex-direction: column;
-		gap: 1.25rem;
-		min-height: 300px;
-		max-height: 72vh;
-		overflow-y: auto;
-		padding: 1.5rem;
-		background: #13131a;
-		border: 1px solid #22222a;
-		border-radius: 14px;
-		scroll-behavior: smooth;
-	}
-
-	.chat::-webkit-scrollbar {
-		width: 6px;
-	}
-	.chat::-webkit-scrollbar-track {
-		background: transparent;
-	}
-	.chat::-webkit-scrollbar-thumb {
-		background: #2e2e3a;
-		border-radius: 3px;
-	}
-
-	/* Empty state */
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.85rem;
-		flex: 1;
-		padding: 3rem 0;
-		color: #555;
-		font-size: 0.9rem;
-	}
-
-	.ai-trio {
-		display: flex;
-		gap: 0.75rem;
-		font-size: 1rem;
-		font-weight: 600;
-	}
-
-	.vs {
-		color: #333;
-	}
-
-	/* Message bubble */
-	.bubble {
-		display: flex;
-		gap: 0.85rem;
-		align-items: flex-start;
-		animation: fadeSlide 0.25s ease;
-	}
-
 	@keyframes fadeSlide {
-		from {
-			opacity: 0;
-			transform: translateY(6px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	.avatar {
-		flex-shrink: 0;
-		width: 34px;
-		height: 34px;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 1rem;
-		color: #fff;
-		font-weight: 700;
-		margin-top: 2px;
-	}
-
-	.bubble-body {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-	}
-
-	.agent-name {
-		font-size: 0.78rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-	}
-
-	.bubble-body p {
-		font-size: 0.97rem;
-		line-height: 1.6;
-		color: #d4d4de;
-		max-width: 620px;
-	}
-
-	/* Typing indicator */
-	.typing-indicator {
-		display: flex;
-		gap: 5px;
-		padding: 0.5rem 0.75rem;
-		align-self: flex-start;
-	}
-
-	.typing-indicator span {
-		width: 7px;
-		height: 7px;
-		background: #444;
-		border-radius: 50%;
-		animation: blink 1.2s infinite;
-	}
-
-	.typing-indicator span:nth-child(2) {
-		animation-delay: 0.2s;
-	}
-	.typing-indicator span:nth-child(3) {
-		animation-delay: 0.4s;
-	}
-
-	@keyframes blink {
-		0%,
-		80%,
-		100% {
-			opacity: 0.2;
-		}
-		40% {
-			opacity: 1;
-		}
-	}
-
-	/* Export bar */
-	.export-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-	}
-
-	.export-label {
-		font-size: 0.75rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
-		color: #555;
-		margin-right: 0.25rem;
-	}
-
-	.export-btn {
-		background: #1a1a1e;
-		border: 1px solid #2e2e34;
-		border-radius: 7px;
-		color: #aaa;
-		padding: 0.45rem 0.9rem;
-		font-size: 0.85rem;
-		cursor: pointer;
-		transition: border-color 0.15s, color 0.15s;
-	}
-
-	.export-btn:hover {
-		border-color: #7c6af7;
-		color: #e8e8ed;
-	}
-
-	/* Done badge */
-	.done-badge {
-		text-align: center;
-		font-size: 0.78rem;
-		color: #444;
-		letter-spacing: 0.08em;
-		padding-top: 0.5rem;
+		from { opacity: 0; transform: translateY(5px); }
+		to   { opacity: 1; transform: translateY(0); }
 	}
 </style>
