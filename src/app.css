@@ -35,3 +35,9 @@ body {
 	margin: 0;
 	padding: 0;
 }
+
+select option,
+select optgroup {
+	background-color: #101018;
+	color: #e4e4ef;
+}

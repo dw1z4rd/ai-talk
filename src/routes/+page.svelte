@@ -274,7 +274,7 @@
 					placeholder="What should they debate?"
 					disabled={running}
 					autofocus
-					class="w-full bg-[--color-surface] border border-[--color-border] rounded-xl px-5 py-4 text-lg text-white placeholder:text-[--color-muted] outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+					class="w-full bg-[--color-surface] border border-[--color-border] rounded-xl px-5 py-5 text-lg text-white placeholder:text-[--color-muted] outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
 				/>
 			</div>
 
