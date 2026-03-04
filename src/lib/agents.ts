@@ -5,7 +5,7 @@ import {
 	withRetry
 } from '$lib/llm-agent';
 import type { LLMProvider } from '$lib/llm-agent';
-import { GEMINI_API_KEY, ANTHROPIC_API_KEY, OLLAMA_CLOUD_URL } from '$env/static/private';
+import { GEMINI_API_KEY, ANTHROPIC_API_KEY, OLLAMA_CLOUD_URL, OLLAMA_CLOUD_API_KEY } from '$env/static/private';
 
 export interface Agent {
 	id: string;
@@ -26,22 +26,22 @@ const MODEL_CATALOG: Record<string, ModelDef> = {
 	'deepseek-v3.1:671b-cloud': {
 		name: 'DeepSeek V3.1',
 		color: '#4B8BF5',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, model: 'deepseek-v3.1:671b-cloud' })
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.1:671b-cloud' })
 	},
 	'llama3.3:70b-cloud': {
 		name: 'Llama 3.3 70B',
 		color: '#8B5CF6',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, model: 'llama3.3:70b-cloud' })
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'llama3.3:70b-cloud' })
 	},
 	'qwq:32b-cloud': {
 		name: 'QwQ 32B',
 		color: '#06B6D4',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, model: 'qwq:32b-cloud' })
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwq:32b-cloud' })
 	},
 	'phi4:14b-cloud': {
 		name: 'Phi-4 14B',
 		color: '#10B981',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, model: 'phi4:14b-cloud' })
+		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'phi4:14b-cloud' })
 	},
 	// Ollama — Local
 	'llama3.2': {
