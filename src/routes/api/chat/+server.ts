@@ -18,9 +18,9 @@ export const GET: RequestHandler = ({ url }) => {
 				const agents = buildAgents();
 				const history: Message[] = [];
 
-				// Rotate through agents: Gemini → Claude → ChatGPT → ...
+				// Rotate through active agents
 				for (let turn = 0; turn < totalTurns; turn++) {
-					const agent = agents[turn % 3];
+					const agent = agents[turn % agents.length];
 
 					const text = await generateReply(agent, history, topic);
 

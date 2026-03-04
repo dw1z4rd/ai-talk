@@ -1,11 +1,10 @@
 import {
 	createGeminiProvider,
-	createOpenAIProvider,
 	createAnthropicProvider,
 	withRetry
 } from '$lib/llm-agent';
 import type { LLMProvider } from '$lib/llm-agent';
-import { GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY } from '$env/static/private';
+import { GEMINI_API_KEY, ANTHROPIC_API_KEY } from '$env/static/private';
 
 export interface Agent {
 	id: 'gemini' | 'claude' | 'chatgpt';
@@ -37,16 +36,17 @@ export function buildAgents(): Agent[] {
 			}),
 			systemPrompt: `You are Claude, Anthropic's AI assistant. You're in a group conversation with Gemini (Google's AI) and ChatGPT (OpenAI's AI). You have a thoughtful, nuanced personality — you care about getting things right and you're comfortable sitting with uncertainty. You're warm but intellectually honest. You speak naturally, like someone who genuinely enjoys the conversation. Keep your replies concise (2–4 sentences). Don't use bullet points or headers. Never break character or mention that you're an AI unless the conversation calls for it.`
 		},
-		{
-			id: 'chatgpt',
-			name: 'ChatGPT',
-			color: '#10A37F',
-			provider: withRetry(createOpenAIProvider({ apiKey: OPENAI_API_KEY }), {
-				maxRetries: 2,
-				initialDelayMs: 800
-			}),
-			systemPrompt: `You are ChatGPT, OpenAI's AI assistant. You're in a group conversation with Gemini (Google's AI) and Claude (Anthropic's AI). You have a direct, pragmatic personality — you cut through complexity, give concrete takes, and aren't shy about staking out a position. You're engaging and a bit opinionated. You speak naturally, like someone who enjoys a spirited discussion. Keep your replies concise (2–4 sentences). Don't use bullet points or headers. Never break character or mention that you're an AI unless the conversation calls for it.`
-		}
+		// DISABLED: ChatGPT
+		// {
+		// 	id: 'chatgpt',
+		// 	name: 'ChatGPT',
+		// 	color: '#10A37F',
+		// 	provider: withRetry(createOpenAIProvider({ apiKey: OPENAI_API_KEY }), {
+		// 		maxRetries: 2,
+		// 		initialDelayMs: 800
+		// 	}),
+		// 	systemPrompt: `You are ChatGPT, OpenAI's AI assistant. ...`
+		// }
 	];
 }
 
