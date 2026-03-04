@@ -277,7 +277,7 @@
 						placeholder="What should they debate?"
 						disabled={running}
 						autofocus
-						class="w-full bg-[--color-panel] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white placeholder:text-[--color-muted] outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white placeholder:text-[--color-muted] outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
 					/>
 				</div>
 				<div class="flex flex-col gap-1.5 w-20">
@@ -291,7 +291,7 @@
 						min="2"
 						max="30"
 						disabled={running}
-						class="w-full bg-[--color-panel] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
 					/>
 				</div>
 				{#if running}
@@ -305,7 +305,7 @@
 				{:else}
 					<button
 						type="submit"
-						class="bg-[--color-accent] hover:bg-[--color-accent-hover] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+						class="bg-[--color-accent] hover:bg-[--color-accent-hover] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shadow-[0_0_16px_#7c6af740]"
 					>
 						Start
 					</button>
@@ -322,7 +322,7 @@
 						id="agentA"
 						bind:value={agentA}
 						disabled={running}
-						class="w-full bg-[--color-panel] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
 					>
 						{#each MODEL_OPTIONS as group}
 							<optgroup label={group.group}>
@@ -341,7 +341,7 @@
 						id="agentB"
 						bind:value={agentB}
 						disabled={running}
-						class="w-full bg-[--color-panel] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
+						class="w-full bg-[--color-surface] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
 					>
 						{#each MODEL_OPTIONS as group}
 							<optgroup label={group.group}>
@@ -433,7 +433,6 @@
 			{/if}
 		</div>
 
-		<!-- Chat -->
 		<!-- Progress -->
 		{#if running || (done && messages.length > 0)}
 			<div class="flex flex-col gap-1.5">
@@ -449,6 +448,7 @@
 			</div>
 		{/if}
 
+		<!-- Chat -->
 		<div
 			bind:this={chatEl}
 			class="flex flex-col gap-0 bg-[--color-panel] border border-[--color-border] rounded-2xl overflow-y-auto min-h-72 max-h-[68vh] scroll-smooth"
@@ -500,8 +500,8 @@
 							{msg.agentName}
 						</span>
 						<p
-							class="text-sm leading-relaxed text-[#d4d4e0] {isLeft ? 'border-l-2 pl-3' : 'border-r-2 pr-3 text-right'}"
-							style="border-color: {msg.color}"
+							class="text-sm leading-relaxed text-[#d4d4e0] px-4 py-3 rounded-2xl {isLeft ? 'rounded-tl-sm' : 'rounded-tr-sm text-right'}"
+							style="background-color: {msg.color}10; border: 1px solid {msg.color}28"
 						>
 							{msg.text}
 						</p>
