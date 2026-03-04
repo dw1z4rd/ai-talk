@@ -546,7 +546,7 @@
 					{#if streamingMessage}
 						{@const isLeft = streamingMessage.agentId === leftAgentId}
 						<div
-							class="flex gap-3 px-5 py-5 border-t border-[--color-border-subtle] {isLeft ? '' : 'flex-row-reverse'}"
+							class="flex gap-3 px-6 py-4 border-t border-[--color-border-subtle] {isLeft ? '' : 'flex-row-reverse'}"
 							style="animation: fadeSlide 0.15s ease both"
 						>
 							<div class="flex-shrink-0 flex flex-col items-center gap-1.5">
