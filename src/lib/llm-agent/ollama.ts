@@ -62,7 +62,7 @@ export const createOllamaProvider = (config: OllamaProviderConfig = {}): LLMProv
 		} catch (e: any) {
 			const msg = e.message || String(e);
 			const safe = config.apiKey ? redactKey(msg, config.apiKey) : msg;
-			console.error('[Ollama] Network Error:', safe);
+			console.error(`[Ollama] Network Error: Unable to connect to ${url}. Is the server reachable? (${safe})`);
 			return null;
 		}
 	}
