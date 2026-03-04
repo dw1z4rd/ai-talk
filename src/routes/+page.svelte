@@ -21,6 +21,7 @@
 	let done = $state(false);
 	let errorMsg = $state('');
 	let chatEl = $state<HTMLElement | null>(null);
+	let abortController = $state<AbortController | null>(null);
 
 	// Files
 	let contextFiles = $state<ContextFile[]>([]);
@@ -52,8 +53,9 @@
 	}
 
 	async function onDrop(e: DragEvent) {
-		dragging = false;
 		e.preventDefault();
+		e.stopPropagation();
+		dragging = false;
 		for (const file of Array.from(e.dataTransfer?.files ?? [])) await readFile(file);
 	}
 
@@ -90,17 +92,28 @@
 		URL.revokeObjectURL(url);
 	}
 
+	function stopConversation() {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+		running = false;
+		done = true;
+	}
+
 	async function startConversation() {
 		messages = [];
 		done = false;
 		errorMsg = '';
 		running = true;
+		abortController = new AbortController();
 
 		try {
 			const response = await fetch('/api/chat', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ topic, turns, context: buildContext() })
+				body: JSON.stringify({ topic, turns, context: buildContext() }),
+				signal: abortController.signal
 			});
 
 			if (!response.ok || !response.body) {
@@ -145,15 +158,24 @@
 					}
 				}
 			}
-		} catch (err) {
-			errorMsg = `Connection error: ${String(err)}`;
+		} catch (err: any) {
+			if (err.name === 'AbortError') {
+				// User manually stopped the conversation
+			} else {
+				errorMsg = `Connection error: ${String(err)}`;
+			}
 		} finally {
 			running = false;
 		}
 	}
 </script>
 
-<div class="min-h-dvh flex flex-col items-center px-4 py-12 sm:py-16">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class="min-h-dvh flex flex-col items-center px-4 py-12 sm:py-16"
+	ondragover={(e) => e.preventDefault()}
+	ondrop={(e) => e.preventDefault()}
+>
 	<div class="w-full max-w-2xl flex flex-col gap-8">
 
 		<!-- Header -->
@@ -169,17 +191,19 @@
 
 		<!-- Controls -->
 		<div class="flex flex-col gap-3">
-			<div class="flex gap-2 items-end">
+			<form onsubmit={(e) => { e.preventDefault(); startConversation(); }} class="flex gap-2 items-end">
 				<div class="flex flex-col gap-1.5 flex-1">
 					<label for="topic" class="text-[10px] font-semibold uppercase tracking-widest text-[--color-muted]">
 						Topic
 					</label>
+					<!-- svelte-ignore a11y_autofocus -->
 					<input
 						id="topic"
 						type="text"
 						bind:value={topic}
 						placeholder="What should they debate?"
 						disabled={running}
+						autofocus
 						class="w-full bg-[--color-panel] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white placeholder:text-[--color-muted] outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
 					/>
 				</div>
@@ -197,14 +221,23 @@
 						class="w-full bg-[--color-panel] border border-[--color-border] rounded-lg px-3.5 py-2.5 text-sm text-white outline-none transition-colors focus:border-[--color-accent] disabled:opacity-40 disabled:cursor-not-allowed"
 					/>
 				</div>
-				<button
-					onclick={startConversation}
-					disabled={running}
-					class="bg-[--color-accent] hover:bg-[--color-accent-hover] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-				>
-					{running ? 'Debating…' : 'Start'}
-				</button>
-			</div>
+				{#if running}
+					<button
+						type="button"
+						onclick={stopConversation}
+						class="bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+					>
+						Stop
+					</button>
+				{:else}
+					<button
+						type="submit"
+						class="bg-[--color-accent] hover:bg-[--color-accent-hover] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap"
+					>
+						Start
+					</button>
+				{/if}
+			</form>
 
 			{#if errorMsg}
 				<div class="bg-red-950/60 border border-red-900/60 rounded-lg px-4 py-3 text-sm text-red-400">
