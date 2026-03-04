@@ -157,7 +157,7 @@ export async function generateReply(
 	return agent.provider.generateText(prompt, {
 		systemPrompt,
 		temperature: 0.9,
-		maxTokens: 300,
+		maxTokens: 500,
 		...(onToken ? { onToken } : {})
 	});
 }
