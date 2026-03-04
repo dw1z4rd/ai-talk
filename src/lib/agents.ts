@@ -124,8 +124,7 @@ export async function generateReply(
 	agent: Agent,
 	history: Message[],
 	topic: string,
-	context?: string,
-	onToken?: (token: string) => void
+	context?: string
 ): Promise<string | null> {
 	const historyText = formatHistory(history);
 
@@ -141,7 +140,6 @@ export async function generateReply(
 	return agent.provider.generateText(prompt, {
 		systemPrompt,
 		temperature: 0.9,
-		maxTokens: 300,
-		...(onToken ? { onToken } : {})
+		maxTokens: 300
 	});
 }
