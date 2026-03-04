@@ -5,12 +5,12 @@
 	--font-sans: 'Inter', system-ui, sans-serif;
 	--font-display: 'Space Grotesk', system-ui, sans-serif;
 
-	--color-surface: #0c0c12;
-	--color-panel: #111119;
-	--color-border: #1e1e2a;
-	--color-border-subtle: #16161f;
-	--color-muted: #52525e;
-	--color-muted-fg: #a1a1b0;
+	--color-surface: #08080f;
+	--color-panel: #101018;
+	--color-border: #28283a;
+	--color-border-subtle: #1c1c2a;
+	--color-muted: #5a5a72;
+	--color-muted-fg: #a8a8c0;
 
 	--color-gemini: #4f8ef7;
 	--color-gemini-dim: #1a2d52;
