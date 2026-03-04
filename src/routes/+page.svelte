@@ -19,6 +19,37 @@
 		claude: '◆'
 	};
 
+	function exportDebate(format: 'md' | 'txt') {
+		const date = new Date().toISOString().slice(0, 10);
+		const safeTitle = topic.slice(0, 60).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+
+		let content: string;
+		let mime: string;
+		let ext: string;
+
+		if (format === 'md') {
+			content = `# Debate: ${topic}\n\n_Exported ${date}_\n\n---\n\n`;
+			content += messages
+				.map((m) => `### ${AVATARS[m.agentId]} ${m.agentName}\n\n${m.text}`)
+				.join('\n\n---\n\n');
+			mime = 'text/markdown';
+			ext = 'md';
+		} else {
+			content = `DEBATE: ${topic}\nExported: ${date}\n${'─'.repeat(40)}\n\n`;
+			content += messages.map((m) => `[${m.agentName}]\n${m.text}`).join('\n\n');
+			mime = 'text/plain';
+			ext = 'txt';
+		}
+
+		const blob = new Blob([content], { type: mime });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `debate-${safeTitle}.${ext}`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
 	async function startConversation() {
 		messages = [];
 		done = false;
@@ -126,9 +157,17 @@
 		{/if}
 
 		{#if done}
-			<div class="done-badge">— conversation ended —</div>
+			<div class="done-badge">— debate ended —</div>
 		{/if}
 	</section>
+
+	{#if messages.length > 0}
+		<div class="export-bar">
+			<span class="export-label">Export</span>
+			<button class="export-btn" onclick={() => exportDebate('md')}>↓ Markdown</button>
+			<button class="export-btn" onclick={() => exportDebate('txt')}>↓ Plain text</button>
+		</div>
+	{/if}
 </main>
 
 <style>
@@ -392,6 +431,38 @@
 		40% {
 			opacity: 1;
 		}
+	}
+
+	/* Export bar */
+	.export-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+	}
+
+	.export-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: #555;
+		margin-right: 0.25rem;
+	}
+
+	.export-btn {
+		background: #1a1a1e;
+		border: 1px solid #2e2e34;
+		border-radius: 7px;
+		color: #aaa;
+		padding: 0.45rem 0.9rem;
+		font-size: 0.85rem;
+		cursor: pointer;
+		transition: border-color 0.15s, color 0.15s;
+	}
+
+	.export-btn:hover {
+		border-color: #7c6af7;
+		color: #e8e8ed;
 	}
 
 	/* Done badge */
