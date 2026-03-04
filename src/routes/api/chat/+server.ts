@@ -31,7 +31,9 @@ export const POST: RequestHandler = async ({ request }) => {
 
 				for (let turn = 0; turn < totalTurns; turn++) {
 					const agent = agents[turn % agents.length];
-					const text = await generateReply(agent, history, safeTopic, context);
+					const text = await generateReply(agent, history, safeTopic, context, (token) => {
+						send({ type: 'token', agentId: agent.id, agentName: agent.name, color: agent.color, text: token });
+					});
 
 					if (!text) {
 						send({ type: 'error', agentId: agent.id, message: `${agent.name} failed to respond.` });
@@ -43,7 +45,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 					send({ type: 'message', agentId: agent.id, agentName: agent.name, color: agent.color, text });
 
-					await new Promise((r) => setTimeout(r, 600));
+					await new Promise((r) => setTimeout(r, 250));
 				}
 
 				send({ type: 'done' });

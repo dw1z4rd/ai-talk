@@ -11,6 +11,8 @@ export interface LLMOptions {
 	readonly temperature?: number;
 	/** System prompt to set context or behavior for the model */
 	readonly systemPrompt?: string;
+	/** Called with each streaming token chunk. When provided, the provider streams the response. */
+	readonly onToken?: (token: string) => void;
 }
 
 /**

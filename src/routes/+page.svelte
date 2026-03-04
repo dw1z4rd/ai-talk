@@ -58,6 +58,7 @@
 	let leftAgentId = $state('deepseek-v3.1:671b-cloud');
 	let typingAgentName = $state('');
 	let typingAgentColor = $state('');
+	let streamingMessage = $state<ChatMessage | null>(null);
 
 	// Files
 	let contextFiles = $state<ContextFile[]>([]);
@@ -149,6 +150,7 @@
 		running = false;
 		done = true;
 		typingAgentName = '';
+		streamingMessage = null;
 	}
 
 	function onTopicKeydown(e: KeyboardEvent) {
@@ -165,6 +167,7 @@
 		running = true;
 		typingAgentName = '';
 		typingAgentColor = '';
+		streamingMessage = null;
 		leftAgentId = agentA;
 		abortController = new AbortController();
 
@@ -200,7 +203,18 @@
 					if (!line.startsWith('data: ')) continue;
 					const data = JSON.parse(line.slice(6));
 
-					if (data.type === 'message') {
+					if (data.type === 'token') {
+						if (!streamingMessage) {
+							// First token — create the streaming bubble and hide typing dots
+							streamingMessage = { agentId: data.agentId, agentName: data.agentName, color: data.color, text: data.text };
+							typingAgentName = '';
+							typingAgentColor = '';
+						} else {
+							streamingMessage = { ...streamingMessage, text: streamingMessage.text + data.text };
+						}
+						setTimeout(() => chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' }), 20);
+					} else if (data.type === 'message') {
+						streamingMessage = null;
 						typingAgentName = '';
 						typingAgentColor = '';
 						messages = [...messages, {
@@ -234,10 +248,11 @@
 			} else {
 				errorMsg = `Connection error: ${String(err)}`;
 			}
-		} finally {
-			running = false;
-			typingAgentName = '';
-		}
+			} finally {
+				running = false;
+				typingAgentName = '';
+				streamingMessage = null;
+			}
 	}
 </script>
 
@@ -466,22 +481,40 @@
 			{/each}
 
 			{#if running}
-				<div class="flex items-center gap-3 px-7 py-5 {messages.length > 0 ? 'border-t border-[--color-border-subtle]' : ''}">
-					{#if typingAgentName}
-						<div class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0"
-							style="background-color: {typingAgentColor}18; color: {typingAgentColor}">
-							{typingAgentName[0]}
+				{#if streamingMessage}
+					{@const isLeft = streamingMessage.agentId === leftAgentId}
+					<div
+						class="flex gap-4 px-7 py-6 border-t border-[--color-border-subtle] {isLeft ? '' : 'flex-row-reverse'}"
+						style="animation: fadeSlide 0.2s ease both"
+					>
+						<div class="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold mt-0.5"
+							style="background-color: {streamingMessage.color}18; color: {streamingMessage.color}; box-shadow: 0 0 0 1px {streamingMessage.color}30">
+							{streamingMessage.agentName[0]}
 						</div>
-					{/if}
-					<div class="flex gap-1.5 items-center">
-						<span class="w-2 h-2 rounded-full animate-bounce [animation-delay:0ms]" style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
-						<span class="w-2 h-2 rounded-full animate-bounce [animation-delay:150ms]" style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
-						<span class="w-2 h-2 rounded-full animate-bounce [animation-delay:300ms]" style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
+						<div class="flex flex-col gap-2 max-w-[80%] {isLeft ? 'items-start' : 'items-end'}">
+							<span class="text-[11px] font-bold uppercase tracking-widest" style="color: {streamingMessage.color}">{streamingMessage.agentName}</span>
+							<p class="text-[15px] leading-relaxed text-[#d8d8e8] px-5 py-4 rounded-2xl {isLeft ? 'rounded-tl-md' : 'rounded-tr-md'}"
+								style="background-color: {streamingMessage.color}0d; border: 1px solid {streamingMessage.color}22">{streamingMessage.text}<span class="inline-block w-0.5 h-4 ml-0.5 align-middle animate-pulse" style="background-color: {streamingMessage.color}"></span></p>
+						</div>
 					</div>
-					{#if typingAgentName}
-						<span class="text-sm" style="color: {typingAgentColor}">{typingAgentName} is thinking…</span>
-					{/if}
-				</div>
+				{:else}
+					<div class="flex items-center gap-3 px-7 py-5 {messages.length > 0 ? 'border-t border-[--color-border-subtle]' : ''}">
+						{#if typingAgentName}
+							<div class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0"
+								style="background-color: {typingAgentColor}18; color: {typingAgentColor}">
+								{typingAgentName[0]}
+							</div>
+						{/if}
+						<div class="flex gap-1.5 items-center">
+							<span class="w-2 h-2 rounded-full animate-bounce [animation-delay:0ms]" style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
+							<span class="w-2 h-2 rounded-full animate-bounce [animation-delay:150ms]" style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
+							<span class="w-2 h-2 rounded-full animate-bounce [animation-delay:300ms]" style="background-color: {typingAgentColor || 'var(--color-muted)'}"></span>
+						</div>
+						{#if typingAgentName}
+							<span class="text-sm" style="color: {typingAgentColor}">{typingAgentName} is thinking…</span>
+						{/if}
+					</div>
+				{/if}
 			{/if}
 
 			{#if done}

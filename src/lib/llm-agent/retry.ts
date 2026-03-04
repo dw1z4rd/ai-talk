@@ -21,6 +21,9 @@ const DEFAULT_BACKOFF_FACTOR = 2;
  */
 export const withRetry = (provider: LLMProvider, config?: RetryConfig): LLMProvider => ({
 	generateText: async (prompt: string, options?: LLMOptions): Promise<string | null> => {
+		// Streaming calls can't be retried after tokens have already been emitted
+		if (options?.onToken) return provider.generateText(prompt, options);
+
 		const maxRetries = config?.maxRetries ?? DEFAULT_MAX_RETRIES;
 		const initialDelayMs = config?.initialDelayMs ?? DEFAULT_INITIAL_DELAY_MS;
 		const backoffFactor = config?.backoffFactor ?? DEFAULT_BACKOFF_FACTOR;

@@ -32,7 +32,8 @@ export const createAnthropicProvider = (config: AnthropicProviderConfig): LLMPro
 					messages: [{ role: 'user', content: prompt }],
 					max_tokens: options?.maxTokens ?? DEFAULT_MAX_TOKENS,
 					...(options?.systemPrompt != null ? { system: options.systemPrompt } : {}),
-					...(options?.temperature != null ? { temperature: options.temperature } : {})
+					...(options?.temperature != null ? { temperature: options.temperature } : {}),
+					...(options?.onToken ? { stream: true } : {})
 				})
 			});
 
@@ -43,6 +44,32 @@ export const createAnthropicProvider = (config: AnthropicProviderConfig): LLMPro
 					redactKey(text, config.apiKey).slice(0, 500)
 				);
 				return null;
+			}
+
+			if (options?.onToken) {
+				// Streaming mode — parse Anthropic SSE
+				const reader = response.body!.getReader();
+				const decoder = new TextDecoder();
+				let buf = '';
+				let fullText = '';
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					buf += decoder.decode(value, { stream: true });
+					const lines = buf.split('\n');
+					buf = lines.pop() ?? '';
+					for (const line of lines) {
+						if (!line.startsWith('data: ')) continue;
+						try {
+							const chunk = JSON.parse(line.slice(6));
+							if (chunk.type === 'content_block_delta' && chunk.delta?.type === 'text_delta') {
+								const token: string = chunk.delta.text;
+								if (token) { fullText += token; options.onToken(token); }
+							}
+						} catch { /* skip malformed chunks */ }
+					}
+				}
+				return fullText || null;
 			}
 
 			const data = (await response.json()) as AnthropicResponse;

@@ -27,34 +27,56 @@ export const createOllamaProvider = (config: OllamaProviderConfig = {}): LLMProv
 		const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, '');
 		const url = `${baseUrl}/v1/chat/completions`;
 
-		try {
-			const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-			if (config.apiKey) {
-				headers['Authorization'] = `Bearer ${config.apiKey}`;
-			}
+		const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+		if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
 
-			const response = await fetch(url, {
-				method: 'POST',
-				headers,
-				body: JSON.stringify({
-					model: config.model ?? DEFAULT_MODEL,
-					messages: [
-						...(options?.systemPrompt != null
-							? [{ role: 'system', content: options.systemPrompt }]
-							: []),
-						{ role: 'user', content: prompt }
-					],
-					...(options?.maxTokens != null ? { max_tokens: options.maxTokens } : {}),
-					...(options?.temperature != null ? { temperature: options.temperature } : {}),
-					stream: false
-				})
-			});
+		const body = JSON.stringify({
+			model: config.model ?? DEFAULT_MODEL,
+			messages: [
+				...(options?.systemPrompt != null
+					? [{ role: 'system', content: options.systemPrompt }]
+					: []),
+				{ role: 'user', content: prompt }
+			],
+			...(options?.maxTokens != null ? { max_tokens: options.maxTokens } : {}),
+			...(options?.temperature != null ? { temperature: options.temperature } : {}),
+			stream: !!options?.onToken
+		});
+
+		try {
+			const response = await fetch(url, { method: 'POST', headers, body });
 
 			if (!response.ok) {
 				const text = await response.text();
 				const safe = config.apiKey ? redactKey(text, config.apiKey) : text;
 				console.error(`[Ollama] API Error ${response.status}:`, safe.slice(0, 500));
 				return null;
+			}
+
+			if (options?.onToken) {
+				// Streaming mode — parse OpenAI-compatible SSE
+				const reader = response.body!.getReader();
+				const decoder = new TextDecoder();
+				let buf = '';
+				let fullText = '';
+				outer: while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					buf += decoder.decode(value, { stream: true });
+					const lines = buf.split('\n');
+					buf = lines.pop() ?? '';
+					for (const line of lines) {
+						if (!line.startsWith('data: ')) continue;
+						const payload = line.slice(6).trim();
+						if (payload === '[DONE]') break outer;
+						try {
+							const chunk = JSON.parse(payload) as OpenAIResponse & { choices?: Array<{ delta?: { content?: string } }> };
+							const token = (chunk.choices as any)?.[0]?.delta?.content;
+							if (token) { fullText += token; options.onToken(token); }
+						} catch { /* skip malformed chunks */ }
+					}
+				}
+				return fullText || null;
 			}
 
 			const data = (await response.json()) as OpenAIResponse;

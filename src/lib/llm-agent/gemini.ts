@@ -65,20 +65,63 @@ export const extractCleanGeminiText = (data: GeminiResponse | null | undefined):
  * const text = await provider.generateText('Hello!', { maxTokens: 100 });
  * ```
  */
+const buildGeminiBody = (prompt: string, options?: LLMOptions) => ({
+	...(options?.systemPrompt != null
+		? { systemInstruction: { parts: [{ text: options.systemPrompt }] } }
+		: {}),
+	contents: [{ role: 'user', parts: [{ text: prompt }] }],
+	generationConfig: {
+		...(options?.maxTokens != null ? { maxOutputTokens: options.maxTokens } : {}),
+		...(options?.temperature != null ? { temperature: options.temperature } : {})
+	}
+});
+
 export const createGeminiProvider = (config: GeminiProviderConfig): LLMProvider => ({
 	generateText: async (prompt: string, options?: LLMOptions): Promise<string | null> => {
+		if (options?.onToken) {
+			// Streaming mode — use streamGenerateContent with SSE
+			const model = config.model ?? DEFAULT_MODEL;
+			const url = `${buildGeminiUrl(model)}?alt=sse&key=${config.apiKey}`;
+			try {
+				const response = await fetch(url, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(buildGeminiBody(prompt, options))
+				});
+				if (!response.ok) {
+					const text = await response.text();
+					console.error(`[Gemini] Stream Error ${response.status}:`, redactKey(text, config.apiKey).slice(0, 500));
+					return null;
+				}
+				const reader = response.body!.getReader();
+				const decoder = new TextDecoder();
+				let buf = '';
+				let fullText = '';
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					buf += decoder.decode(value, { stream: true });
+					const lines = buf.split('\n');
+					buf = lines.pop() ?? '';
+					for (const line of lines) {
+						if (!line.startsWith('data: ')) continue;
+						try {
+							const chunk = JSON.parse(line.slice(6)) as GeminiResponse;
+							const token = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
+							if (token) { fullText += token; options.onToken(token); }
+						} catch { /* skip malformed chunks */ }
+					}
+				}
+				return fullText || null;
+			} catch (e: any) {
+				console.error('[Gemini] Stream Network Error:', redactKey(e.message || String(e), config.apiKey));
+				return null;
+			}
+		}
+
 		const data = await callGemini<GeminiResponse>(
 			config.apiKey,
-			{
-				...(options?.systemPrompt != null
-					? { systemInstruction: { parts: [{ text: options.systemPrompt }] } }
-					: {}),
-				contents: [{ role: 'user', parts: [{ text: prompt }] }],
-				generationConfig: {
-					...(options?.maxTokens != null ? { maxOutputTokens: options.maxTokens } : {}),
-					...(options?.temperature != null ? { temperature: options.temperature } : {})
-				}
-			},
+			buildGeminiBody(prompt, options),
 			config.model
 		);
 		return extractCleanGeminiText(data);
