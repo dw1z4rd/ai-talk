@@ -26,9 +26,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			for (let turn = 0; turn < totalTurns; turn++) {
 				const agent = agents[turn % agents.length];
 
-				const text = await generateStoryContinuation(agent, storySoFar, safePremise, (token) => {
-					send({ type: 'token', agentId: agent.id, agentName: agent.name, color: agent.color, text: token });
-				});
+const isFinalParagraph = turn === totalTurns - 1;
+const text = await generateStoryContinuation(agent, storySoFar, safePremise, (token) => {
+send({ type: 'token', agentId: agent.id, agentName: agent.name, color: agent.color, text: token });
+}, isFinalParagraph);
 
 if (!text) {
 // All retries exhausted — silently skip this turn so the story continues uninterrupted.

@@ -171,6 +171,13 @@ const STORY_SYSTEM_PROMPT = `You are a collaborative fiction writer contributing
 - ABSOLUTE RULE: Every sentence you write MUST be complete. You are STRICTLY FORBIDDEN from ending your response mid-sentence or mid-thought. If you are approaching the token limit, finish your current sentence and stop. Incomplete sentences are a critical failure.
 - Do NOT include headings, author notes, or meta-commentary. Output only the story paragraph.`;
 
+const STORY_FINAL_SYSTEM_PROMPT = `You are a collaborative fiction writer writing the FINAL paragraph of a round-robin story. Follow these rules:
+- Write exactly ONE paragraph (3–5 sentences) that brings the story to a satisfying, complete conclusion.
+- Resolve the main conflict or tension that has been building. Provide genuine closure — do not leave threads dangling.
+- Match the tone, tense, and style already established.
+- ABSOLUTE RULE: Every sentence you write MUST be complete. You are STRICTLY FORBIDDEN from ending your response mid-sentence or mid-thought. Incomplete sentences are a critical failure.
+- Do NOT include headings, author notes, or meta-commentary. Output only the story paragraph.`;
+
 export function buildStoryAgents(agentIds: string[]): Agent[] {
 	return agentIds.map((id) => {
 		const def = MODEL_CATALOG[id] ?? MODEL_CATALOG['deepseek-v3.1:671b-cloud'];
@@ -188,14 +195,21 @@ export async function generateStoryContinuation(
 agent: Agent,
 storySoFar: string,
 premise: string,
-onToken?: (token: string) => void
+onToken?: (token: string) => void,
+isFinalParagraph?: boolean
 ): Promise<string | null> {
+const baseSystemPrompt = isFinalParagraph ? STORY_FINAL_SYSTEM_PROMPT : agent.systemPrompt;
+
+const continuationInstruction = isFinalParagraph
+? 'Write the FINAL paragraph. Conclude the story with a satisfying ending that resolves the main conflict. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.'
+: 'Continue the story with the next paragraph, following the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.';
+
 const prompt = storySoFar.trim()
-? `STORY SO FAR:\n${storySoFar}\n\nContinue the story with the next paragraph, following the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.`
+? `STORY SO FAR:\n${storySoFar}\n\n${continuationInstruction}`
 : `This is the beginning of the story. Write the first paragraph based on the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.`;
 
 return agent.provider.generateText(prompt, {
-systemPrompt: `${agent.systemPrompt}\n\nSTORY PREMISE (always follow this blueprint):\n${premise}`,
+systemPrompt: `${baseSystemPrompt}\n\nSTORY PREMISE (always follow this blueprint):\n${premise}`,
 temperature: 0.92,
 maxTokens: 300,
 ...(onToken ? { onToken } : {})
