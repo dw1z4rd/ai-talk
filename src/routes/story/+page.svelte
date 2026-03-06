@@ -39,7 +39,7 @@
 		text: string;
 	}
 
-	let premise = $state('Once upon a time, in a city that never slept,');
+let premise = $state('');
 	let rounds = $state(6);
 	let paragraphs = $state<StoryParagraph[]>([]);
 	let running = $state(false);
