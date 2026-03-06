@@ -185,21 +185,21 @@ export function buildStoryAgents(agentIds: string[]): Agent[] {
 }
 
 export async function generateStoryContinuation(
-	agent: Agent,
-	storySoFar: string,
-	premise: string,
-	onToken?: (token: string) => void
+agent: Agent,
+storySoFar: string,
+premise: string,
+onToken?: (token: string) => void
 ): Promise<string | null> {
 const prompt = storySoFar.trim()
-? `STORY PREMISE/BLUEPRINT: ${premise}\n\nSTORY SO FAR:\n${storySoFar}\n\nContinue the story with the next paragraph, following the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.`
-: `STORY PREMISE/BLUEPRINT: ${premise}\n\nThis is the beginning of the story. Write the first paragraph based on the premise above. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.`;
+? `STORY SO FAR:\n${storySoFar}\n\nContinue the story with the next paragraph, following the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.`
+: `This is the beginning of the story. Write the first paragraph based on the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.`;
 
-	return agent.provider.generateText(prompt, {
-		systemPrompt: agent.systemPrompt,
-		temperature: 0.92,
-		maxTokens: 300,
-		...(onToken ? { onToken } : {})
-	});
+return agent.provider.generateText(prompt, {
+systemPrompt: `${agent.systemPrompt}\n\nSTORY PREMISE (always follow this blueprint):\n${premise}`,
+temperature: 0.92,
+maxTokens: 300,
+...(onToken ? { onToken } : {})
+});
 }
 
 // ── Escape Room ────────────────────────────────────────────────────────────────
