@@ -209,7 +209,7 @@ CRITICAL RULES:
 IF AND ONLY IF the player's state changes, you MUST append the relevant tags from the list below to the VERY END of your response. 
 [LOCATION_SET: 🏠 LocationName] (ONLY use when the location changes to a new room)
 [INVENTORY_ADD: 🗝️ itemName] (MANDATORY whenever the player picks up, finds, or is given an item. If they pick up multiple items, you MUST output a separate tag for EACH item.)
-[INVENTORY_REMOVE: 🗝️ itemName] (MANDATORY whenever an item is consumed, lost, or placed somewhere else)
+[INVENTORY_REMOVE: 🗝️ itemName] (MANDATORY whenever an item is consumed, lost, or placed somewhere else. CRITICAL: If the player THROWS, DROPS, or INSERTS an item into something, they no longer have it! You MUST output an INVENTORY_REMOVE tag immediately!)
 [CLUE_FOUND: 📜 clueName] (MANDATORY whenever a major clue or piece of information is discovered)
 [WIN_CONDITION_MET] (MANDATORY when the player successfully escapes)
 [LOSE_CONDITION_MET] (MANDATORY if the player triggers a fatal failure)`;
