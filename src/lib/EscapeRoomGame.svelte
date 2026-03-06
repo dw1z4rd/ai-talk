@@ -120,10 +120,18 @@
     <!-- Chat Area -->
     <div class="flex-1 flex flex-col bg-[--color-panel] rounded-2xl p-5 border border-[--color-border] overflow-hidden">
         
-        <div bind:this={chatContainer} class="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 scroll-smooth">
+        <div bind:this={chatContainer} class="flex-1 overflow-y-auto space-y-6 mb-4 pr-3 scroll-smooth">
             {#each messages as msg}
-                <div class="p-3.5 rounded-xl {msg.role === 'user' ? 'bg-[#222] self-end ml-12 border border-[#333]' : 'bg-[--color-surface] text-[#aaa] mr-12 border border-[--color-border]'}">
-                    {msg.content}
+                <div class="p-5 rounded-xl text-[15px] leading-[1.8] tracking-wide {msg.role === 'user' ? 'bg-[#222] self-end ml-16 border border-[#333] text-[#ddd]' : 'bg-[--color-surface] text-[#e2e8f0] mr-16 border border-[--color-border] shadow-sm'}">
+                    <!-- Basic formatting to handle markdown bold and newlines -->
+                    {#each msg.content.split('\n') as paragraph}
+                        {#if paragraph.trim()}
+                            <p class="mb-3 last:mb-0">
+                                <!-- Replacing **text** with <strong>text</strong> safely -->
+                                {@html paragraph.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>').replace(/\*(.*?)\*/g, '<em class="text-[#a1a1aa] italic">$1</em>')}
+                            </p>
+                        {/if}
+                    {/each}
                 </div>
             {/each}
             {#if isLoading}
