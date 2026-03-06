@@ -221,7 +221,7 @@
 			<!-- Nav -->
 			<div class="flex items-center gap-1 mt-1 bg-[--color-panel] border border-[--color-border] rounded-xl p-1">
 				<a href="/" class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors">⚔ Debate</a>
-				<a href="/whoseline" class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors">🎭 Whose Line</a>
+				<a href="/escape-room" class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors">🗝️ Escape Room</a>
 				<span class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-[#34d399]/10 text-[#34d399]">📖 Story</span>
 			</div>
 		</header>

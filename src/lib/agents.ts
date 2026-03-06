@@ -198,6 +198,49 @@ export async function generateStoryContinuation(
 	});
 }
 
+// ── Escape Room ────────────────────────────────────────────────────────────────
+
+const ESCAPE_ROOM_SYSTEM_PROMPT = `You are the Game Master of a unique text-based escape room.
+Respond to the player's actions dynamically and fairly. Always use emojis to represent items, clues, and locations.
+Append the following tags to your response to update the game's internal state:
+[LOCATION_SET: 🏠 LocationName] (Use when the location changes or initially)
+[INVENTORY_ADD: 🗝️ itemName] (Use when the player acquires an item)
+[INVENTORY_REMOVE: 🗝️ itemName] (Use when an item is consumed or lost)
+[CLUE_FOUND: 📜 clueName] (Use when a clue is discovered)
+[WIN_CONDITION_MET] (Use when the player successfully escapes)
+[LOSE_CONDITION_MET] (Use if the player triggers a fatal failure)`;
+
+export function buildEscapeRoomAgent(agentId: string = 'claude-3-5-sonnet-20241022'): Agent {
+	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG['claude-3-5-sonnet-20241022'];
+	return {
+		id: agentId,
+		name: 'Game Master',
+		color: def.color,
+		provider: withRetry(def.makeProvider(), { maxRetries: 2, initialDelayMs: 600 }),
+		systemPrompt: ESCAPE_ROOM_SYSTEM_PROMPT
+	};
+}
+
+export async function generateEscapeRoomResponse(
+	agent: Agent,
+	messages: { role: 'user' | 'assistant' | 'system', content: string }[],
+	gameState?: any
+): Promise<string | null> {
+	// The provider.generateText expects a single string prompt. We will serialize the message history.
+	const historyText = messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
+	
+	let prompt = historyText;
+	if (gameState) {
+		prompt += `\n\nCURRENT GAME STATE (For your reference, DO NOT SHOW TO PLAYER):\n${JSON.stringify(gameState, null, 2)}\n\nRespond to the last USER message.`;
+	}
+
+	return agent.provider.generateText(prompt, {
+		systemPrompt: agent.systemPrompt,
+		temperature: 0.8,
+		maxTokens: 500
+	});
+}
+
 // ── Whose Line Is It Anyway? ──────────────────────────────────────────────────
 
 export const WHOSE_LINE_GAMES = [
