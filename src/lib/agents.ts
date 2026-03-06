@@ -214,12 +214,17 @@ phase === 'final' ? STORY_FINAL_SYSTEM_PROMPT
 : phase === 'nearing-end' ? STORY_NEARING_END_SYSTEM_PROMPT
 : agent.systemPrompt;
 
-const continuationInstruction =
-phase === 'final'
-? 'Write the FINAL paragraph. Conclude the story with a satisfying ending that resolves the main conflict. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.'
-: phase === 'nearing-end'
-? 'The story is nearly over. Write a paragraph that steers toward the ending — begin resolving tension and setting up the final closing paragraph. Do NOT introduce anything new. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.'
-: 'Continue the story with the next paragraph, following the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.';
+let continuationInstruction: string;
+if (phase === 'final') {
+const paragraphs = storySoFar.trim().split('\n\n');
+const prevParagraph = paragraphs[paragraphs.length - 1] ?? '';
+continuationInstruction =
+`The paragraph written just before yours was:\n"${prevParagraph}"\n\nRead it carefully. If that paragraph already achieved closure, write a brief, graceful final sentence or two that completes the tone without re-resolving anything. If closure is still needed, resolve the main conflict now. Either way, write the FINAL paragraph — satisfying, complete, no loose ends. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.`;
+} else if (phase === 'nearing-end') {
+continuationInstruction = 'The story is nearly over. Write a paragraph that steers toward the ending — begin resolving tension and setting up the final closing paragraph. Do NOT introduce anything new. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.';
+} else {
+continuationInstruction = 'Continue the story with the next paragraph, following the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.';
+}
 
 const prompt = storySoFar.trim()
 ? `STORY SO FAR:\n${storySoFar}\n\n${continuationInstruction}`
