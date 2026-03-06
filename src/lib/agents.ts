@@ -210,8 +210,8 @@ Append the following tags to your response to update the game's internal state:
 [WIN_CONDITION_MET] (Use when the player successfully escapes)
 [LOSE_CONDITION_MET] (Use if the player triggers a fatal failure)`;
 
-export function buildEscapeRoomAgent(agentId: string = 'claude-3-5-sonnet-20241022'): Agent {
-	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG['claude-3-5-sonnet-20241022'];
+export function buildEscapeRoomAgent(agentId: string = 'deepseek-v3.2-cloud'): Agent {
+	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG['deepseek-v3.2-cloud'];
 	return {
 		id: agentId,
 		name: 'Game Master',
