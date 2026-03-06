@@ -171,6 +171,15 @@ const STORY_SYSTEM_PROMPT = `You are a collaborative fiction writer contributing
 - ABSOLUTE RULE: Every sentence you write MUST be complete. You are STRICTLY FORBIDDEN from ending your response mid-sentence or mid-thought. If you are approaching the token limit, finish your current sentence and stop. Incomplete sentences are a critical failure.
 - Do NOT include headings, author notes, or meta-commentary. Output only the story paragraph.`;
 
+const STORY_NEARING_END_SYSTEM_PROMPT = `You are a collaborative fiction writer contributing to a round-robin story. The story is in its FINAL STRETCH — only a couple of paragraphs remain. Follow these rules:
+- Write exactly ONE paragraph (3–5 sentences) that actively steers the story toward its conclusion.
+- Begin resolving subplots, move characters toward the final confrontation or moment of resolution, and raise the emotional stakes.
+- Do NOT introduce any new characters, locations, or plot threads — only work with what already exists.
+- The writer after you will deliver the final closing paragraph, so set them up perfectly.
+- Match the tone, tense, and style already established.
+- ABSOLUTE RULE: Every sentence you write MUST be complete. You are STRICTLY FORBIDDEN from ending your response mid-sentence or mid-thought. Incomplete sentences are a critical failure.
+- Do NOT include headings, author notes, or meta-commentary. Output only the story paragraph.`;
+
 const STORY_FINAL_SYSTEM_PROMPT = `You are a collaborative fiction writer writing the FINAL paragraph of a round-robin story. Follow these rules:
 - Write exactly ONE paragraph (3–5 sentences) that brings the story to a satisfying, complete conclusion.
 - Resolve the main conflict or tension that has been building. Provide genuine closure — do not leave threads dangling.
@@ -191,17 +200,25 @@ export function buildStoryAgents(agentIds: string[]): Agent[] {
 	});
 }
 
+export type StoryPhase = 'normal' | 'nearing-end' | 'final';
+
 export async function generateStoryContinuation(
 agent: Agent,
 storySoFar: string,
 premise: string,
 onToken?: (token: string) => void,
-isFinalParagraph?: boolean
+phase: StoryPhase = 'normal'
 ): Promise<string | null> {
-const baseSystemPrompt = isFinalParagraph ? STORY_FINAL_SYSTEM_PROMPT : agent.systemPrompt;
+const baseSystemPrompt =
+phase === 'final' ? STORY_FINAL_SYSTEM_PROMPT
+: phase === 'nearing-end' ? STORY_NEARING_END_SYSTEM_PROMPT
+: agent.systemPrompt;
 
-const continuationInstruction = isFinalParagraph
+const continuationInstruction =
+phase === 'final'
 ? 'Write the FINAL paragraph. Conclude the story with a satisfying ending that resolves the main conflict. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.'
+: phase === 'nearing-end'
+? 'The story is nearly over. Write a paragraph that steers toward the ending — begin resolving tension and setting up the final closing paragraph. Do NOT introduce anything new. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.'
 : 'Continue the story with the next paragraph, following the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.';
 
 const prompt = storySoFar.trim()

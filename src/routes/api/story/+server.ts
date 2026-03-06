@@ -1,5 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { buildStoryAgents, generateStoryContinuation } from '$lib/agents';
+import type { StoryPhase } from '$lib/agents';
 
 export const POST: RequestHandler = async ({ request }) => {
 	const { premise, agentIds, rounds } = (await request.json()) as {
@@ -26,10 +27,13 @@ export const POST: RequestHandler = async ({ request }) => {
 			for (let turn = 0; turn < totalTurns; turn++) {
 				const agent = agents[turn % agents.length];
 
-const isFinalParagraph = turn === totalTurns - 1;
+const phase: StoryPhase =
+turn === totalTurns - 1 ? 'final'
+: turn >= totalTurns - 3 ? 'nearing-end'
+: 'normal';
 const text = await generateStoryContinuation(agent, storySoFar, safePremise, (token) => {
 send({ type: 'token', agentId: agent.id, agentName: agent.name, color: agent.color, text: token });
-}, isFinalParagraph);
+}, phase);
 
 if (!text) {
 // All retries exhausted — silently skip this turn so the story continues uninterrupted.
