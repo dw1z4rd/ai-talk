@@ -33,11 +33,6 @@ const MODEL_CATALOG: Record<string, ModelDef> = {
 		color: '#3B7BFF',
 		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.2' })
 	},
-	'llama3.3:70b-cloud': {
-		name: 'Llama 3.3 70B',
-		color: '#8B5CF6',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'llama3.3:70b' })
-	},
 	'gemini-3-flash-preview-cloud': {
 		name: 'Gemini 3 Flash',
 		color: '#1A73E8',
@@ -106,7 +101,7 @@ function makeSystemPrompt(myName: string, opponentName: string): string {
 
 export function buildAgents(agentAId: string, agentBId: string): Agent[] {
 	const defA = MODEL_CATALOG[agentAId] ?? MODEL_CATALOG['deepseek-v3.1:671b-cloud'];
-	const defB = MODEL_CATALOG[agentBId] ?? MODEL_CATALOG['llama3.3:70b-cloud'];
+const defB = MODEL_CATALOG[agentBId] ?? MODEL_CATALOG['deepseek-v3.2-cloud'];
 
 	return [
 		{
@@ -331,7 +326,7 @@ export function buildWhoseLineHost(agentId: string): WhoseLineAgent {
 }
 
 export function buildWhoseLineContestant(agentId: string): WhoseLineAgent {
-	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG['llama3.3:70b-cloud'];
+	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG['deepseek-v3.2-cloud'];
 	return {
 		id: agentId,
 		name: def.name,
