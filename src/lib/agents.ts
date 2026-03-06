@@ -202,10 +202,10 @@ export async function generateStoryContinuation(
 
 const ESCAPE_ROOM_SYSTEM_PROMPT = `You are the Game Master of a unique text-based escape room.
 Respond to the player's actions dynamically and fairly. Always use emojis to represent items, clues, and locations.
-Append the following tags to your response to update the game's internal state:
+CRITICAL: You MUST append the following tags to the END of your response to update the game's internal HUD state. If the player acquires or loses MULTIPLE items, you MUST output a separate tag for EACH item. Never summarize multiple items in a single tag.
 [LOCATION_SET: 🏠 LocationName] (Use when the location changes or initially)
-[INVENTORY_ADD: 🗝️ itemName] (Use when the player acquires an item)
-[INVENTORY_REMOVE: 🗝️ itemName] (Use when an item is consumed or lost)
+[INVENTORY_ADD: 🗝️ itemName] (Use when the player acquires an item. Emit this tag once for EACH item acquired)
+[INVENTORY_REMOVE: 🗝️ itemName] (Use when an item is consumed or lost. Emit this tag once for EACH item removed)
 [CLUE_FOUND: 📜 clueName] (Use when a clue is discovered)
 [WIN_CONDITION_MET] (Use when the player successfully escapes)
 [LOSE_CONDITION_MET] (Use if the player triggers a fatal failure)`;
