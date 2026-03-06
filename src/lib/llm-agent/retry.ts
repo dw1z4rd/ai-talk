@@ -20,33 +20,46 @@ const DEFAULT_BACKOFF_FACTOR = 2;
  * ```
  */
 export const withRetry = (provider: LLMProvider, config?: RetryConfig): LLMProvider => ({
-	generateText: async (prompt: string, options?: LLMOptions): Promise<string | null> => {
-		// Streaming calls can't be retried after tokens have already been emitted
-		if (options?.onToken) return provider.generateText(prompt, options);
+generateText: async (prompt: string, options?: LLMOptions): Promise<string | null> => {
+const maxRetries = config?.maxRetries ?? DEFAULT_MAX_RETRIES;
+const initialDelayMs = config?.initialDelayMs ?? DEFAULT_INITIAL_DELAY_MS;
+const backoffFactor = config?.backoffFactor ?? DEFAULT_BACKOFF_FACTOR;
 
-		const maxRetries = config?.maxRetries ?? DEFAULT_MAX_RETRIES;
-		const initialDelayMs = config?.initialDelayMs ?? DEFAULT_INITIAL_DELAY_MS;
-		const backoffFactor = config?.backoffFactor ?? DEFAULT_BACKOFF_FACTOR;
+for (let attempt = 1; attempt <= maxRetries; attempt++) {
+// Track whether any tokens were emitted during a streaming call.
+// Once tokens have been sent to the client we cannot retry — the
+// partial stream is already in flight and replaying it would duplicate output.
+let tokensEmitted = false;
+const wrappedOptions: LLMOptions | undefined = options?.onToken
+? {
+...options,
+onToken: (token: string) => {
+tokensEmitted = true;
+options.onToken!(token);
+}
+}
+: options;
 
-		for (let attempt = 1; attempt <= maxRetries; attempt++) {
-			try {
-				const text = await provider.generateText(prompt, options);
-				if (text && text.length > 0) {
-					return text;
-				}
-				config?.onRetryableFailure?.(attempt);
-			} catch (e) {
-				config?.onRetryableFailure?.(attempt, e);
-			}
+try {
+const text = await provider.generateText(prompt, wrappedOptions);
+if (text && text.length > 0) return text;
+// Tokens were already sent — don't retry, just return whatever we got.
+if (tokensEmitted) return text;
+config?.onRetryableFailure?.(attempt);
+} catch (e) {
+// If tokens were already sent, re-throw — partial stream is committed.
+if (tokensEmitted) throw e;
+config?.onRetryableFailure?.(attempt, e);
+}
 
-			if (attempt < maxRetries) {
-				const delay = initialDelayMs * backoffFactor ** (attempt - 1);
-				await new Promise((resolve) => setTimeout(resolve, delay));
-			}
-		}
+if (attempt < maxRetries) {
+const delay = initialDelayMs * backoffFactor ** (attempt - 1);
+await new Promise((resolve) => setTimeout(resolve, delay));
+}
+}
 
-		return null;
-	}
+return null;
+}
 });
 
 /**
