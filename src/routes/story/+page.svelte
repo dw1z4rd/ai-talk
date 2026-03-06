@@ -48,9 +48,9 @@ let premise = $state('');
 	let chatEl = $state<HTMLElement | null>(null);
 	let abortController = $state<AbortController | null>(null);
 
-	let agentA = $state('claude-3-5-sonnet-20241022');
-	let agentB = $state('gemini-2.0-flash');
-	let agentC = $state('llama3.3:70b-cloud');
+let agentA = $state('devstral-small-2:24b-cloud');
+let agentB = $state('deepseek-v3.2-cloud');
+let agentC = $state('gemini-2.0-flash');
 
 	let typingAgentName = $state('');
 	let typingAgentColor = $state('');
