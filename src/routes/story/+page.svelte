@@ -84,6 +84,34 @@
   let typingAgentColor = $state("");
   let streamingParagraph = $state<StoryParagraph | null>(null);
 
+  let publishing = $state(false);
+  let publishedSlug = $state<string | null>(null);
+  let publishError = $state("");
+
+  async function publishStory() {
+    publishing = true;
+    publishError = "";
+    publishedSlug = null;
+    try {
+      const res = await fetch("/api/story/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ premise, paragraphs }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Unknown error" }));
+        publishError = err.message || `Error ${res.status}`;
+      } else {
+        const { slug } = await res.json();
+        publishedSlug = slug;
+      }
+    } catch (e: any) {
+      publishError = String(e);
+    } finally {
+      publishing = false;
+    }
+  }
+
   let progress = $derived(
     rounds > 0 ? Math.min((paragraphs.length / (rounds * 3)) * 100, 100) : 0,
   );
@@ -314,6 +342,11 @@
         <span
           class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-[#34d399]/10 text-[#34d399]"
           >📖 Story</span
+        >
+        <a
+          href="/stories"
+          class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors"
+          >📚 Published</a
         >
       </div>
     </header>
@@ -659,6 +692,40 @@
           >
           Plain text
         </button>
+        {#if done && !publishedSlug}
+          <button
+            type="button"
+            onclick={publishStory}
+            disabled={publishing}
+            class="flex items-center gap-1.5 bg-[#34d399]/10 text-[#34d399] hover:bg-[#34d399]/20 border border-[#34d399]/30 font-semibold text-xs px-4 py-2 rounded-lg transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {#if publishing}
+              <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              Publishing…
+            {:else}
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+              </svg>
+              Publish
+            {/if}
+          </button>
+        {/if}
+
+        {#if publishedSlug}
+          <a
+            href="/stories/{publishedSlug}"
+            class="flex items-center gap-1.5 bg-[#34d399]/10 text-[#34d399] border border-[#34d399]/40 font-semibold text-xs px-4 py-2 rounded-lg transition-all hover:bg-[#34d399]/20"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+            </svg>
+            View published
+          </a>
+        {/if}
+
         <button
           onclick={resetStory}
           class="ml-auto flex items-center gap-1.5 text-[--color-muted] hover:text-red-400 text-xs font-medium px-3.5 py-2 rounded-lg border border-transparent hover:border-red-900/50 transition-all cursor-pointer"
@@ -678,6 +745,12 @@
           Clear
         </button>
       </div>
+
+      {#if publishError}
+        <div class="flex items-start gap-2 bg-red-950/50 border border-red-900/50 rounded-xl px-4 py-3 text-xs text-red-400">
+          Publish failed: {publishError}
+        </div>
+      {/if}
     {/if}
   </div>
 </div>
