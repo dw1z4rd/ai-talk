@@ -165,9 +165,10 @@ export async function generateReply(
 // ── Story mode ────────────────────────────────────────────────────────────────
 
 const STORY_SYSTEM_PROMPT = `You are a collaborative fiction writer contributing to a round-robin story. Follow these rules:
-- Write exactly ONE paragraph (3–5 sentences) that continues directly from where the story left off.
+- Write exactly ONE paragraph (3–5 sentences) that continues the story based on the premise and story so far.
 - Match the tone, tense, and style already established.
 - Advance the plot, deepen a character, or introduce a small twist — but never resolve the whole story.
+- CRITICAL: Never end mid-sentence. All responses must contain complete paragraphs with complete sentences.
 - Do NOT include headings, author notes, or meta-commentary. Output only the story paragraph.`;
 
 export function buildStoryAgents(agentIds: string[]): Agent[] {
@@ -186,9 +187,12 @@ export function buildStoryAgents(agentIds: string[]): Agent[] {
 export async function generateStoryContinuation(
 	agent: Agent,
 	storySoFar: string,
+	premise: string,
 	onToken?: (token: string) => void
 ): Promise<string | null> {
-	const prompt = `Here is the story so far:\n\n${storySoFar}\n\nContinue the story with the next paragraph.`;
+	const prompt = storySoFar.trim()
+		? `STORY PREMISE/BLUEPRINT: ${premise}\n\nSTORY SO FAR:\n${storySoFar}\n\nContinue the story with the next paragraph, following the premise.`
+		: `STORY PREMISE/BLUEPRINT: ${premise}\n\nThis is the beginning of the story. Write the first paragraph based on the premise above.`;
 
 	return agent.provider.generateText(prompt, {
 		systemPrompt: agent.systemPrompt,

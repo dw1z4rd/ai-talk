@@ -18,24 +18,24 @@ export const POST: RequestHandler = async ({ request }) => {
 				controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
 			};
 
-			try {
-				const agents = buildStoryAgents(safeAgentIds);
-				let storySoFar = safePremise;
-				const totalTurns = totalRounds * agents.length;
+		try {
+			const agents = buildStoryAgents(safeAgentIds);
+			let storySoFar = '';
+			const totalTurns = totalRounds * agents.length;
 
-				for (let turn = 0; turn < totalTurns; turn++) {
-					const agent = agents[turn % agents.length];
+			for (let turn = 0; turn < totalTurns; turn++) {
+				const agent = agents[turn % agents.length];
 
-					const text = await generateStoryContinuation(agent, storySoFar, (token) => {
-						send({ type: 'token', agentId: agent.id, agentName: agent.name, color: agent.color, text: token });
-					});
+				const text = await generateStoryContinuation(agent, storySoFar, safePremise, (token) => {
+					send({ type: 'token', agentId: agent.id, agentName: agent.name, color: agent.color, text: token });
+				});
 
-					if (!text) {
-						send({ type: 'error', agentId: agent.id, message: `${agent.name} failed to respond.` });
-						continue;
-					}
+				if (!text) {
+					send({ type: 'error', agentId: agent.id, message: `${agent.name} failed to respond.` });
+					continue;
+				}
 
-					storySoFar += '\n\n' + text;
+				storySoFar += (storySoFar ? '\n\n' : '') + text;
 
 					send({ type: 'paragraph', agentId: agent.id, agentName: agent.name, color: agent.color, text });
 

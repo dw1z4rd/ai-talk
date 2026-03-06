@@ -236,7 +236,7 @@
 					id="premise"
 					bind:value={premise}
 					onkeydown={onPremiseKeydown}
-					placeholder="How does the story begin?"
+					placeholder="Describe the plot, characters, and setting you want the AIs to write about..."
 					disabled={running}
 					rows="3"
 					class="w-full bg-[--color-surface] border border-[--color-border] rounded-xl px-4 py-4 text-base text-white placeholder:text-[--color-muted] outline-none transition-all focus:border-[#34d399] focus:shadow-[0_0_0_3px_#34d39922] disabled:opacity-40 disabled:cursor-not-allowed resize-none"
