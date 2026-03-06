@@ -240,7 +240,7 @@ export async function generateEscapeRoomResponse(
 	return agent.provider.generateText(prompt, {
 		systemPrompt: agent.systemPrompt,
 		temperature: 0.8,
-		maxTokens: 500
+		maxTokens: 1000
 	});
 }
 
