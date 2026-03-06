@@ -248,8 +248,7 @@
 							typingAgentName = '';
 							typingAgentColor = '';
 						} else {
-							const cur = streamingMessage!;
-							streamingMessage = { agentId: cur.agentId, agentName: cur.agentName, color: cur.color, text: cur.text + data.text };
+							streamingMessage = { agentId: streamingMessage.agentId, agentName: streamingMessage.agentName, color: streamingMessage.color, text: streamingMessage.text + data.text };
 						}
 						setTimeout(() => chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: 'smooth' }), 20);
 					} else if (data.type === 'message') {
@@ -317,6 +316,7 @@
 			<div class="flex items-center gap-1 mt-1 bg-[--color-panel] border border-[--color-border] rounded-xl p-1">
 				<span class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-[--color-accent]/10 text-[--color-accent]">⚔ Debate</span>
 				<a href="/whoseline" class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors">🎭 Whose Line</a>
+				<a href="/story" class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors">📖 Story</a>
 			</div>
 		</header>
 
