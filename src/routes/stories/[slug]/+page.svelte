@@ -43,12 +43,6 @@
         {#if date}
           <span>{formatDate(date)}</span>
         {/if}
-        {#if authors.length > 0}
-          <span class="text-[--color-border]">·</span>
-          <span class="normal-case tracking-normal">
-            {authors.join(', ')}
-          </span>
-        {/if}
       </div>
     </header>
 

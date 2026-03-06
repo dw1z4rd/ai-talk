@@ -562,14 +562,6 @@
             >
               {p.text}
             </p>
-            <div
-              class="mt-1 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <span
-                class="text-[9px] font-bold uppercase tracking-widest"
-                style="color: {p.color}">{p.agentName}</span
-              >
-            </div>
           </div>
         {/each}
 
@@ -595,13 +587,6 @@
                   style="background: {streamingParagraph.color}"
                 ></span>
               </p>
-              <div class="mt-1 flex items-center gap-1.5">
-                <span
-                  class="text-[9px] font-bold uppercase tracking-widest"
-                  style="color: {streamingParagraph.color}"
-                  >{streamingParagraph.agentName}</span
-                >
-              </div>
             </div>
           {:else if typingAgentName}
             <div class="flex items-center gap-3 py-4">
