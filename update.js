@@ -1,0 +1,5 @@
+"const fs = require('fs');"  
+"let c = fs.readFileSync('src/routes/api/chat/+server.ts', 'utf8');"  
+"c = c.replace('const { topic, turns, context, agentA, agentB } = (await request.json()) as {', 'const { topic, turns, context, agentA, agentB, messages } = (await request.json()) as {\\n\\t\\tmessages?: any[];');"  
+"c = c.replace('const history: Message[] = [];', 'const history: Message[] = (messages || []).map((m: any) => {\\n\\t\\t\\t\\t\\tif (m.role === \\'moderator\\') {\\n\\t\\t\\t\\t\\t\\treturn {\\n\\t\\t\\t\\t\\t\\t\\tagentId: \\'moderator\\',\\n\\t\\t\\t\\t\\t\\t\\tagentName: \\'Moderator\\',\\n\\t\\t\\t\\t\\t\\t\\ttext: \\`The debate was interrupted by the Moderator, who said: \\'\\${m.text || m.content}\\'. You must address this point before continuing your attack on your opponent.\\`\\n\\t\\t\\t\\t\\t\\t};\\n\\t\\t\\t\\t\\t}\\n\\t\\t\\t\\t\\treturn m;\\n\\t\\t\\t\\t});');"  
+"fs.writeFileSync('src/routes/api/chat/+server.ts', c);"  

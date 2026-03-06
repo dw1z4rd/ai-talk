@@ -52,6 +52,8 @@
 	let turns = $state(20);
 	let messages = $state<ChatMessage[]>([]);
 	let running = $state(false);
+	let isPaused = $state(false);
+	let moderatorInput = $state('');
 	let done = $state(false);
 	let errorMsg = $state('');
 	let chatEl = $state<HTMLElement | null>(null);
@@ -148,6 +150,22 @@
 		URL.revokeObjectURL(url);
 	}
 
+	function pauseConversation() {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+		}
+		running = false;
+		isPaused = true;
+		typingAgentName = '';
+		
+		// If there was a streaming message, commit it to history so it's not lost
+		if (streamingMessage) {
+			messages = [...messages, streamingMessage];
+			streamingMessage = null;
+		}
+	}
+
 	function stopConversation() {
 		if (abortController) {
 			abortController.abort();
@@ -155,33 +173,47 @@
 		}
 		running = false;
 		done = true;
+		isPaused = false;
 		typingAgentName = '';
 		streamingMessage = null;
 	}
 
 	function onTopicKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !running && topic.trim()) {
+		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !running && !isPaused && topic.trim()) {
 			e.preventDefault();
 			startConversation();
 		}
 	}
 
-	async function startConversation() {
-		messages = [];
+	function onModeratorKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey && moderatorInput.trim()) {
+			e.preventDefault();
+			const text = moderatorInput.trim();
+			moderatorInput = '';
+			messages = [...messages, { agentId: 'moderator', agentName: 'Moderator', color: '#ff4b4b', text }];
+			startConversation(true);
+		}
+	}
+
+	async function startConversation(resume = false) {
+		if (!resume) {
+			messages = [];
+			leftAgentId = agentA;
+		}
 		done = false;
+		isPaused = false;
 		errorMsg = '';
 		running = true;
 		typingAgentName = '';
 		typingAgentColor = '';
 		streamingMessage = null;
-		leftAgentId = agentA;
 		abortController = new AbortController();
 
 		try {
 			const response = await fetch('/api/chat', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ topic, turns, context: buildContext(), agentA, agentB }),
+				body: JSON.stringify({ topic, turns, context: buildContext(), agentA, agentB, messages: resume ? messages : undefined }),
 				signal: abortController.signal
 			});
 
@@ -231,7 +263,8 @@
 							text: data.text
 						}];
 						// Set the next typing agent
-						if (messages.length < turns) {
+						const aiCount = messages.filter(m => m.agentId !== 'moderator').length;
+						if (aiCount < turns) {
 							const nextId = data.agentId === agentA ? agentB : agentA;
 							const next = getModelInfo(nextId);
 							typingAgentName = next.name;
@@ -395,10 +428,30 @@
 				{#if running}
 					<button
 						type="button"
+						onclick={pauseConversation}
+						class="flex items-center gap-2 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/30 font-semibold text-sm px-5 py-2.5 rounded-xl transition-all cursor-pointer"
+					>
+						Pause
+					</button>
+					<button
+						type="button"
 						onclick={stopConversation}
 						class="flex items-center gap-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 font-semibold text-sm px-5 py-2.5 rounded-xl transition-all cursor-pointer"
 					>
 						<span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>
+						Stop
+					</button>
+				{:else if isPaused}
+					<button
+						type="button"
+						onclick={() => startConversation(true)}
+						class="bg-[--color-accent] hover:bg-[--color-accent-hover] text-white font-semibold text-sm px-7 py-2.5 rounded-xl transition-all cursor-pointer shadow-[0_0_24px_#7c6af740] hover:shadow-[0_0_32px_#7c6af760]"
+					>Resume debate</button>
+					<button
+						type="button"
+						onclick={stopConversation}
+						class="flex items-center gap-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 font-semibold text-sm px-5 py-2.5 rounded-xl transition-all cursor-pointer"
+					>
 						Stop
 					</button>
 				{:else}
@@ -410,6 +463,22 @@
 					>Start debate</button>
 				{/if}
 			</div>
+
+			{#if isPaused}
+				<div class="flex flex-col gap-1.5 pt-2 border-t border-[--color-border-subtle]">
+					<label for="moderatorInput" class="text-[11px] font-semibold uppercase tracking-widest text-[#ff4b4b]">Moderator Intervention</label>
+					<input
+						id="moderatorInput"
+						type="text"
+						bind:value={moderatorInput}
+						onkeydown={onModeratorKeydown}
+						placeholder="Add a point, sub-topic, or rebuttal..."
+						autofocus
+						class="w-full bg-[--color-surface] border border-[#ff4b4b]/30 rounded-xl px-4 py-3 text-sm text-white placeholder:text-[--color-muted] outline-none transition-all focus:border-[#ff4b4b] focus:shadow-[0_0_0_3px_#ff4b4b22]"
+					/>
+					<p class="text-xs text-[--color-muted]">Hit <span class="text-white font-semibold">Enter</span> to inject message and resume debate</p>
+				</div>
+			{/if}
 
 			{#if errorMsg}
 				<div class="flex items-start gap-3 bg-red-950/50 border border-red-900/50 rounded-xl px-4 py-3 text-sm text-red-400">
@@ -525,28 +594,36 @@
 
 				<!-- Messages -->
 				{#each messages as msg, i (i)}
-					{@const isLeft = msg.agentId === leftAgentId}
-					<div
-						class="group flex gap-3 px-6 py-4 {i > 0 ? 'border-t border-[--color-border-subtle]' : ''} {isLeft ? '' : 'flex-row-reverse'}"
-						style="animation: fadeSlide 0.2s ease both; animation-delay: {Math.min(i * 20, 100)}ms"
-					>
-						<!-- Avatar -->
-						<div class="flex-shrink-0 flex flex-col items-center gap-1.5">
-							<div class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold"
-								style="background: linear-gradient(135deg, {msg.color}22, {msg.color}0a); color: {msg.color}; border: 1px solid {msg.color}28">
-								{msg.agentName[0]}
+					{@const isModerator = msg.agentId === 'moderator'}
+					{@const isLeft = !isModerator && msg.agentId === leftAgentId}
+					{#if isModerator}
+						<div class="flex flex-col items-center gap-2 px-6 py-6 border-t border-[--color-border-subtle]" style="animation: fadeSlide 0.2s ease both; animation-delay: {Math.min(i * 20, 100)}ms">
+							<span class="text-[10px] font-bold uppercase tracking-widest text-[#ff4b4b] bg-[#ff4b4b]/10 px-3 py-1 rounded-full border border-[#ff4b4b]/20">Moderator Intervened</span>
+							<p class="text-[14.5px] leading-relaxed text-white text-center max-w-[80%] italic">"{msg.text}"</p>
+						</div>
+					{:else}
+						<div
+							class="group flex gap-3 px-6 py-4 border-t border-[--color-border-subtle] {isLeft ? '' : 'flex-row-reverse'}"
+							style="animation: fadeSlide 0.2s ease both; animation-delay: {Math.min(i * 20, 100)}ms"
+						>
+							<!-- Avatar -->
+							<div class="flex-shrink-0 flex flex-col items-center gap-1.5">
+								<div class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold"
+									style="background: linear-gradient(135deg, {msg.color}22, {msg.color}0a); color: {msg.color}; border: 1px solid {msg.color}28">
+									{msg.agentName[0]}
+								</div>
+								<span class="text-[10px] tabular-nums text-[--color-border] group-hover:text-[--color-muted] transition-colors">#{i + 1}</span>
 							</div>
-							<span class="text-[10px] tabular-nums text-[--color-border] group-hover:text-[--color-muted] transition-colors">#{i + 1}</span>
+							<!-- Bubble -->
+							<div class="flex flex-col gap-1.5 min-w-0 {isLeft ? 'items-start' : 'items-end'}" style="max-width: calc(100% - 3rem)">
+								<span class="text-[10px] font-bold uppercase tracking-widest" style="color: {msg.color}">{msg.agentName}</span>
+								<p class="text-[14.5px] leading-relaxed text-[#d4d4e8] px-4 py-3.5 rounded-2xl {isLeft ? 'rounded-tl-sm border-l-2' : 'rounded-tr-sm border-r-2'}"
+									style="background-color: {msg.color}09; border-color: {msg.color}30; border-top: 1px solid {msg.color}1a; border-bottom: 1px solid {msg.color}1a; {isLeft ? '' : 'border-left: 1px solid ' + msg.color + '1a'}">
+									{msg.text}
+								</p>
+							</div>
 						</div>
-						<!-- Bubble -->
-						<div class="flex flex-col gap-1.5 min-w-0 {isLeft ? 'items-start' : 'items-end'}" style="max-width: calc(100% - 3rem)">
-							<span class="text-[10px] font-bold uppercase tracking-widest" style="color: {msg.color}">{msg.agentName}</span>
-							<p class="text-[14.5px] leading-relaxed text-[#d4d4e8] px-4 py-3.5 rounded-2xl {isLeft ? 'rounded-tl-sm border-l-2' : 'rounded-tr-sm border-r-2'}"
-								style="background-color: {msg.color}09; border-color: {msg.color}30; border-top: 1px solid {msg.color}1a; border-bottom: 1px solid {msg.color}1a; {isLeft ? '' : 'border-left: 1px solid ' + msg.color + '1a'}">
-								{msg.text}
-							</p>
-						</div>
-					</div>
+					{/if}
 				{/each}
 
 				<!-- Live stream / typing indicator -->
@@ -593,7 +670,7 @@
 				{#if done}
 					<div class="flex items-center gap-3 px-6 py-4 border-t border-[--color-border-subtle]">
 						<div class="flex-1 h-px bg-[--color-border-subtle]"></div>
-						<span class="text-[11px] uppercase tracking-widest text-[--color-muted]">Debate ended · {messages.length} turns</span>
+						<span class="text-[11px] uppercase tracking-widest text-[--color-muted]">Debate ended · {messages.filter(m => m.agentId !== 'moderator').length} turns</span>
 						<div class="flex-1 h-px bg-[--color-border-subtle]"></div>
 					</div>
 				{/if}

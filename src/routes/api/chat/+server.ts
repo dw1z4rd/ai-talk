@@ -5,12 +5,13 @@ import type { Message } from '$lib/agents';
 // Each SSE event is JSON: { type: 'message' | 'done' | 'error', ... }
 
 export const POST: RequestHandler = async ({ request }) => {
-	const { topic, turns, context, agentA, agentB } = (await request.json()) as {
+	const { topic, turns, context, agentA, agentB, messages } = (await request.json()) as {
 		topic: string;
 		turns: number;
 		context?: string;
 		agentA?: string;
 		agentB?: string;
+		messages?: Message[];
 	};
 
 	const safeTopic = topic?.trim() || 'What is consciousness?';
@@ -27,9 +28,21 @@ export const POST: RequestHandler = async ({ request }) => {
 					agentA ?? 'deepseek-v3.1:671b-cloud',
 					agentB ?? 'llama3.3:70b-cloud'
 				);
-				const history: Message[] = [];
+				
+				const history: Message[] = (messages || []).map((m: any) => {
+					if (m.agentId === 'moderator') {
+						return {
+							agentId: 'moderator',
+							agentName: 'Moderator',
+							text: `The debate was interrupted by the Moderator, who said: '${m.text}'. You must address this point before continuing your attack on your opponent.`
+						};
+					}
+					return m;
+				});
 
-				for (let turn = 0; turn < totalTurns; turn++) {
+				const aiMessagesCount = history.filter(m => m.agentId !== 'moderator').length;
+				
+				for (let turn = aiMessagesCount; turn < totalTurns; turn++) {
 					const agent = agents[turn % agents.length];
 					const text = await generateReply(agent, history, safeTopic, context, (token) => {
 						send({ type: 'token', agentId: agent.id, agentName: agent.name, color: agent.color, text: token });
