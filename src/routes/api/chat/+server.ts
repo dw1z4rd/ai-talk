@@ -48,10 +48,10 @@ export const POST: RequestHandler = async ({ request }) => {
 						send({ type: 'token', agentId: agent.id, agentName: agent.name, color: agent.color, text: token });
 					});
 
-					if (!text) {
-						send({ type: 'error', agentId: agent.id, message: `${agent.name} failed to respond.` });
-						continue;
-					}
+if (!text) {
+// All retries exhausted — silently skip this turn so the debate continues uninterrupted.
+continue;
+}
 
 					const msg: Message = { agentId: agent.id, agentName: agent.name, text };
 					history.push(msg);
