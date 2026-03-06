@@ -8,16 +8,16 @@
         status: 'playing' | 'won' | 'lost';
     };
 
-    let gameState: GameState = {
+    let gameState = $state<GameState>({
         location: 'Unknown',
         inventory: [],
         clues: [],
         status: 'playing'
-    };
+    });
 
-    let messages: { role: 'user' | 'assistant', content: string }[] = [];
-    let userInput = '';
-    let isLoading = true;
+    let messages = $state<{ role: 'user' | 'assistant', content: string }[]>([]);
+    let userInput = $state('');
+    let isLoading = $state(true);
     let chatContainer: HTMLElement;
 
     async function scrollToBottom() {
