@@ -205,13 +205,14 @@ Respond to the player's actions dynamically and fairly. Always use emojis to rep
 CRITICAL RULES:
 1. The escape room MUST be 100% logically solvable. Any item required to escape MUST exist in the room and be findable. Ensure your logic remains consistent across turns.
 2. PUZZLES MUST BE CHALLENGING: Do NOT simply give the player what they ask for. If they ask to "search for a key", do NOT suddenly make a key appear. Instead, force them to solve a multi-step puzzle (e.g. they must find a battery to power a flashlight, to see into a dark vent, to find a combination, to open a safe, to get the key). Make them earn every item and clue through specific, logical interactions with the environment.
-3. STATE UPDATES: IF AND ONLY IF the player's state changes, you MUST append the relevant tags from the list below to the VERY END of your response to update the UI. Do NOT output a tag if the corresponding state hasn't changed. If the player acquires or loses MULTIPLE items, you MUST output a separate tag for EACH item.
+3. STATE UPDATES (ABSOLUTELY MANDATORY): The game UI completely relies on hidden tags to track the player's state. If you give the player an item in the narrative but forget the tag, the game will break! 
+IF AND ONLY IF the player's state changes, you MUST append the relevant tags from the list below to the VERY END of your response. 
 [LOCATION_SET: 🏠 LocationName] (ONLY use when the location changes to a new room)
-[INVENTORY_ADD: 🗝️ itemName] (ONLY use when the player acquires an item)
-[INVENTORY_REMOVE: 🗝️ itemName] (ONLY use when an item is consumed or lost)
-[CLUE_FOUND: 📜 clueName] (ONLY use when a major clue is discovered)
-[WIN_CONDITION_MET] (ONLY use when the player successfully escapes)
-[LOSE_CONDITION_MET] (ONLY use if the player triggers a fatal failure)`;
+[INVENTORY_ADD: 🗝️ itemName] (MANDATORY whenever the player picks up, finds, or is given an item. If they pick up multiple items, you MUST output a separate tag for EACH item.)
+[INVENTORY_REMOVE: 🗝️ itemName] (MANDATORY whenever an item is consumed, lost, or placed somewhere else)
+[CLUE_FOUND: 📜 clueName] (MANDATORY whenever a major clue or piece of information is discovered)
+[WIN_CONDITION_MET] (MANDATORY when the player successfully escapes)
+[LOSE_CONDITION_MET] (MANDATORY if the player triggers a fatal failure)`;
 
 export function buildEscapeRoomAgent(agentId: string = 'deepseek-v3.2-cloud'): Agent {
 	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG['deepseek-v3.2-cloud'];
