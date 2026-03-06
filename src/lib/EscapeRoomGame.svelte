@@ -32,46 +32,55 @@
         let cleanText = text;
         
         // Location
-        const locationMatch = cleanText.match(/\[LOCATION_SET:\s*(.+?)\]/);
+        const locationMatch = cleanText.match(/\[LOCATION_SET:\s*(.+?)(?:\]|$)/);
         if (locationMatch) {
-            gameState.location = locationMatch[1];
+            gameState.location = locationMatch[1].trim();
             cleanText = cleanText.replace(locationMatch[0], '');
         }
 
         // Inventory Add
-        const invAddMatches = [...cleanText.matchAll(/\[INVENTORY_ADD:\s*(.+?)\]/g)];
+        const invAddMatches = [...cleanText.matchAll(/\[INVENTORY_ADD:\s*(.+?)(?:\]|$)/g)];
         for (const match of invAddMatches) {
-            if (!gameState.inventory.includes(match[1])) {
-                gameState.inventory = [...gameState.inventory, match[1]];
+            const item = match[1].trim();
+            if (!gameState.inventory.includes(item)) {
+                gameState.inventory = [...gameState.inventory, item];
             }
             cleanText = cleanText.replace(match[0], '');
         }
 
         // Inventory Remove
-        const invRemMatches = [...cleanText.matchAll(/\[INVENTORY_REMOVE:\s*(.+?)\]/g)];
+        const invRemMatches = [...cleanText.matchAll(/\[INVENTORY_REMOVE:\s*(.+?)(?:\]|$)/g)];
         for (const match of invRemMatches) {
-            gameState.inventory = gameState.inventory.filter(i => i !== match[1]);
+            const item = match[1].trim();
+            gameState.inventory = gameState.inventory.filter(i => i !== item);
             cleanText = cleanText.replace(match[0], '');
         }
 
         // Clue Found
-        const clueMatches = [...cleanText.matchAll(/\[CLUE_FOUND:\s*(.+?)\]/g)];
+        const clueMatches = [...cleanText.matchAll(/\[CLUE_FOUND:\s*(.+?)(?:\]|$)/g)];
         for (const match of clueMatches) {
-            if (!gameState.clues.includes(match[1])) {
-                gameState.clues = [...gameState.clues, match[1]];
+            const clue = match[1].trim();
+            if (!gameState.clues.includes(clue)) {
+                gameState.clues = [...gameState.clues, clue];
             }
             cleanText = cleanText.replace(match[0], '');
         }
 
         // Win/Lose
-        if (cleanText.includes('[WIN_CONDITION_MET]')) {
+        const winMatch = cleanText.match(/\[WIN_CONDITION_MET(?:\]|$)/);
+        if (winMatch) {
             gameState.status = 'won';
-            cleanText = cleanText.replace('[WIN_CONDITION_MET]', '');
+            cleanText = cleanText.replace(winMatch[0], '');
         }
-        if (cleanText.includes('[LOSE_CONDITION_MET]')) {
+        
+        const loseMatch = cleanText.match(/\[LOSE_CONDITION_MET(?:\]|$)/);
+        if (loseMatch) {
             gameState.status = 'lost';
-            cleanText = cleanText.replace('[LOSE_CONDITION_MET]', '');
+            cleanText = cleanText.replace(loseMatch[0], '');
         }
+
+        // Catch any malformed tags that might have been left over to ensure they don't render
+        cleanText = cleanText.replace(/\[[A-Z_]+:.*/g, '');
 
         return cleanText.trim();
     }
