@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, tick } from 'svelte';
 
     type GameState = {
         location: string;
@@ -18,6 +18,14 @@
     let messages: { role: 'user' | 'assistant', content: string }[] = [];
     let userInput = '';
     let isLoading = true;
+    let chatContainer: HTMLElement;
+
+    async function scrollToBottom() {
+        await tick();
+        if (chatContainer) {
+            chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+        }
+    }
 
     // Helper to parse tags and update state, returning the clean text
     function parseTagsAndUpdateState(text: string) {
@@ -74,6 +82,7 @@
         const cleanText = parseTagsAndUpdateState(data.response);
         messages = [{ role: 'assistant', content: cleanText }];
         isLoading = false;
+        scrollToBottom();
     });
 
     async function submitAction() {
@@ -83,6 +92,7 @@
         userInput = '';
         messages = [...messages, { role: 'user', content: action }];
         isLoading = true;
+        scrollToBottom();
 
         const res = await fetch('/api/escape-room/chat', {
             method: 'POST',
@@ -93,6 +103,7 @@
         const cleanText = parseTagsAndUpdateState(data.response);
         messages = [...messages, { role: 'assistant', content: cleanText }];
         isLoading = false;
+        scrollToBottom();
     }
 </script>
 
@@ -100,7 +111,7 @@
     <!-- Chat Area -->
     <div class="flex-1 flex flex-col bg-[--color-panel] rounded-2xl p-5 border border-[--color-border] overflow-hidden">
         
-        <div class="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+        <div bind:this={chatContainer} class="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 scroll-smooth">
             {#each messages as msg}
                 <div class="p-3.5 rounded-xl {msg.role === 'user' ? 'bg-[#222] self-end ml-12 border border-[#333]' : 'bg-[--color-surface] text-[#aaa] mr-12 border border-[--color-border]'}">
                     {msg.content}
