@@ -48,12 +48,14 @@ export interface RetryConfig {
 // ─── Ollama-Specific Types ───────────────────────────────────────────────────
 
 export interface OllamaProviderConfig {
-	/** Base URL of the Ollama server (default: http://localhost:11434) */
-	readonly baseUrl?: string;
-	/** Model name, including optional tag e.g. 'deepseek-v3.1:671b-cloud' */
-	readonly model?: string;
-	/** Optional bearer token for cloud/remote Ollama instances */
-	readonly apiKey?: string;
+/** Base URL of the Ollama server (default: http://localhost:11434) */
+readonly baseUrl?: string;
+/** Model name, including optional tag e.g. 'deepseek-v3.1:671b-cloud' */
+readonly model?: string;
+/** Optional bearer token for cloud/remote Ollama instances */
+readonly apiKey?: string;
+/** Extra fields merged directly into the request body (e.g. { think: false } for Qwen3) */
+readonly extraBody?: Record<string, unknown>;
 }
 
 // ─── OpenAI-Specific Types ───────────────────────────────────────────────────

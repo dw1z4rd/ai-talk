@@ -30,18 +30,19 @@ export const createOllamaProvider = (config: OllamaProviderConfig = {}): LLMProv
 		const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 		if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
 
-		const body = JSON.stringify({
-			model: config.model ?? DEFAULT_MODEL,
-			messages: [
-				...(options?.systemPrompt != null
-					? [{ role: 'system', content: options.systemPrompt }]
-					: []),
-				{ role: 'user', content: prompt }
-			],
-			...(options?.maxTokens != null ? { max_tokens: options.maxTokens } : {}),
-			...(options?.temperature != null ? { temperature: options.temperature } : {}),
-			stream: !!options?.onToken
-		});
+const body = JSON.stringify({
+model: config.model ?? DEFAULT_MODEL,
+messages: [
+...(options?.systemPrompt != null
+? [{ role: 'system', content: options.systemPrompt }]
+: []),
+{ role: 'user', content: prompt }
+],
+...(options?.maxTokens != null ? { max_tokens: options.maxTokens } : {}),
+...(options?.temperature != null ? { temperature: options.temperature } : {}),
+stream: !!options?.onToken,
+...(config.extraBody ?? {})
+});
 
 		try {
 			const response = await fetch(url, { method: 'POST', headers, body });
@@ -70,9 +71,9 @@ export const createOllamaProvider = (config: OllamaProviderConfig = {}): LLMProv
 						const payload = line.slice(6).trim();
 						if (payload === '[DONE]') break outer;
 						try {
-							const chunk = JSON.parse(payload) as OpenAIResponse & { choices?: Array<{ delta?: { content?: string } }> };
-							const token = (chunk.choices as any)?.[0]?.delta?.content;
-							if (token) { fullText += token; options.onToken(token); }
+const chunk = JSON.parse(payload) as OpenAIResponse & { choices?: Array<{ delta?: { content?: string; reasoning?: string } }> };
+const token = (chunk.choices as any)?.[0]?.delta?.content || (chunk.choices as any)?.[0]?.delta?.reasoning || '';
+if (token) { fullText += token; options.onToken(token); }
 						} catch { /* skip malformed chunks */ }
 					}
 				}

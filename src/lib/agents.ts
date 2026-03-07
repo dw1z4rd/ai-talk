@@ -46,7 +46,7 @@ makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OL
 'qwen3:72b-cloud': {
 name: 'Qwen3 Next 80B',
 color: '#34D399',
-makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwen3:72b-cloud' })
+makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwen3:72b-cloud', extraBody: { think: false } })
 },
 'kimi-k2:1t-cloud': {
 name: 'Kimi K2 1T',
