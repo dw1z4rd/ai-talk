@@ -249,7 +249,8 @@ const createTarpitStream = (
     sessionId: string,
     ip: string,
     pathname: string,
-    startTime: number
+    startTime: number,
+    signal?: AbortSignal
 ): ReadableStream => {
     // Shared state between start() and cancel() — must live outside both.
     let contentBuffer = '';
@@ -270,6 +271,12 @@ const createTarpitStream = (
 
     return new ReadableStream({
         async start(controller) {
+            const onAbort = () => {
+                cancelled = true;
+                teardown(); // fire-and-forget; idempotent via tornDown guard
+            };
+            signal?.addEventListener('abort', onAbort, { once: true });
+
             try {
                 for await (const chunk of llmStream) {
                     if (cancelled) break;
@@ -290,9 +297,11 @@ const createTarpitStream = (
                         await new Promise(r => setTimeout(r, 100 + randomInt(250)));
                     }
                 }
+                signal?.removeEventListener('abort', onAbort);
                 await teardown();
                 if (!cancelled) controller.close();
             } catch (e) {
+                signal?.removeEventListener('abort', onAbort);
                 const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
                 console.log(`[TARPIT] 💀 Bot ${ip} gave up after ${elapsed} seconds.`);
                 await teardown();
@@ -411,7 +420,7 @@ export const handleTarpit: Handle = async ({ event, resolve }) => {
         const { stream: llmStream } = await model.generateContentStream({
             contents: [{ role: 'user', parts: [{ text: TARPIT_PROMPT }] }],
         });
-        const stream = createTarpitStream(llmStream, sessionId, ip, pathname, startTime);
+        const stream = createTarpitStream(llmStream, sessionId, ip, pathname, startTime, event.request.signal);
         return new Response(stream, {
             headers: {
                 'Content-Type': 'application/json',
