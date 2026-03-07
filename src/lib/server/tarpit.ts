@@ -123,7 +123,6 @@ export const TRAP_PATHS = [
     '/c99.php',
     '/r57.php',
     '/.well-known/security.txt',
-    '/robots.txt',
     '/sitemap.xml',
     '/.DS_Store',
     '/thumbs.db',
