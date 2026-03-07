@@ -430,6 +430,7 @@ export const handleTarpit: Handle = async ({ event, resolve }) => {
         });
     } catch (error) {
         console.error('[Tarpit] API failed, dropping back to 404:', error);
+        activeSessions.delete(sessionId);
         tarpitBus.emit('bot_disconnected', { sessionId, duration_seconds: 0 });
         return resolve(event);
     }
