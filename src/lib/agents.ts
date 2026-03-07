@@ -43,11 +43,6 @@ name: 'Devstral Small 2',
 color: '#FF7000',
 makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'devstral-small-2:24b-cloud' })
 },
-'qwen3:72b-cloud': {
-name: 'Qwen3 Next 80B',
-color: '#34D399',
-makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwen3:72b-cloud', extraBody: { think: false } })
-},
 'kimi-k2:1t-cloud': {
 name: 'Kimi K2 1T',
 color: '#A78BFA',
@@ -65,18 +60,6 @@ makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OL
 		color: '#34A853',
 		makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-1.5-pro' })
 	},
-	// Claude
-	'claude-sonnet-4-6': {
-		name: 'Claude Sonnet 4.6',
-		color: '#D97706',
-		makeProvider: () => createAnthropicProvider({ apiKey: ANTHROPIC_API_KEY, model: 'claude-sonnet-4-6' })
-	},
-	'claude-3-5-sonnet-20241022': {
-		name: 'Claude 3.5 Sonnet',
-		color: '#B45309',
-		makeProvider: () =>
-			createAnthropicProvider({ apiKey: ANTHROPIC_API_KEY, model: 'claude-3-5-sonnet-20241022' })
-	}
 };
 
 function makeSystemPrompt(myName: string, opponentName: string): string {
