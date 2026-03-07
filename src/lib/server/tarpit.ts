@@ -6,7 +6,7 @@ import type { Handle } from '@sveltejs/kit';
 import { createGzip } from 'node:zlib';
 import { createWriteStream } from 'node:fs';
 import { randomInt } from 'node:crypto';
-import { tarpitBus, getTarpitMode } from '$lib/server/tarpit-bus';
+import { tarpitBus, getTarpitMode, activeSessions } from '$lib/server/tarpit-bus';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -258,6 +258,7 @@ const createTarpitStream = (
             const teardown = async () => {
                 const dropEvent = makeConnectionDroppedEvent(ip, pathname, startTime, contentBuffer, sessionId);
                 await logTarpitEvent(dropEvent);
+                activeSessions.delete(sessionId);
                 tarpitBus.emit('bot_disconnected', {
                     sessionId,
                     duration_seconds: dropEvent.duration_seconds,
@@ -268,6 +269,12 @@ const createTarpitStream = (
                 for await (const chunk of llmStream) {
                     const chunkText = chunk.text();
                     if (contentBuffer.length < MAX_CONTENT_BUFFER) contentBuffer += chunkText;
+                    const session = activeSessions.get(sessionId);
+                    if (session) {
+                        session.type = 'tarpit';
+                        const combined = session.content + chunkText;
+                        session.content = combined.length > 10240 ? combined.slice(-10240) : combined;
+                    }
                     tarpitBus.emit('tarpit_chunk', { sessionId, text: chunkText });
 
                     for (const char of chunkText) {
@@ -369,6 +376,7 @@ export const handleTarpit: Handle = async ({ event, resolve }) => {
 
     await logTarpitEvent(makeConnectionStartedEvent(ip, pathname, userAgent));
     tarpitBus.emit('bot_detected', { sessionId, ip, path: pathname, userAgent, timestamp });
+    activeSessions.set(sessionId, { sessionId, ip, path: pathname, userAgent, timestamp, type: 'pending', content: '' });
 
     const mode = selectTarpitMode(getTarpitMode(), bombReady);
 
@@ -376,8 +384,13 @@ export const handleTarpit: Handle = async ({ event, resolve }) => {
         const filename = pathname.split('/').pop() ?? 'data.bin';
         await logTarpitEvent(makeBombServedEvent(ip, pathname, userAgent, filename, sessionId));
         tarpitBus.emit('bomb_served', { sessionId, filename });
+        const bombSession = activeSessions.get(sessionId);
+        if (bombSession) { bombSession.type = 'bomb'; bombSession.filename = filename; }
         console.log(`[TARPIT] 💣 Serving bomb to ${ip} as "${filename}"`);
-        setImmediate(() => tarpitBus.emit('bot_disconnected', { sessionId, duration_seconds: 0 }));
+        setImmediate(() => {
+            activeSessions.delete(sessionId);
+            tarpitBus.emit('bot_disconnected', { sessionId, duration_seconds: 0 });
+        });
         return createBombResponse(bombBuffer!, filename);
     }
 

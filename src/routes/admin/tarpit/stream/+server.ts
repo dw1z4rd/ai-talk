@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { tarpitBus, getTarpitMode, setTarpitMode, type TarpitMode } from '$lib/server/tarpit-bus';
+import { tarpitBus, getTarpitMode, setTarpitMode, activeSessions, type TarpitMode } from '$lib/server/tarpit-bus';
 import type { RequestHandler } from './$types';
 
 const encoder = new TextEncoder();
@@ -30,7 +30,8 @@ async function loadInitialState() {
     bombSizeBytes = stat.size;
   } catch { /* bomb not generated yet */ }
 
-  return { victims, totalWasted: totalWasted.toFixed(1), bombSizeBytes, mode: getTarpitMode() };
+  const activeBots = Object.fromEntries(activeSessions);
+  return { victims, totalWasted: totalWasted.toFixed(1), bombSizeBytes, mode: getTarpitMode(), activeBots };
 }
 
 export const DELETE: RequestHandler = async () => {
@@ -65,9 +66,11 @@ export const GET: RequestHandler = ({ request }) => {
   const stream = new ReadableStream({
     async start(controller) {
       let alive = true;
+      let heartbeat: ReturnType<typeof setInterval> | null = null;
 
       const cleanup = () => {
         alive = false;
+        if (heartbeat) { clearInterval(heartbeat); heartbeat = null; }
         tarpitBus.off('bot_detected', onBotDetected);
         tarpitBus.off('bomb_served', onBombServed);
         tarpitBus.off('tarpit_chunk', onTarpitChunk);
@@ -86,11 +89,12 @@ export const GET: RequestHandler = ({ request }) => {
         }
       };
 
-      // Send initial state on connect
-      const initial = await loadInitialState();
-      safeSend({ type: 'init', ...initial });
+      const safeEnqueue = (chunk: Uint8Array) => {
+        if (!alive) return;
+        try { controller.enqueue(chunk); } catch { cleanup(); }
+      };
 
-      // Subscribe to live events
+      // Subscribe FIRST to avoid missing events during async init load
       const onBotDetected = (payload: unknown) => safeSend({ type: 'bot_detected', ...payload as object });
       const onBombServed = (payload: unknown) => safeSend({ type: 'bomb_served', ...payload as object });
       const onTarpitChunk = (payload: unknown) => safeSend({ type: 'tarpit_chunk', ...payload as object });
@@ -106,6 +110,15 @@ export const GET: RequestHandler = ({ request }) => {
       tarpitBus.on('bot_disconnected', onBotDisconnected);
       tarpitBus.on('bomb_ready', onBombReady);
       tarpitBus.on('mode_changed', onModeChanged);
+
+      // Send initial state (includes current activeSessions snapshot)
+      const initial = await loadInitialState();
+      safeSend({ type: 'init', ...initial });
+
+      // Heartbeat: keep the connection alive through proxies/firewalls
+      heartbeat = setInterval(() => {
+        safeEnqueue(encoder.encode(': ping\n\n'));
+      }, 15_000);
 
       request.signal.addEventListener('abort', cleanup);
     }

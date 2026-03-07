@@ -45,6 +45,7 @@
         liveTotalWasted = msg.totalWasted;
         bombSizeBytes = msg.bombSizeBytes;
         if (msg.mode) tarpitMode = msg.mode;
+        if (msg.activeBots) activeBots = msg.activeBots;
         return;
       }
 
