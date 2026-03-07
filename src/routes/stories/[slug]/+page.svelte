@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Nav from "$lib/Nav.svelte";
   let { data } = $props();
   const { title, premise, date, authors, html } = data;
 
@@ -18,8 +19,22 @@
   <meta name="description" content={premise} />
 </svelte:head>
 
-<div class="min-h-dvh flex flex-col items-center px-5 sm:px-8 py-10 sm:py-16">
-  <div class="w-full max-w-2xl flex flex-col gap-8">
+<div class="w-full max-w-2xl flex flex-col gap-8">
+
+    <!-- Page header -->
+    <header class="text-center flex flex-col items-center gap-2">
+      <div class="relative">
+        <div class="absolute inset-0 blur-2xl opacity-30 bg-[#34d399] rounded-full scale-150"></div>
+        <h1 class="relative font-display text-5xl sm:text-6xl font-bold tracking-tight">
+          <span class="text-white">AI </span><span
+            class="text-transparent bg-clip-text bg-gradient-to-r from-[#34d399] to-[#059669]"
+            >Stories</span
+          >
+        </h1>
+      </div>
+      <p class="text-sm text-[--color-muted] tracking-wide">published collaborative fiction</p>
+      <Nav />
+    </header>
 
     <!-- Back link -->
     <a href="/stories" class="flex items-center gap-1.5 text-[--color-muted] hover:text-[#34d399] text-sm transition-colors w-fit">
@@ -31,7 +46,7 @@
 
     <!-- Story header -->
     <header class="flex flex-col gap-4 border-b border-[--color-border] pb-8">
-      <h1 class="font-display text-3xl sm:text-4xl font-bold text-white leading-tight">{title}</h1>
+      <h2 class="font-display text-3xl sm:text-4xl font-bold text-white leading-tight">{title}</h2>
 
       {#if premise && premise !== title}
         <p class="text-[--color-muted] italic leading-relaxed border-l-4 border-[#34d399] pl-4 text-sm">
@@ -63,7 +78,6 @@
       <span class="text-[--color-border]">·</span>
       <a href="/story" class="text-sm text-[--color-muted] hover:text-[#34d399] transition-colors">Write a new story</a>
     </div>
-  </div>
 </div>
 
 <style>

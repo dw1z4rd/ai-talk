@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Nav from "$lib/Nav.svelte";
   const MODEL_OPTIONS = [
     {
       group: "Ollama — Cloud",
@@ -305,8 +306,7 @@
   }
 </script>
 
-<div class="min-h-dvh flex flex-col items-center px-5 sm:px-8 py-10 sm:py-14">
-  <div class="w-full max-w-3xl flex flex-col gap-6">
+<div class="w-full max-w-3xl flex flex-col gap-6">
     <!-- Header -->
     <header class="text-center flex flex-col items-center gap-2">
       <div class="relative">
@@ -316,39 +316,16 @@
         <h1
           class="relative font-display text-5xl sm:text-6xl font-bold tracking-tight"
         >
-          <span class="text-white">ai</span><span
+          <span class="text-white">AI </span><span
             class="text-transparent bg-clip-text bg-gradient-to-r from-[#34d399] to-[#059669]"
-            >story</span
+            >Story Generator</span
           >
         </h1>
       </div>
       <p class="text-sm text-[--color-muted] tracking-wide">
         collaborative fiction by language models
       </p>
-      <!-- Nav -->
-      <div
-        class="flex items-center gap-1 mt-1 bg-[--color-panel] border border-[--color-border] rounded-xl p-1"
-      >
-        <a
-          href="/"
-          class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors"
-          >⚔ Debate</a
-        >
-        <a
-          href="/escape-room"
-          class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors"
-          >🗝️ Escape Room</a
-        >
-        <span
-          class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-[#34d399]/10 text-[#34d399]"
-          >📖 Story</span
-        >
-        <a
-          href="/stories"
-          class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors"
-          >📚 Published</a
-        >
-      </div>
+      <Nav />
     </header>
 
     <!-- Setup card -->
@@ -737,18 +714,7 @@
         </div>
       {/if}
     {/if}
-  </div>
 </div>
 
 <style>
-  @keyframes fadeSlide {
-    from {
-      opacity: 0;
-      transform: translateY(5px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
 </style>

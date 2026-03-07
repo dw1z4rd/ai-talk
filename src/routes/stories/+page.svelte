@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Nav from "$lib/Nav.svelte";
   let { data } = $props();
   const { stories } = data;
 
@@ -13,28 +14,20 @@
   }
 </script>
 
-<div class="min-h-dvh flex flex-col items-center px-5 sm:px-8 py-10 sm:py-14">
-  <div class="w-full max-w-3xl flex flex-col gap-8">
+<div class="w-full max-w-3xl flex flex-col gap-8">
     <!-- Header -->
     <header class="text-center flex flex-col items-center gap-2">
       <div class="relative">
         <div class="absolute inset-0 blur-2xl opacity-30 bg-[#34d399] rounded-full scale-150"></div>
         <h1 class="relative font-display text-5xl sm:text-6xl font-bold tracking-tight">
-          <span class="text-white">ai</span><span
+          <span class="text-white">AI </span><span
             class="text-transparent bg-clip-text bg-gradient-to-r from-[#34d399] to-[#059669]"
-            >stories</span
+            >Stories</span
           >
         </h1>
       </div>
       <p class="text-sm text-[--color-muted] tracking-wide">published collaborative fiction</p>
-
-      <!-- Nav -->
-      <div class="flex items-center gap-1 mt-1 bg-[--color-panel] border border-[--color-border] rounded-xl p-1 flex-wrap justify-center">
-        <a href="/" class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors">⚔ Debate</a>
-        <a href="/escape-room" class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors">🗝️ Escape Room</a>
-        <a href="/story" class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors">📖 Story</a>
-        <span class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-[#34d399]/10 text-[#34d399]">📚 Published</span>
-      </div>
+      <Nav />
     </header>
 
     <!-- Story list -->
@@ -92,5 +85,4 @@
         </a>
       </div>
     {/if}
-  </div>
 </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Nav from "$lib/Nav.svelte";
   const MODEL_OPTIONS = [
     {
       group: "Ollama — Cloud",
@@ -384,11 +385,10 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="min-h-dvh flex flex-col items-center px-5 sm:px-8 py-10 sm:py-14"
+  class="w-full max-w-2xl flex flex-col gap-6"
   ondragover={(e) => e.preventDefault()}
   ondrop={(e) => e.preventDefault()}
 >
-  <div class="w-full max-w-2xl flex flex-col gap-6">
     <!-- Header -->
     <header class="text-center flex flex-col items-center gap-2">
       <div class="relative">
@@ -398,34 +398,16 @@
         <h1
           class="relative font-display text-5xl sm:text-6xl font-bold tracking-tight"
         >
-          <span class="text-white">ai</span><span
+          <span class="text-white">AI </span><span
             class="text-transparent bg-clip-text bg-gradient-to-r from-[#7c6af7] to-[#c084fc]"
-            >talk</span
+            >Debate</span
           >
         </h1>
       </div>
       <p class="text-sm text-[--color-muted] tracking-wide">
         two AIs, one topic, no mercy
       </p>
-      <!-- Nav -->
-      <div
-        class="flex items-center gap-1 mt-1 bg-[--color-panel] border border-[--color-border] rounded-xl p-1"
-      >
-        <span
-          class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-[--color-accent]/10 text-[--color-accent]"
-          >⚔ Debate</span
-        >
-        <a
-          href="/escape-room"
-          class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors"
-          >🗝️ Escape Room</a
-        >
-        <a
-          href="/story"
-          class="text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg text-[--color-muted] hover:text-white transition-colors"
-          >📖 Story</a
-        >
-      </div>
+      <Nav />
     </header>
 
     <!-- Setup card -->
@@ -1120,18 +1102,7 @@
         </button>
       </div>
     {/if}
-  </div>
 </div>
 
 <style>
-  @keyframes fadeSlide {
-    from {
-      opacity: 0;
-      transform: translateY(5px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
 </style>
