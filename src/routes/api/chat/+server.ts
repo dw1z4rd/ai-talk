@@ -25,8 +25,8 @@ export const POST: RequestHandler = async ({ request }) => {
 
 			try {
 				const agents = buildAgents(
-					agentA ?? 'deepseek-v3.1:671b-cloud',
-					agentB ?? 'llama3.3:70b-cloud'
+          agentA ?? 'deepseek-v3.1:671b-cloud',
+          agentB ?? 'deepseek-v3.2-cloud'
 				);
 				
 				const history: Message[] = (messages || []).map((m: any) => {
