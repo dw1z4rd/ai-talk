@@ -69,9 +69,9 @@
   let errorMsg = $state("");
   let chatEl = $state<HTMLElement | null>(null);
   let abortController = $state<AbortController | null>(null);
-  let agentA = $state("gemini-2.0-flash");
-  let agentB = $state("devstral-small-2:24b-cloud");
-  let leftAgentId = $state("gemini-2.0-flash");
+  let agentA = $state("kimi-k2:1t-cloud");
+  let agentB = $state("deepseek-v3.2-cloud");
+  let leftAgentId = $state("kimi-k2:1t-cloud");
   let typingAgentName = $state("");
   let typingAgentColor = $state("");
   let streamingMessage = $state<ChatMessage | null>(null);
