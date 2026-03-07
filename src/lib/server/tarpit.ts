@@ -250,23 +250,29 @@ const createTarpitStream = (
     ip: string,
     pathname: string,
     startTime: number
-): ReadableStream =>
-    new ReadableStream({
+): ReadableStream => {
+    // Shared state between start() and cancel() — must live outside both.
+    let contentBuffer = '';
+    let cancelled = false;
+    let tornDown = false;
+
+    const teardown = async () => {
+        if (tornDown) return; // idempotent — prevent double-emit
+        tornDown = true;
+        const dropEvent = makeConnectionDroppedEvent(ip, pathname, startTime, contentBuffer, sessionId);
+        await logTarpitEvent(dropEvent);
+        activeSessions.delete(sessionId);
+        tarpitBus.emit('bot_disconnected', {
+            sessionId,
+            duration_seconds: dropEvent.duration_seconds,
+        });
+    };
+
+    return new ReadableStream({
         async start(controller) {
-            let contentBuffer = '';
-
-            const teardown = async () => {
-                const dropEvent = makeConnectionDroppedEvent(ip, pathname, startTime, contentBuffer, sessionId);
-                await logTarpitEvent(dropEvent);
-                activeSessions.delete(sessionId);
-                tarpitBus.emit('bot_disconnected', {
-                    sessionId,
-                    duration_seconds: dropEvent.duration_seconds,
-                });
-            };
-
             try {
                 for await (const chunk of llmStream) {
+                    if (cancelled) break;
                     const chunkText = chunk.text();
                     if (contentBuffer.length < MAX_CONTENT_BUFFER) contentBuffer += chunkText;
                     const session = activeSessions.get(sessionId);
@@ -278,21 +284,28 @@ const createTarpitStream = (
                     tarpitBus.emit('tarpit_chunk', { sessionId, text: chunkText });
 
                     for (const char of chunkText) {
+                        if (cancelled) break;
                         controller.enqueue(new TextEncoder().encode(char));
                         // Randomized Kaufman Delay: between 100ms and 350ms per character
                         await new Promise(r => setTimeout(r, 100 + randomInt(250)));
                     }
                 }
-                controller.close();
                 await teardown();
+                if (!cancelled) controller.close();
             } catch (e) {
                 const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
                 console.log(`[TARPIT] 💀 Bot ${ip} gave up after ${elapsed} seconds.`);
                 await teardown();
-                controller.error(e);
+                if (!cancelled) controller.error(e);
             }
         },
+        // Called by the runtime when the bot closes the HTTP connection.
+        async cancel() {
+            cancelled = true;
+            await teardown();
+        },
     });
+};
 
 // ─── Bomb lifecycle ───────────────────────────────────────────────────────────
 
