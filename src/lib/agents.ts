@@ -38,13 +38,23 @@ name: 'Gemini 2.5 Flash',
 color: '#1A73E8',
 makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-2.5-flash' })
 },
-	'devstral-small-2:24b-cloud': {
-		name: 'Devstral Small 2',
-		color: '#FF7000',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'devstral-small-2:24b' })
-	},
+'devstral-small-2:24b-cloud': {
+name: 'Devstral Small 2',
+color: '#FF7000',
+makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'devstral-small-2:24b' })
+},
+'qwen3:72b-cloud': {
+name: 'Qwen 3 72B',
+color: '#34D399',
+makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwen3:72b' })
+},
+'llama4-maverick-cloud': {
+name: 'Llama 4 Maverick',
+color: '#A78BFA',
+makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'llama4:maverick' })
+},
 
-	// Ollama — Local
+// Ollama — Local
 	'llama3.2': {
 		name: 'Llama 3.2 3B',
 		color: '#A78BFA',
