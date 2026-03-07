@@ -12,11 +12,6 @@
         { id: "deepseek-v3.2-cloud", name: "DeepSeek V3.2", color: "#3B7BFF" },
         { id: "llama3.3:70b-cloud", name: "Llama 3.3 70B", color: "#8B5CF6" },
         {
-          id: "gemini-3-flash-preview-cloud",
-          name: "Gemini 3 Flash",
-          color: "#1A73E8",
-        },
-        {
           id: "devstral-small-2:24b-cloud",
           name: "Devstral Small 2",
           color: "#FF7000",
@@ -33,6 +28,11 @@
       group: "Gemini",
       options: [
         { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", color: "#4285F4" },
+        {
+          id: "gemini-3-flash-preview-cloud",
+          name: "Gemini 2.5 Flash",
+          color: "#1A73E8",
+        },
         { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", color: "#34A853" },
       ],
     },

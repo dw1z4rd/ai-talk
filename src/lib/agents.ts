@@ -33,11 +33,11 @@ const MODEL_CATALOG: Record<string, ModelDef> = {
 		color: '#3B7BFF',
 		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.2' })
 	},
-	'gemini-3-flash-preview-cloud': {
-		name: 'Gemini 3 Flash',
-		color: '#1A73E8',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'gemini-3-flash-preview' })
-	},
+'gemini-3-flash-preview-cloud': {
+name: 'Gemini 2.5 Flash',
+color: '#1A73E8',
+makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-2.5-flash' })
+},
 	'devstral-small-2:24b-cloud': {
 		name: 'Devstral Small 2',
 		color: '#FF7000',
