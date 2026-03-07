@@ -10,22 +10,15 @@
           color: "#4B8BF5",
         },
         { id: "deepseek-v3.2-cloud", name: "DeepSeek V3.2", color: "#3B7BFF" },
-        { id: "llama3.3:70b-cloud", name: "Llama 3.3 70B", color: "#8B5CF6" },
-        {
-          id: "gemini-3-flash-preview-cloud",
-          name: "Gemini 3 Flash",
-          color: "#1A73E8",
-        },
         {
           id: "devstral-small-2:24b-cloud",
           name: "Devstral Small 2",
           color: "#FF7000",
         },
-        { id: "kimi-k2.5-cloud", name: "Kimi K2.5", color: "#00C2FF" },
         {
-          id: "qwen3-next:80b-cloud",
-          name: "Qwen3-Next 80B",
-          color: "#34D399",
+          id: "kimi-k2:1t-cloud",
+          name: "Kimi K2 1T",
+          color: "#A78BFA",
         },
       ],
     },
@@ -33,22 +26,12 @@
       group: "Gemini",
       options: [
         { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", color: "#4285F4" },
+        {
+          id: "gemini-3-flash-preview-cloud",
+          name: "Gemini 2.5 Flash",
+          color: "#1A73E8",
+        },
         { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", color: "#34A853" },
-      ],
-    },
-    {
-      group: "Claude",
-      options: [
-        {
-          id: "claude-sonnet-4-6",
-          name: "Claude Sonnet 4.6",
-          color: "#D97706",
-        },
-        {
-          id: "claude-3-5-sonnet-20241022",
-          name: "Claude 3.5 Sonnet",
-          color: "#B45309",
-        },
       ],
     },
   ];
