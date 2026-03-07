@@ -15,10 +15,10 @@
           name: "Devstral Small 2",
           color: "#FF7000",
         },
-        { id: "qwen3:72b-cloud", name: "Qwen 3 72B", color: "#34D399" },
+        { id: "qwen3:72b-cloud", name: "Qwen3 Next 80B", color: "#34D399" },
         {
-          id: "llama4-maverick-cloud",
-          name: "Llama 4 Maverick",
+          id: "kimi-k2:1t-cloud",
+          name: "Kimi K2 1T",
           color: "#A78BFA",
         },
       ],

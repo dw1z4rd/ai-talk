@@ -22,17 +22,17 @@ interface ModelDef {
 }
 
 const MODEL_CATALOG: Record<string, ModelDef> = {
-	// Ollama — Cloud
-	'deepseek-v3.1:671b-cloud': {
-		name: 'DeepSeek V3.1',
-		color: '#4B8BF5',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.1:671b' })
-	},
-	'deepseek-v3.2-cloud': {
-		name: 'DeepSeek V3.2',
-		color: '#3B7BFF',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.2' })
-	},
+// Ollama — Cloud
+'deepseek-v3.1:671b-cloud': {
+name: 'DeepSeek V3.1',
+color: '#4B8BF5',
+makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.1:671b-cloud' })
+},
+'deepseek-v3.2-cloud': {
+name: 'DeepSeek V3.2',
+color: '#3B7BFF',
+makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.2-cloud' })
+},
 'gemini-3-flash-preview-cloud': {
 name: 'Gemini 2.5 Flash',
 color: '#1A73E8',
@@ -41,17 +41,17 @@ makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemin
 'devstral-small-2:24b-cloud': {
 name: 'Devstral Small 2',
 color: '#FF7000',
-makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'devstral-small-2:24b' })
+makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'devstral-small-2:24b-cloud' })
 },
 'qwen3:72b-cloud': {
-name: 'Qwen 3 72B',
+name: 'Qwen3 Next 80B',
 color: '#34D399',
-makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwen3:72b' })
+makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwen3:72b-cloud' })
 },
-'llama4-maverick-cloud': {
-name: 'Llama 4 Maverick',
+'kimi-k2:1t-cloud': {
+name: 'Kimi K2 1T',
 color: '#A78BFA',
-makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'llama4:maverick' })
+makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'kimi-k2:1t-cloud' })
 },
 
 // Gemini
