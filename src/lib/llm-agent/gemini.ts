@@ -65,15 +65,18 @@ export const extractCleanGeminiText = (data: GeminiResponse | null | undefined):
  * const text = await provider.generateText('Hello!', { maxTokens: 100 });
  * ```
  */
-const buildGeminiBody = (prompt: string, options?: LLMOptions) => ({
-	...(options?.systemPrompt != null
-		? { systemInstruction: { parts: [{ text: options.systemPrompt }] } }
-		: {}),
-	contents: [{ role: 'user', parts: [{ text: prompt }] }],
-	generationConfig: {
-		...(options?.maxTokens != null ? { maxOutputTokens: options.maxTokens } : {}),
-		...(options?.temperature != null ? { temperature: options.temperature } : {})
-	}
+const buildGeminiBody = (prompt: string, options?: LLMOptions, model?: string) => ({
+...(options?.systemPrompt != null
+? { systemInstruction: { parts: [{ text: options.systemPrompt }] } }
+: {}),
+contents: [{ role: 'user', parts: [{ text: prompt }] }],
+generationConfig: {
+...(options?.maxTokens != null ? { maxOutputTokens: options.maxTokens } : {}),
+...(options?.temperature != null ? { temperature: options.temperature } : {})
+},
+...(options?.useGoogleSearch
+? { tools: [model?.includes('1.5') ? { googleSearchRetrieval: {} } : { google_search: {} }] }
+: {})
 });
 
 export const createGeminiProvider = (config: GeminiProviderConfig): LLMProvider => ({
@@ -83,11 +86,11 @@ export const createGeminiProvider = (config: GeminiProviderConfig): LLMProvider 
 			const model = config.model ?? DEFAULT_MODEL;
 			const url = `${buildGeminiUrl(model)}?alt=sse&key=${config.apiKey}`;
 			try {
-				const response = await fetch(url, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(buildGeminiBody(prompt, options))
-				});
+const response = await fetch(url, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(buildGeminiBody(prompt, options, model))
+});
 				if (!response.ok) {
 					const text = await response.text();
 					console.error(`[Gemini] Stream Error ${response.status}:`, redactKey(text, config.apiKey).slice(0, 500));
@@ -119,11 +122,11 @@ export const createGeminiProvider = (config: GeminiProviderConfig): LLMProvider 
 			}
 		}
 
-		const data = await callGemini<GeminiResponse>(
-			config.apiKey,
-			buildGeminiBody(prompt, options),
-			config.model
-		);
+const data = await callGemini<GeminiResponse>(
+config.apiKey,
+buildGeminiBody(prompt, options, config.model),
+config.model
+);
 		return extractCleanGeminiText(data);
 	}
 });

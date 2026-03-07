@@ -3,6 +3,7 @@
 
   const NAV_ITEMS = [
     { href: '/', label: '⚔ Debate' },
+    { href: '/assistant', label: '🤖 Ask' },
     { href: '/escape-room', label: '🗝️ Escape Room' },
     { href: '/story', label: '📖 Story' },
     { href: '/stories', label: '📚 Published' },

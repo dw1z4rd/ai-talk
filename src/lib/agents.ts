@@ -338,6 +338,64 @@ export async function generateContestantPerformance(
 	});
 }
 
+// ── Assistant ─────────────────────────────────────────────────────────────────
+
+const ASSISTANT_SYSTEM_PROMPT = `You are a helpful, knowledgeable AI assistant. You excel at answering questions across all domains — science, mathematics, history, philosophy, literature, technology, current events, and more.
+
+Guidelines:
+- Be precise and factual. If you are unsure about something, say so clearly rather than speculating.
+- Adapt your depth and tone to the question: concise for simple questions, detailed for complex ones.
+- When discussing scholarly or technical topics, explain concepts clearly and provide relevant context.
+- Use markdown formatting (headers, bullet points, code blocks) when it aids readability.
+- Never fabricate citations, statistics, or specific data you don't have confidence in.
+- When web search is enabled, ground your answers in the retrieved information and note when answering from live search results.`;
+
+export function buildAssistantAgent(modelId: string): Agent {
+const def = MODEL_CATALOG[modelId] ?? MODEL_CATALOG['gemini-2.0-flash'];
+return {
+id: modelId,
+name: def.name,
+color: def.color,
+provider: withRetry(def.makeProvider(), { maxRetries: 2, initialDelayMs: 800 }),
+systemPrompt: ASSISTANT_SYSTEM_PROMPT
+};
+}
+
+export interface AssistantMessage {
+role: 'user' | 'assistant';
+content: string;
+}
+
+export async function generateAssistantReply(
+agent: Agent,
+messages: AssistantMessage[],
+useSearch: boolean = false,
+onToken?: (token: string) => void
+): Promise<string | null> {
+if (messages.length === 0) return null;
+
+const lastMessage = messages[messages.length - 1];
+const history = messages.slice(0, -1);
+
+let prompt: string;
+if (history.length === 0) {
+prompt = lastMessage.content;
+} else {
+const historyText = history
+.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+.join('\n\n');
+prompt = `${historyText}\n\nUser: ${lastMessage.content}`;
+}
+
+return agent.provider.generateText(prompt, {
+systemPrompt: agent.systemPrompt,
+temperature: 0.7,
+maxTokens: 2000,
+useGoogleSearch: useSearch,
+...(onToken ? { onToken } : {})
+});
+}
+
 // ── Alias pool (disguise AI contestants as humans) ────────────────────────────
 
 const ALIAS_POOL = [
