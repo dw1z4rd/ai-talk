@@ -43,16 +43,6 @@ makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemin
 		color: '#FF7000',
 		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'devstral-small-2:24b' })
 	},
-	'kimi-k2.5-cloud': {
-		name: 'Kimi K2.5',
-		color: '#00C2FF',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'kimi-k2.5' })
-	},
-	'qwen3-next:80b-cloud': {
-		name: 'Qwen3-Next 80B',
-		color: '#34D399',
-		makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'qwen3-next:80b' })
-	},
 
 	// Ollama — Local
 	'llama3.2': {
