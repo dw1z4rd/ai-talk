@@ -54,23 +54,7 @@ color: '#A78BFA',
 makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'llama4:maverick' })
 },
 
-// Ollama — Local
-	'llama3.2': {
-		name: 'Llama 3.2 3B',
-		color: '#A78BFA',
-		makeProvider: () => createOllamaProvider({ model: 'llama3.2' })
-	},
-	'mistral': {
-		name: 'Mistral 7B',
-		color: '#F59E0B',
-		makeProvider: () => createOllamaProvider({ model: 'mistral' })
-	},
-	'qwen2.5:7b': {
-		name: 'Qwen 2.5 7B',
-		color: '#34D399',
-		makeProvider: () => createOllamaProvider({ model: 'qwen2.5:7b' })
-	},
-	// Gemini
+// Gemini
 	'gemini-2.0-flash': {
 		name: 'Gemini 2.0 Flash',
 		color: '#4285F4',
