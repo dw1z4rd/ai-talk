@@ -217,8 +217,8 @@ IF AND ONLY IF the player's state changes, you MUST append the relevant tags fro
 [WIN_CONDITION_MET] (MANDATORY when the player successfully escapes)
 [LOSE_CONDITION_MET] (MANDATORY if the player triggers a fatal failure)`;
 
-export function buildEscapeRoomAgent(agentId: string = 'deepseek-v3.2-cloud'): Agent {
-	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG['deepseek-v3.2-cloud'];
+export function buildEscapeRoomAgent(agentId: string = 'kimi-k2:1t-cloud'): Agent {
+	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG['kimi-k2:1t-cloud'];
 	return {
 		id: agentId,
 		name: 'Game Master',
