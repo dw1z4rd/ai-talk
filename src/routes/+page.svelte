@@ -282,7 +282,7 @@
       }
 
       // Parse vote from the final text
-      const voteMatch = fullText.match(/^VOTE:\s*(.+)$/im);
+      const voteMatch = fullText.match(/^\*{0,2}VOTE:\s*(.+?)[\s*]*$/im);
       const voteName = voteMatch?.[1]?.trim() ?? "";
       const vote =
         voteName.toLowerCase().includes(agentAInfo.name.toLowerCase())
@@ -455,7 +455,7 @@
         content += judgeResults
           .map((r, i) => {
             const votedFor = getModelInfo(r.vote);
-            const deliberation = r.text.replace(/\n?VOTE:\s*.+$/im, "").trim();
+            const deliberation = r.text.replace(/\n?\*{0,2}VOTE:\s*.+$/im, "").trim();
             return `### 🧑‍⚖️ Judge ${i + 1} · ${r.model.name}\n\n> **Voted:** ${votedFor.name}\n\n${deliberation}`;
           })
           .join("\n\n---\n\n");
@@ -482,7 +482,7 @@
         content += judgeResults
           .map((r, i) => {
             const votedFor = getModelInfo(r.vote);
-            const deliberation = r.text.replace(/\n?VOTE:\s*.+$/im, "").trim();
+            const deliberation = r.text.replace(/\n?\*{0,2}VOTE:\s*.+$/im, "").trim();
             return `[Judge ${i + 1} — ${r.model.name}]\nVoted: ${votedFor.name}\n\n${deliberation}`;
           })
           .join(`\n\n${"─".repeat(40)}\n\n`);
@@ -1566,7 +1566,7 @@
               <!-- Strip the VOTE line from display -->
               <div class="message-content">
                 {@html formatMessage(
-                  result.text.replace(/\n?VOTE:\s*.+$/im, "").trim(),
+                  result.text.replace(/\n?\*{0,2}VOTE:\s*.+$/im, "").trim(),
                 )}
               </div>
             {:else if isStreaming}
