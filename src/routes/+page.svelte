@@ -1571,7 +1571,7 @@
               </div>
             {:else if isStreaming}
               <div class="message-content">
-                {@html formatMessage(judgeStreamingText)}<span
+                {@html formatMessage(judgeStreamingText.replace(/\n?\*{0,2}VOTE:\s*.+$/im, "").trim())}<span
                   class="inline-block w-[2px] h-[0.9em] ml-[2px] align-text-bottom rounded-sm animate-pulse"
                   style="background: {judge.color}"
                 ></span>
