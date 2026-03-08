@@ -183,7 +183,7 @@ After your commentary, announce your winner. At the very end of your response, o
 VOTE: ${agentAName}
 VOTE: ${agentBName}
 
-Do not add anything after the VOTE line.`;
+The VOTE line must be plain text — no markdown, no asterisks, no bold formatting. Do not add anything after the VOTE line.`;
 }
 
 export function buildJudgeAgent(
