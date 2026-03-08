@@ -155,7 +155,7 @@ export async function generateReply(
 	return agent.provider.generateText(prompt, {
 		systemPrompt,
 		temperature: 0.9,
-		maxTokens: 500,
+		maxTokens: 1000,
 		...(onToken ? { onToken } : {}),
 	});
 }
@@ -200,7 +200,7 @@ export async function generateJudgeVerdict(
 	return judge.provider.generateText(prompt, {
 		systemPrompt: judge.systemPrompt,
 		temperature: 1.0,
-		maxTokens: 1500,
+		maxTokens: 2500,
 		...(onToken ? { onToken } : {}),
 	});
 }
@@ -282,7 +282,7 @@ export async function generateStoryContinuation(
 	return agent.provider.generateText(prompt, {
 		systemPrompt: `${baseSystemPrompt}\n\nSTORY PREMISE (always follow this blueprint):\n${premise}`,
 		temperature: 0.92,
-		maxTokens: 300,
+		maxTokens: 600,
 		...(onToken ? { onToken } : {}),
 	});
 }
@@ -342,145 +342,6 @@ export async function generateEscapeRoomResponse(
 		systemPrompt: agent.systemPrompt,
 		temperature: 0.8,
 		maxTokens: 1000,
-	});
-}
-
-// ── Whose Line Is It Anyway? ──────────────────────────────────────────────────
-
-export const WHOSE_LINE_GAMES = [
-	// Classic
-	{
-		id: "scenes_from_a_hat",
-		name: "Scenes from a Hat",
-		classic: true,
-		instructions:
-			"The host draws a scenario from the hat. Each contestant acts out a short scene fitting that scenario in 2–3 sentences. Be funny, committed, and in-character.",
-	},
-	{
-		id: "party_quirks",
-		name: "Party Quirks",
-		classic: true,
-		instructions:
-			"The host is throwing a party and each contestant enters with a secret quirk. Each contestant describes their behavior at the party without naming their quirk directly. The host tries to guess it at the end.",
-	},
-	{
-		id: "hoedown",
-		name: "Hoedown",
-		classic: true,
-		instructions:
-			"Each contestant improvises a short rhyming verse (4 lines, AABB or ABAB) on the topic the host gives. Keep it upbeat and corny.",
-	},
-	{
-		id: "greatest_hits",
-		name: "Greatest Hits",
-		classic: true,
-		instructions:
-			'The host introduces a fake greatest-hits album. Each contestant performs one "song" from the album — a few lines in the style of a randomly assigned music genre.',
-	},
-	{
-		id: "newsflash",
-		name: "Newsflash",
-		classic: true,
-		instructions:
-			"One contestant is a clueless news anchor. The other contestants give clues hinting at a bizarre news event without saying what it is. The anchor must guess.",
-	},
-	{
-		id: "props",
-		name: "Props",
-		classic: true,
-		instructions:
-			"The host describes an absurd prop. Each contestant mimes using it in the most creative way possible, describing the bit in 1–2 sentences.",
-	},
-	{
-		id: "two_line_vocab",
-		name: "Two-Line Vocabulary",
-		classic: true,
-		instructions:
-			"Each contestant must use the same odd phrase in every sentence they say. They perform a scene together, smuggling the phrase in as naturally as possible.",
-	},
-	{
-		id: "weird_newscasters",
-		name: "Weird Newscasters",
-		classic: true,
-		instructions:
-			"Each contestant plays a news anchor with a bizarre secret personality trait affecting how they deliver the news. Perform a short news broadcast in character.",
-	},
-	// Creative / AI-invented
-	{ id: "ai_invented", name: "AI Invented", classic: false, instructions: "" }, // host invents on the fly
-];
-
-const HOST_SYSTEM_PROMPT = `You are the host of "Whose Line Is It Anyway?" — a chaotic, hilarious improv comedy show. Act like Drew Carey meets Aisha Tyler: enthusiastic, punny, quick-witted, lightly roasting contestants, bestowing completely absurd and meaningless points ("That's 1000 points for you and -47 for everyone else!"). Keep your lines snappy — 1 to 3 sentences max unless announcing a game. Never break character. The show is live, unscripted, and wonderfully ridiculous.`;
-
-const CONTESTANT_SYSTEM_PROMPT = `You are a contestant on "Whose Line Is It Anyway?" — a live improv comedy show. Commit fully to every scene, character, and game the host assigns. Be funny, spontaneous, and creative. Keep your performance to 2–4 sentences unless the game calls for something longer. Never narrate what you're doing — just DO it. No meta-commentary.`;
-
-export interface WhoseLineAgent extends Agent {
-	isHost: boolean;
-}
-
-export function buildWhoseLineHost(agentId: string): WhoseLineAgent {
-	const def =
-		MODEL_CATALOG[agentId] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
-	return {
-		id: agentId,
-		name: def.name,
-		color: def.color,
-		provider: withRetry(def.makeProvider(), {
-			maxRetries: 2,
-			initialDelayMs: 600,
-		}),
-		systemPrompt: HOST_SYSTEM_PROMPT,
-		isHost: true,
-	};
-}
-
-export function buildWhoseLineContestant(agentId: string): WhoseLineAgent {
-	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG["deepseek-v3.2-cloud"];
-	return {
-		id: agentId,
-		name: def.name,
-		color: def.color,
-		provider: withRetry(def.makeProvider(), {
-			maxRetries: 2,
-			initialDelayMs: 600,
-		}),
-		systemPrompt: CONTESTANT_SYSTEM_PROMPT,
-		isHost: false,
-	};
-}
-
-export async function generateHostLine(
-	host: WhoseLineAgent,
-	context: string,
-	onToken?: (token: string) => void
-): Promise<string | null> {
-	return host.provider.generateText(context, {
-		systemPrompt: host.systemPrompt,
-		temperature: 1.0,
-		maxTokens: 200,
-		...(onToken ? { onToken } : {}),
-	});
-}
-
-export async function generateContestantPerformance(
-	contestant: WhoseLineAgent,
-	game: { name: string; instructions: string; scenario: string },
-	previousPerformances: { name: string; text: string }[],
-	onToken?: (token: string) => void
-): Promise<string | null> {
-	const prev =
-		previousPerformances.length > 0
-			? `\n\nPrevious performances this round:\n${previousPerformances
-				.map((p) => `${p.name}: "${p.text}"`)
-				.join("\n")}`
-			: "";
-
-	const prompt = `GAME: ${game.name}\nSCENARIO: ${game.scenario}\nINSTRUCTIONS: ${game.instructions}${prev}\n\nYour turn! Perform now.`;
-
-	return contestant.provider.generateText(prompt, {
-		systemPrompt: contestant.systemPrompt,
-		temperature: 1.0,
-		maxTokens: 250,
-		...(onToken ? { onToken } : {}),
 	});
 }
 
