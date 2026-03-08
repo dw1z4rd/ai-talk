@@ -54,31 +54,71 @@ stream: !!options?.onToken,
 				return null;
 			}
 
-			if (options?.onToken) {
-				// Streaming mode — parse OpenAI-compatible SSE
-				const reader = response.body!.getReader();
-				const decoder = new TextDecoder();
-				let buf = '';
-				let fullText = '';
-				outer: while (true) {
-					const { done, value } = await reader.read();
-					if (done) break;
-					buf += decoder.decode(value, { stream: true });
-					const lines = buf.split('\n');
-					buf = lines.pop() ?? '';
-					for (const line of lines) {
-						if (!line.startsWith('data: ')) continue;
-						const payload = line.slice(6).trim();
-						if (payload === '[DONE]') break outer;
-						try {
-const chunk = JSON.parse(payload) as OpenAIResponse & { choices?: Array<{ delta?: { content?: string } }> };
-const token = (chunk.choices as any)?.[0]?.delta?.content ?? '';
+		if (options?.onToken) {
+			// Streaming mode — parse OpenAI-compatible SSE
+			const reader = response.body!.getReader();
+			const decoder = new TextDecoder();
+			let buf = '';
+			let fullText = '';
+			let finishReason: string | null = null;
+
+const processLine = (line: string): boolean => {
+if (!line.startsWith('data: ')) return false;
+const payload = line.slice(6).trim();
+if (payload === '[DONE]') return true; // signal done
+try {
+const chunk = JSON.parse(payload) as OpenAIResponse & {
+choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }> & { error?: unknown };
+};
+// Detect error objects the server embeds inside a 200 SSE stream
+if ((chunk as any).error) {
+console.error(`[Ollama] Error in stream payload (model=${config.model ?? DEFAULT_MODEL}):`, JSON.stringify((chunk as any).error).slice(0, 500));
+return false;
+}
+const choice = (chunk.choices as any)?.[0];
+const token: string = choice?.delta?.content ?? '';
 if (token) { fullText += token; options.onToken(token); }
-						} catch { /* skip malformed chunks */ }
+if (choice?.finish_reason != null) finishReason = choice.finish_reason;
+} catch {
+// Log the raw payload so silent swallowing of server errors is visible
+console.error(`[Ollama] Unparseable stream chunk (model=${config.model ?? DEFAULT_MODEL}): ${payload.slice(0, 300)}`);
+}
+return false;
+};
+
+			outer: while (true) {
+				const { done, value } = await reader.read();
+				if (done) {
+					// Flush any bytes remaining in the TextDecoder's internal buffer,
+					// then process whatever incomplete line is still in buf.
+					const remaining = (buf + decoder.decode()).trim();
+					if (remaining) {
+						console.log(`[Ollama] buf had ${remaining.length} unprocessed bytes at stream end`);
+						processLine(remaining);
 					}
+					break;
 				}
-				return fullText || null;
+				buf += decoder.decode(value, { stream: true });
+				const lines = buf.split('\n');
+				buf = lines.pop() ?? '';
+				for (const line of lines) {
+					if (processLine(line)) break outer;
+				}
 			}
+
+			const model = config.model ?? DEFAULT_MODEL;
+			if (finishReason === 'length') {
+				console.warn(
+					`[Ollama] Stream ended: finish_reason=length, chars=${fullText.length}, maxTokens=${options?.maxTokens ?? 'unset'} — model ${model} hit output cap`
+				);
+			} else {
+				console.log(
+					`[Ollama] Stream ended: finish_reason=${finishReason ?? 'unknown'}, chars=${fullText.length}, maxTokens=${options?.maxTokens ?? 'unset'}, model=${model}`
+				);
+			}
+
+			return fullText || null;
+		}
 
 			const data = (await response.json()) as OpenAIResponse;
 			return data.choices?.[0]?.message?.content ?? null;
