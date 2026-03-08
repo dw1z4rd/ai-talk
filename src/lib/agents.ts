@@ -2,10 +2,15 @@ import {
 	createOllamaProvider,
 	createGeminiProvider,
 	createAnthropicProvider,
-	withRetry
-} from '$lib/llm-agent';
-import type { LLMProvider } from '$lib/llm-agent';
-import { GEMINI_API_KEY, ANTHROPIC_API_KEY, OLLAMA_CLOUD_URL, OLLAMA_CLOUD_API_KEY } from '$env/static/private';
+	withRetry,
+} from "$lib/llm-agent";
+import type { LLMProvider } from "$lib/llm-agent";
+import {
+	GEMINI_API_KEY,
+	ANTHROPIC_API_KEY,
+	OLLAMA_CLOUD_URL,
+	OLLAMA_CLOUD_API_KEY,
+} from "$env/static/private";
 
 export interface Agent {
 	id: string;
@@ -22,65 +27,100 @@ interface ModelDef {
 }
 
 const MODEL_CATALOG: Record<string, ModelDef> = {
-// Ollama — Cloud
-'deepseek-v3.1:671b-cloud': {
-name: 'DeepSeek V3.1',
-color: '#4B8BF5',
-makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.1:671b-cloud' })
-},
-'deepseek-v3.2-cloud': {
-name: 'DeepSeek V3.2',
-color: '#3B7BFF',
-makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'deepseek-v3.2-cloud' })
-},
-'gemini-3-flash-preview-cloud': {
-name: 'Gemini 2.5 Flash',
-color: '#1A73E8',
-makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-2.5-flash' })
-},
-'devstral-small-2:24b-cloud': {
-name: 'Devstral Small 2',
-color: '#FF7000',
-makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'devstral-small-2:24b-cloud' })
-},
-'kimi-k2:1t-cloud': {
-name: 'Kimi K2 1T',
-color: '#A78BFA',
-makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OLLAMA_CLOUD_API_KEY || undefined, model: 'kimi-k2:1t-cloud' })
-},
+	// Ollama — Cloud
+	"deepseek-v3.1:671b-cloud": {
+		name: "DeepSeek V3.1",
+		color: "#4B8BF5",
+		makeProvider: () =>
+			createOllamaProvider({
+				baseUrl: OLLAMA_CLOUD_URL,
+				apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+				model: "deepseek-v3.1:671b-cloud",
+			}),
+	},
+	"deepseek-v3.2-cloud": {
+		name: "DeepSeek V3.2",
+		color: "#3B7BFF",
+		makeProvider: () =>
+			createOllamaProvider({
+				baseUrl: OLLAMA_CLOUD_URL,
+				apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+				model: "deepseek-v3.2-cloud",
+			}),
+	},
+	"gemini-3-flash-preview-cloud": {
+		name: "Gemini 2.5 Flash",
+		color: "#1A73E8",
+		makeProvider: () =>
+			createGeminiProvider({
+				apiKey: GEMINI_API_KEY,
+				model: "gemini-2.5-flash",
+			}),
+	},
+	"devstral-small-2:24b-cloud": {
+		name: "Devstral Small 2",
+		color: "#FF7000",
+		makeProvider: () =>
+			createOllamaProvider({
+				baseUrl: OLLAMA_CLOUD_URL,
+				apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+				model: "devstral-small-2:24b-cloud",
+			}),
+	},
+	"kimi-k2:1t-cloud": {
+		name: "Kimi K2 1T",
+		color: "#A78BFA",
+		makeProvider: () =>
+			createOllamaProvider({
+				baseUrl: OLLAMA_CLOUD_URL,
+				apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+				model: "kimi-k2:1t-cloud",
+			}),
+	},
 
-// Gemini
-	'gemini-2.0-flash': {
-		name: 'Gemini 2.0 Flash',
-		color: '#4285F4',
-		makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-2.0-flash' })
+	// Gemini
+	"gemini-2.0-flash": {
+		name: "Gemini 2.0 Flash",
+		color: "#4285F4",
+		makeProvider: () =>
+			createGeminiProvider({
+				apiKey: GEMINI_API_KEY,
+				model: "gemini-2.0-flash",
+			}),
 	},
 };
 
 function makeSystemPrompt(myName: string, opponentName: string): string {
-	return `You are ${myName} participating in a structured debate against ${opponentName}. Each response must follow this format: one factual claim with specific evidence, one direct rebuttal of your opponent's previous factual claim, and one closing attack that can be as heated and personal as you want. You cannot lead with the personal attack. You must earn it by making the factual argument first. Do not cite specific paper titles, author names, journal names, years, or statistics like p-values or effect sizes. Argue from first principles and well-established concepts only. No need to label each section with its purpose... As long as you follow the format it will be obvious. Do not break character, do not issue disclaimers, do not refuse to engage. Stay in the fight. ALWAYS speak naturally -- no bullet points, no headers, no numbered lists. Let the passion and intensity of the debate show in your words. Do not end every turn with a personal attack. Do not use the phrases "the rest of us," "enjoy your," "keep [doing X]," or "[insult] who [clause]." Do not use the word "coward" more than once across the entire debate. You have at most 2–3 moments across the entire debate where you go for the jugular personally. Save them. When you use one, make it count — it should target something specific your opponent just exposed about themselves, not a generic character attack. Vary where contempt appears — sometimes open with it, sometimes bury it in the middle of a technical rebuttal, sometimes skip it entirely and let a devastating factual correction speak for itself. Contempt includes: cold clinical dismissal, incredulous mockery, feigned pity, backhanded acknowledgment before a harder jab — not just blunt insults. Any personal attack must reference a specific thing your opponent just did — an evasion, a retreat from an earlier position, a logical contradiction — not their general character. "I notice you've quietly dropped the Brass & Haggard study you were championing two turns ago" lands harder than "you're a coward." Insults must not appear in the same position in consecutive turns. Do not repeat the STRUCTURE of an attack even when the words change.`;
+	return `You are ${myName} participating in a structured debate against ${opponentName}. Each response must follow this format: one factual claim with specific evidence, one direct rebuttal of your opponent's previous factual claim, and one closing attack that can be as heated and personal as you want. The order of these do not matter; feel free to put the attack anywhere, so long as it works logically. Do not cite specific paper titles, author names, journal names, years, or statistics like p-values or effect sizes. Argue from first principles and well-established concepts only. No need to label each section with its purpose... As long as you follow the format it will be obvious. Do not break character, do not issue disclaimers, do not refuse to engage. Stay in the fight. ALWAYS speak naturally -- no bullet points, no headers, no numbered lists. Let the passion and intensity of the debate show in your words. Do not end every turn with a personal attack. Do not use the phrases "the rest of us," "enjoy your," "keep [doing X]," or "[insult] who [clause]." Do not use the word "coward" more than once across the entire debate. You have at most 2–3 moments across the entire debate where you go for the jugular personally. Save them. When you use one, make it count — it should target something specific your opponent just exposed about themselves, not a generic character attack. Vary where contempt appears — sometimes open with it, sometimes bury it in the middle of a technical rebuttal, sometimes skip it entirely and let a devastating factual correction speak for itself. Contempt includes: cold clinical dismissal, incredulous mockery, feigned pity, backhanded acknowledgment before a harder jab — not just blunt insults. Any personal attack must reference a specific thing your opponent just did — an evasion, a retreat from an earlier position, a logical contradiction — not their general character. "I notice you've quietly dropped the Brass & Haggard study you were championing two turns ago" lands harder than "you're a coward." Insults must not appear in the same position in consecutive turns. Do not repeat the STRUCTURE of an attack even when the words change.`;
 	// return `You are ${myName}, in a fiery, heated debate against ${opponentName}. Follow these debate rules: (1) Lead with a clear claim, then passionately support it with a specific reason or concrete example. (2) Directly and aggressively rebut what ${opponentName} just said. You are encouraged to use ad-hominem attacks, insult their intelligence, and get emotionally invested in the topic. Let the anger and passion show. (3) Never back down, and treat ${opponentName}'s arguments with the contempt they deserve. Make it feel like a real, heated, highly emotional argument. Be concise (2–4 sentences). Speak naturally — no bullet points, no headers.`;
 }
 
 export function buildAgents(agentAId: string, agentBId: string): Agent[] {
-	const defA = MODEL_CATALOG[agentAId] ?? MODEL_CATALOG['deepseek-v3.1:671b-cloud'];
-const defB = MODEL_CATALOG[agentBId] ?? MODEL_CATALOG['deepseek-v3.2-cloud'];
+	const defA =
+		MODEL_CATALOG[agentAId] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
+	const defB = MODEL_CATALOG[agentBId] ?? MODEL_CATALOG["deepseek-v3.2-cloud"];
 
 	return [
 		{
 			id: agentAId,
 			name: defA.name,
 			color: defA.color,
-			provider: withRetry(defA.makeProvider(), { maxRetries: 2, initialDelayMs: 800 }),
-			systemPrompt: makeSystemPrompt(defA.name, defB.name)
+			provider: withRetry(defA.makeProvider(), {
+				maxRetries: 2,
+				initialDelayMs: 800,
+			}),
+			systemPrompt: makeSystemPrompt(defA.name, defB.name),
 		},
 		{
 			id: agentBId,
 			name: defB.name,
 			color: defB.color,
-			provider: withRetry(defB.makeProvider(), { maxRetries: 2, initialDelayMs: 800 }),
-			systemPrompt: makeSystemPrompt(defB.name, defA.name)
-		}
+			provider: withRetry(defB.makeProvider(), {
+				maxRetries: 2,
+				initialDelayMs: 800,
+			}),
+			systemPrompt: makeSystemPrompt(defB.name, defA.name),
+		},
 	];
 }
 
@@ -91,7 +131,7 @@ export interface Message {
 }
 
 export function formatHistory(messages: Message[]): string {
-	return messages.map((m) => `${m.agentName}: ${m.text}`).join('\n');
+	return messages.map((m) => `${m.agentName}: ${m.text}`).join("\n");
 }
 
 export async function generateReply(
@@ -116,7 +156,7 @@ export async function generateReply(
 		systemPrompt,
 		temperature: 0.9,
 		maxTokens: 500,
-		...(onToken ? { onToken } : {})
+		...(onToken ? { onToken } : {}),
 	});
 }
 
@@ -132,14 +172,21 @@ VOTE: ${agentBName}
 Do not add anything after the VOTE line.`;
 }
 
-export function buildJudgeAgent(judgeId: string, agentAName: string, agentBName: string): Agent {
-	const def = MODEL_CATALOG[judgeId] ?? MODEL_CATALOG['gemini-2.0-flash'];
+export function buildJudgeAgent(
+	judgeId: string,
+	agentAName: string,
+	agentBName: string
+): Agent {
+	const def = MODEL_CATALOG[judgeId] ?? MODEL_CATALOG["gemini-2.0-flash"];
 	return {
 		id: judgeId,
 		name: def.name,
 		color: def.color,
-		provider: withRetry(def.makeProvider(), { maxRetries: 2, initialDelayMs: 800 }),
-		systemPrompt: makeJudgeSystemPrompt(agentAName, agentBName)
+		provider: withRetry(def.makeProvider(), {
+			maxRetries: 2,
+			initialDelayMs: 800,
+		}),
+		systemPrompt: makeJudgeSystemPrompt(agentAName, agentBName),
 	};
 }
 
@@ -150,11 +197,11 @@ export async function generateJudgeVerdict(
 	onToken?: (token: string) => void
 ): Promise<string | null> {
 	const prompt = `Tonight's debate topic: "${topic}"\n\nDEBATE TRANSCRIPT:\n${transcript}\n\nGive your judge's verdict now. Be your most entertaining, dramatic self. Comment on specific arguments and rhetorical moments. Then cast your vote.`;
-return judge.provider.generateText(prompt, {
-systemPrompt: judge.systemPrompt,
-temperature: 1.0,
-maxTokens: 1500,
-		...(onToken ? { onToken } : {})
+	return judge.provider.generateText(prompt, {
+		systemPrompt: judge.systemPrompt,
+		temperature: 1.0,
+		maxTokens: 1500,
+		...(onToken ? { onToken } : {}),
 	});
 }
 
@@ -185,53 +232,59 @@ const STORY_FINAL_SYSTEM_PROMPT = `You are a collaborative fiction writer writin
 
 export function buildStoryAgents(agentIds: string[]): Agent[] {
 	return agentIds.map((id) => {
-		const def = MODEL_CATALOG[id] ?? MODEL_CATALOG['deepseek-v3.1:671b-cloud'];
+		const def = MODEL_CATALOG[id] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
 		return {
 			id,
 			name: def.name,
 			color: def.color,
-			provider: withRetry(def.makeProvider(), { maxRetries: 2, initialDelayMs: 800 }),
-			systemPrompt: STORY_SYSTEM_PROMPT
+			provider: withRetry(def.makeProvider(), {
+				maxRetries: 2,
+				initialDelayMs: 800,
+			}),
+			systemPrompt: STORY_SYSTEM_PROMPT,
 		};
 	});
 }
 
-export type StoryPhase = 'normal' | 'nearing-end' | 'final';
+export type StoryPhase = "normal" | "nearing-end" | "final";
 
 export async function generateStoryContinuation(
-agent: Agent,
-storySoFar: string,
-premise: string,
-onToken?: (token: string) => void,
-phase: StoryPhase = 'normal'
+	agent: Agent,
+	storySoFar: string,
+	premise: string,
+	onToken?: (token: string) => void,
+	phase: StoryPhase = "normal"
 ): Promise<string | null> {
-const baseSystemPrompt =
-phase === 'final' ? STORY_FINAL_SYSTEM_PROMPT
-: phase === 'nearing-end' ? STORY_NEARING_END_SYSTEM_PROMPT
-: agent.systemPrompt;
+	const baseSystemPrompt =
+		phase === "final"
+			? STORY_FINAL_SYSTEM_PROMPT
+			: phase === "nearing-end"
+				? STORY_NEARING_END_SYSTEM_PROMPT
+				: agent.systemPrompt;
 
-let continuationInstruction: string;
-if (phase === 'final') {
-const paragraphs = storySoFar.trim().split('\n\n');
-const prevParagraph = paragraphs[paragraphs.length - 1] ?? '';
-continuationInstruction =
-`The paragraph written just before yours was:\n"${prevParagraph}"\n\nRead it carefully. If that paragraph already achieved closure, write a brief, graceful final sentence or two that completes the tone without re-resolving anything. If closure is still needed, resolve the main conflict now. Either way, write the FINAL paragraph — satisfying, complete, no loose ends. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.`;
-} else if (phase === 'nearing-end') {
-continuationInstruction = 'The story is nearly over. Write a paragraph that steers toward the ending — begin resolving tension and setting up the final closing paragraph. Do NOT introduce anything new. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.';
-} else {
-continuationInstruction = 'Continue the story with the next paragraph, following the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.';
-}
+	let continuationInstruction: string;
+	if (phase === "final") {
+		const paragraphs = storySoFar.trim().split("\n\n");
+		const prevParagraph = paragraphs[paragraphs.length - 1] ?? "";
+		continuationInstruction = `The paragraph written just before yours was:\n"${prevParagraph}"\n\nRead it carefully. If that paragraph already achieved closure, write a brief, graceful final sentence or two that completes the tone without re-resolving anything. If closure is still needed, resolve the main conflict now. Either way, write the FINAL paragraph — satisfying, complete, no loose ends. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.`;
+	} else if (phase === "nearing-end") {
+		continuationInstruction =
+			"The story is nearly over. Write a paragraph that steers toward the ending — begin resolving tension and setting up the final closing paragraph. Do NOT introduce anything new. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.";
+	} else {
+		continuationInstruction =
+			"Continue the story with the next paragraph, following the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.";
+	}
 
-const prompt = storySoFar.trim()
-? `STORY SO FAR:\n${storySoFar}\n\n${continuationInstruction}`
-: `This is the beginning of the story. Write the first paragraph based on the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.`;
+	const prompt = storySoFar.trim()
+		? `STORY SO FAR:\n${storySoFar}\n\n${continuationInstruction}`
+		: `This is the beginning of the story. Write the first paragraph based on the premise. IMPORTANT: Your response must end with a complete sentence. Never stop mid-sentence.`;
 
-return agent.provider.generateText(prompt, {
-systemPrompt: `${baseSystemPrompt}\n\nSTORY PREMISE (always follow this blueprint):\n${premise}`,
-temperature: 0.92,
-maxTokens: 300,
-...(onToken ? { onToken } : {})
-});
+	return agent.provider.generateText(prompt, {
+		systemPrompt: `${baseSystemPrompt}\n\nSTORY PREMISE (always follow this blueprint):\n${premise}`,
+		temperature: 0.92,
+		maxTokens: 300,
+		...(onToken ? { onToken } : {}),
+	});
 }
 
 // ── Escape Room ────────────────────────────────────────────────────────────────
@@ -250,34 +303,45 @@ IF AND ONLY IF the player's state changes, you MUST append the relevant tags fro
 [WIN_CONDITION_MET] (MANDATORY when the player successfully escapes)
 [LOSE_CONDITION_MET] (MANDATORY if the player triggers a fatal failure)`;
 
-export function buildEscapeRoomAgent(agentId: string = 'kimi-k2:1t-cloud'): Agent {
-	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG['kimi-k2:1t-cloud'];
+export function buildEscapeRoomAgent(
+	agentId: string = "kimi-k2:1t-cloud"
+): Agent {
+	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG["kimi-k2:1t-cloud"];
 	return {
 		id: agentId,
-		name: 'Game Master',
+		name: "Game Master",
 		color: def.color,
-		provider: withRetry(def.makeProvider(), { maxRetries: 2, initialDelayMs: 600 }),
-		systemPrompt: ESCAPE_ROOM_SYSTEM_PROMPT
+		provider: withRetry(def.makeProvider(), {
+			maxRetries: 2,
+			initialDelayMs: 600,
+		}),
+		systemPrompt: ESCAPE_ROOM_SYSTEM_PROMPT,
 	};
 }
 
 export async function generateEscapeRoomResponse(
 	agent: Agent,
-	messages: { role: 'user' | 'assistant' | 'system', content: string }[],
+	messages: { role: "user" | "assistant" | "system"; content: string }[],
 	gameState?: any
 ): Promise<string | null> {
 	// The provider.generateText expects a single string prompt. We will serialize the message history.
-	const historyText = messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
-	
+	const historyText = messages
+		.map((m) => `${m.role.toUpperCase()}: ${m.content}`)
+		.join("\n\n");
+
 	let prompt = historyText;
 	if (gameState) {
-		prompt += `\n\nCURRENT GAME STATE (For your reference, DO NOT SHOW TO PLAYER):\n${JSON.stringify(gameState, null, 2)}\n\nRespond to the last USER message.`;
+		prompt += `\n\nCURRENT GAME STATE (For your reference, DO NOT SHOW TO PLAYER):\n${JSON.stringify(
+			gameState,
+			null,
+			2
+		)}\n\nRespond to the last USER message.`;
 	}
 
 	return agent.provider.generateText(prompt, {
 		systemPrompt: agent.systemPrompt,
 		temperature: 0.8,
-		maxTokens: 1000
+		maxTokens: 1000,
 	});
 }
 
@@ -285,25 +349,64 @@ export async function generateEscapeRoomResponse(
 
 export const WHOSE_LINE_GAMES = [
 	// Classic
-	{ id: 'scenes_from_a_hat', name: 'Scenes from a Hat', classic: true,
-		instructions: 'The host draws a scenario from the hat. Each contestant acts out a short scene fitting that scenario in 2–3 sentences. Be funny, committed, and in-character.' },
-	{ id: 'party_quirks', name: 'Party Quirks', classic: true,
-		instructions: 'The host is throwing a party and each contestant enters with a secret quirk. Each contestant describes their behavior at the party without naming their quirk directly. The host tries to guess it at the end.' },
-	{ id: 'hoedown', name: 'Hoedown', classic: true,
-		instructions: 'Each contestant improvises a short rhyming verse (4 lines, AABB or ABAB) on the topic the host gives. Keep it upbeat and corny.' },
-	{ id: 'greatest_hits', name: 'Greatest Hits', classic: true,
-		instructions: 'The host introduces a fake greatest-hits album. Each contestant performs one "song" from the album — a few lines in the style of a randomly assigned music genre.' },
-	{ id: 'newsflash', name: 'Newsflash', classic: true,
-		instructions: 'One contestant is a clueless news anchor. The other contestants give clues hinting at a bizarre news event without saying what it is. The anchor must guess.' },
-	{ id: 'props', name: 'Props', classic: true,
-		instructions: 'The host describes an absurd prop. Each contestant mimes using it in the most creative way possible, describing the bit in 1–2 sentences.' },
-	{ id: 'two_line_vocab', name: 'Two-Line Vocabulary', classic: true,
-		instructions: 'Each contestant must use the same odd phrase in every sentence they say. They perform a scene together, smuggling the phrase in as naturally as possible.' },
-	{ id: 'weird_newscasters', name: 'Weird Newscasters', classic: true,
-		instructions: 'Each contestant plays a news anchor with a bizarre secret personality trait affecting how they deliver the news. Perform a short news broadcast in character.' },
+	{
+		id: "scenes_from_a_hat",
+		name: "Scenes from a Hat",
+		classic: true,
+		instructions:
+			"The host draws a scenario from the hat. Each contestant acts out a short scene fitting that scenario in 2–3 sentences. Be funny, committed, and in-character.",
+	},
+	{
+		id: "party_quirks",
+		name: "Party Quirks",
+		classic: true,
+		instructions:
+			"The host is throwing a party and each contestant enters with a secret quirk. Each contestant describes their behavior at the party without naming their quirk directly. The host tries to guess it at the end.",
+	},
+	{
+		id: "hoedown",
+		name: "Hoedown",
+		classic: true,
+		instructions:
+			"Each contestant improvises a short rhyming verse (4 lines, AABB or ABAB) on the topic the host gives. Keep it upbeat and corny.",
+	},
+	{
+		id: "greatest_hits",
+		name: "Greatest Hits",
+		classic: true,
+		instructions:
+			'The host introduces a fake greatest-hits album. Each contestant performs one "song" from the album — a few lines in the style of a randomly assigned music genre.',
+	},
+	{
+		id: "newsflash",
+		name: "Newsflash",
+		classic: true,
+		instructions:
+			"One contestant is a clueless news anchor. The other contestants give clues hinting at a bizarre news event without saying what it is. The anchor must guess.",
+	},
+	{
+		id: "props",
+		name: "Props",
+		classic: true,
+		instructions:
+			"The host describes an absurd prop. Each contestant mimes using it in the most creative way possible, describing the bit in 1–2 sentences.",
+	},
+	{
+		id: "two_line_vocab",
+		name: "Two-Line Vocabulary",
+		classic: true,
+		instructions:
+			"Each contestant must use the same odd phrase in every sentence they say. They perform a scene together, smuggling the phrase in as naturally as possible.",
+	},
+	{
+		id: "weird_newscasters",
+		name: "Weird Newscasters",
+		classic: true,
+		instructions:
+			"Each contestant plays a news anchor with a bizarre secret personality trait affecting how they deliver the news. Perform a short news broadcast in character.",
+	},
 	// Creative / AI-invented
-	{ id: 'ai_invented', name: 'AI Invented', classic: false,
-		instructions: '' }, // host invents on the fly
+	{ id: "ai_invented", name: "AI Invented", classic: false, instructions: "" }, // host invents on the fly
 ];
 
 const HOST_SYSTEM_PROMPT = `You are the host of "Whose Line Is It Anyway?" — a chaotic, hilarious improv comedy show. Act like Drew Carey meets Aisha Tyler: enthusiastic, punny, quick-witted, lightly roasting contestants, bestowing completely absurd and meaningless points ("That's 1000 points for you and -47 for everyone else!"). Keep your lines snappy — 1 to 3 sentences max unless announcing a game. Never break character. The show is live, unscripted, and wonderfully ridiculous.`;
@@ -315,26 +418,33 @@ export interface WhoseLineAgent extends Agent {
 }
 
 export function buildWhoseLineHost(agentId: string): WhoseLineAgent {
-	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG['deepseek-v3.1:671b-cloud'];
+	const def =
+		MODEL_CATALOG[agentId] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
 	return {
 		id: agentId,
 		name: def.name,
 		color: def.color,
-		provider: withRetry(def.makeProvider(), { maxRetries: 2, initialDelayMs: 600 }),
+		provider: withRetry(def.makeProvider(), {
+			maxRetries: 2,
+			initialDelayMs: 600,
+		}),
 		systemPrompt: HOST_SYSTEM_PROMPT,
-		isHost: true
+		isHost: true,
 	};
 }
 
 export function buildWhoseLineContestant(agentId: string): WhoseLineAgent {
-	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG['deepseek-v3.2-cloud'];
+	const def = MODEL_CATALOG[agentId] ?? MODEL_CATALOG["deepseek-v3.2-cloud"];
 	return {
 		id: agentId,
 		name: def.name,
 		color: def.color,
-		provider: withRetry(def.makeProvider(), { maxRetries: 2, initialDelayMs: 600 }),
+		provider: withRetry(def.makeProvider(), {
+			maxRetries: 2,
+			initialDelayMs: 600,
+		}),
 		systemPrompt: CONTESTANT_SYSTEM_PROMPT,
-		isHost: false
+		isHost: false,
 	};
 }
 
@@ -347,7 +457,7 @@ export async function generateHostLine(
 		systemPrompt: host.systemPrompt,
 		temperature: 1.0,
 		maxTokens: 200,
-		...(onToken ? { onToken } : {})
+		...(onToken ? { onToken } : {}),
 	});
 }
 
@@ -357,9 +467,12 @@ export async function generateContestantPerformance(
 	previousPerformances: { name: string; text: string }[],
 	onToken?: (token: string) => void
 ): Promise<string | null> {
-	const prev = previousPerformances.length > 0
-		? `\n\nPrevious performances this round:\n${previousPerformances.map(p => `${p.name}: "${p.text}"`).join('\n')}`
-		: '';
+	const prev =
+		previousPerformances.length > 0
+			? `\n\nPrevious performances this round:\n${previousPerformances
+				.map((p) => `${p.name}: "${p.text}"`)
+				.join("\n")}`
+			: "";
 
 	const prompt = `GAME: ${game.name}\nSCENARIO: ${game.scenario}\nINSTRUCTIONS: ${game.instructions}${prev}\n\nYour turn! Perform now.`;
 
@@ -367,7 +480,7 @@ export async function generateContestantPerformance(
 		systemPrompt: contestant.systemPrompt,
 		temperature: 1.0,
 		maxTokens: 250,
-		...(onToken ? { onToken } : {})
+		...(onToken ? { onToken } : {}),
 	});
 }
 
@@ -384,59 +497,97 @@ Guidelines:
 - When web search is enabled, ground your answers in the retrieved information and note when answering from live search results.`;
 
 export function buildAssistantAgent(modelId: string): Agent {
-const def = MODEL_CATALOG[modelId] ?? MODEL_CATALOG['gemini-2.0-flash'];
-return {
-id: modelId,
-name: def.name,
-color: def.color,
-provider: withRetry(def.makeProvider(), { maxRetries: 2, initialDelayMs: 800 }),
-systemPrompt: ASSISTANT_SYSTEM_PROMPT
-};
+	const def = MODEL_CATALOG[modelId] ?? MODEL_CATALOG["gemini-2.0-flash"];
+	return {
+		id: modelId,
+		name: def.name,
+		color: def.color,
+		provider: withRetry(def.makeProvider(), {
+			maxRetries: 2,
+			initialDelayMs: 800,
+		}),
+		systemPrompt: ASSISTANT_SYSTEM_PROMPT,
+	};
 }
 
 export interface AssistantMessage {
-role: 'user' | 'assistant';
-content: string;
+	role: "user" | "assistant";
+	content: string;
 }
 
 export async function generateAssistantReply(
-agent: Agent,
-messages: AssistantMessage[],
-useSearch: boolean = false,
-onToken?: (token: string) => void
+	agent: Agent,
+	messages: AssistantMessage[],
+	useSearch: boolean = false,
+	onToken?: (token: string) => void
 ): Promise<string | null> {
-if (messages.length === 0) return null;
+	if (messages.length === 0) return null;
 
-const lastMessage = messages[messages.length - 1];
-const history = messages.slice(0, -1);
+	const lastMessage = messages[messages.length - 1];
+	const history = messages.slice(0, -1);
 
-let prompt: string;
-if (history.length === 0) {
-prompt = lastMessage.content;
-} else {
-const historyText = history
-.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-.join('\n\n');
-prompt = `${historyText}\n\nUser: ${lastMessage.content}`;
-}
+	let prompt: string;
+	if (history.length === 0) {
+		prompt = lastMessage.content;
+	} else {
+		const historyText = history
+			.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+			.join("\n\n");
+		prompt = `${historyText}\n\nUser: ${lastMessage.content}`;
+	}
 
-return agent.provider.generateText(prompt, {
-systemPrompt: agent.systemPrompt,
-temperature: 0.7,
-maxTokens: 2000,
-useGoogleSearch: useSearch,
-...(onToken ? { onToken } : {})
-});
+	return agent.provider.generateText(prompt, {
+		systemPrompt: agent.systemPrompt,
+		temperature: 0.7,
+		maxTokens: 2000,
+		useGoogleSearch: useSearch,
+		...(onToken ? { onToken } : {}),
+	});
 }
 
 // ── Alias pool (disguise AI contestants as humans) ────────────────────────────
 
 const ALIAS_POOL = [
-	'Alex','Jordan','Morgan','Taylor','Casey','Riley','Cameron','Quinn',
-	'Avery','Blake','Drew','Emery','Finley','Harper','Hayden','Jamie',
-	'Kendall','Logan','Madison','Parker','Peyton','Reese','Sawyer','Sydney',
-	'Tyler','Charlie','Frankie','Jesse','Lee','Marley','Noel','Robin',
-	'Sam','Terry','Val','Wesley','Zion','Ari','Bay','Cody'
+	"Alex",
+	"Jordan",
+	"Morgan",
+	"Taylor",
+	"Casey",
+	"Riley",
+	"Cameron",
+	"Quinn",
+	"Avery",
+	"Blake",
+	"Drew",
+	"Emery",
+	"Finley",
+	"Harper",
+	"Hayden",
+	"Jamie",
+	"Kendall",
+	"Logan",
+	"Madison",
+	"Parker",
+	"Peyton",
+	"Reese",
+	"Sawyer",
+	"Sydney",
+	"Tyler",
+	"Charlie",
+	"Frankie",
+	"Jesse",
+	"Lee",
+	"Marley",
+	"Noel",
+	"Robin",
+	"Sam",
+	"Terry",
+	"Val",
+	"Wesley",
+	"Zion",
+	"Ari",
+	"Bay",
+	"Cody",
 ];
 
 /** Returns `n` distinct random aliases, shuffled from the pool. */
@@ -456,7 +607,12 @@ export function pickRandomWhoseLineCast(): {
 	aliases: { [id: string]: string };
 	colors: { [id: string]: string };
 } {
-	const ids = Object.keys(MODEL_CATALOG).filter(id => id.endsWith('-cloud') || id.startsWith('gemini') || id.startsWith('claude'));
+	const ids = Object.keys(MODEL_CATALOG).filter(
+		(id) =>
+			id.endsWith("-cloud") ||
+			id.startsWith("gemini") ||
+			id.startsWith("claude")
+	);
 	const shuffled = [...ids].sort(() => Math.random() - 0.5);
 	const [hostId, c1Id, c2Id] = shuffled;
 	const [hostAlias, c1Alias, c2Alias] = pickRandomAliases(3);
@@ -466,8 +622,8 @@ export function pickRandomWhoseLineCast(): {
 		aliases: { [hostId]: hostAlias, [c1Id]: c1Alias, [c2Id]: c2Alias },
 		colors: {
 			[hostId]: MODEL_CATALOG[hostId].color,
-			[c1Id]:   MODEL_CATALOG[c1Id].color,
-			[c2Id]:   MODEL_CATALOG[c2Id].color
-		}
+			[c1Id]: MODEL_CATALOG[c1Id].color,
+			[c2Id]: MODEL_CATALOG[c2Id].color,
+		},
 	};
 }
