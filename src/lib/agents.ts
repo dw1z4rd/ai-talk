@@ -55,11 +55,11 @@ makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OL
 		color: '#4285F4',
 		makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-2.0-flash' })
 	},
-	'gemini-1.5-pro': {
-		name: 'Gemini 1.5 Pro',
-		color: '#34A853',
-		makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-1.5-pro' })
-	},
+'gemini-1.5-pro': {
+name: 'Gemini 2.5 Pro',
+color: '#34A853',
+makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-2.5-pro' })
+},
 };
 
 function makeSystemPrompt(myName: string, opponentName: string): string {
@@ -155,10 +155,10 @@ export async function generateJudgeVerdict(
 	onToken?: (token: string) => void
 ): Promise<string | null> {
 	const prompt = `Tonight's debate topic: "${topic}"\n\nDEBATE TRANSCRIPT:\n${transcript}\n\nGive your judge's verdict now. Be your most entertaining, dramatic self. Comment on specific arguments and rhetorical moments. Then cast your vote.`;
-	return judge.provider.generateText(prompt, {
-		systemPrompt: judge.systemPrompt,
-		temperature: 1.0,
-		maxTokens: 600,
+return judge.provider.generateText(prompt, {
+systemPrompt: judge.systemPrompt,
+temperature: 1.0,
+maxTokens: 1500,
 		...(onToken ? { onToken } : {})
 	});
 }
