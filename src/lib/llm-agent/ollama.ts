@@ -71,8 +71,8 @@ stream: !!options?.onToken,
 						const payload = line.slice(6).trim();
 						if (payload === '[DONE]') break outer;
 						try {
-const chunk = JSON.parse(payload) as OpenAIResponse & { choices?: Array<{ delta?: { content?: string; reasoning?: string } }> };
-const token = (chunk.choices as any)?.[0]?.delta?.content || (chunk.choices as any)?.[0]?.delta?.reasoning || '';
+const chunk = JSON.parse(payload) as OpenAIResponse & { choices?: Array<{ delta?: { content?: string } }> };
+const token = (chunk.choices as any)?.[0]?.delta?.content ?? '';
 if (token) { fullText += token; options.onToken(token); }
 						} catch { /* skip malformed chunks */ }
 					}

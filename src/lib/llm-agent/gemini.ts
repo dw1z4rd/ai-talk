@@ -42,10 +42,15 @@ export async function callGemini<T = GeminiResponse>(
 
 /**
  * Extracts the text content from a Gemini API response.
+ * Skips thought parts (present on thinking models like gemini-2.5-flash).
  * Returns null if the response is missing or malformed.
  */
-export const extractGeminiText = (data: GeminiResponse | null | undefined): string | null =>
-	data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
+export const extractGeminiText = (data: GeminiResponse | null | undefined): string | null => {
+	const parts = data?.candidates?.[0]?.content?.parts;
+	if (!parts) return null;
+	const textPart = parts.find((p) => !p.thought) ?? parts[0];
+	return textPart?.text ?? null;
+};
 
 /**
  * Extracts and cleans the text from a Gemini response,
@@ -65,6 +70,13 @@ export const extractCleanGeminiText = (data: GeminiResponse | null | undefined):
  * const text = await provider.generateText('Hello!', { maxTokens: 100 });
  * ```
  */
+const SAFETY_SETTINGS = [
+	{ category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+	{ category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+	{ category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+	{ category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+];
+
 const buildGeminiBody = (prompt: string, options?: LLMOptions, model?: string) => ({
 ...(options?.systemPrompt != null
 ? { systemInstruction: { parts: [{ text: options.systemPrompt }] } }
@@ -74,6 +86,7 @@ generationConfig: {
 ...(options?.maxTokens != null ? { maxOutputTokens: options.maxTokens } : {}),
 ...(options?.temperature != null ? { temperature: options.temperature } : {})
 },
+safetySettings: SAFETY_SETTINGS,
 ...(options?.useGoogleSearch
 ? { tools: [model?.includes('1.5') ? { googleSearchRetrieval: {} } : { google_search: {} }] }
 : {})
@@ -108,11 +121,12 @@ body: JSON.stringify(buildGeminiBody(prompt, options, model))
 					buf = lines.pop() ?? '';
 					for (const line of lines) {
 						if (!line.startsWith('data: ')) continue;
-						try {
-							const chunk = JSON.parse(line.slice(6)) as GeminiResponse;
-							const token = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
-							if (token) { fullText += token; options.onToken(token); }
-						} catch { /* skip malformed chunks */ }
+try {
+const chunk = JSON.parse(line.slice(6)) as GeminiResponse;
+const parts = chunk.candidates?.[0]?.content?.parts;
+const token = parts?.find((p) => !p.thought)?.text;
+if (token) { fullText += token; options.onToken(token); }
+} catch { /* skip malformed chunks */ }
 					}
 				}
 				return fullText || null;

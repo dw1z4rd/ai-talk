@@ -102,7 +102,9 @@ export interface AnthropicResponse {
  * Gemini API content part
  */
 export interface GeminiContentPart {
-	readonly text?: string;
+readonly text?: string;
+/** Present on thinking-model parts that contain internal reasoning (should be filtered out) */
+readonly thought?: boolean;
 }
 
 /**
