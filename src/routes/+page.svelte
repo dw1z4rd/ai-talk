@@ -89,6 +89,62 @@
   // UI state
   let showFiles = $state(false);
 
+  function escapeHtml(s: string): string {
+    return s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function applyInline(text: string): string {
+    return text
+      .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*([^*\n]+)\*/g, "<em>$1</em>")
+      .replace(/`([^`\n]+)`/g, "<code>$1</code>");
+  }
+
+  function formatMessage(raw: string): string {
+    const text = escapeHtml(raw);
+    const blocks = text.split(/\n{2,}/);
+
+    return blocks
+      .map((block) => {
+        const trimmed = block.trim();
+        if (!trimmed) return "";
+
+        const lines = trimmed.split("\n");
+
+        // Bullet list
+        if (lines.every((l) => /^[-*•] /.test(l.trimStart()))) {
+          const items = lines
+            .map(
+              (l) =>
+                `<li>${applyInline(l.replace(/^[-*•] /, "").trim())}</li>`,
+            )
+            .join("");
+          return `<ul>${items}</ul>`;
+        }
+
+        // Numbered list
+        if (lines.every((l) => /^\d+[.)]\s/.test(l.trimStart()))) {
+          const items = lines
+            .map(
+              (l) =>
+                `<li>${applyInline(l.replace(/^\d+[.)]\s/, "").trim())}</li>`,
+            )
+            .join("");
+          return `<ol>${items}</ol>`;
+        }
+
+        // Regular paragraph
+        return `<p>${lines.map(applyInline).join("<br>")}</p>`;
+      })
+      .filter(Boolean)
+      .join("");
+  }
+
   function swapAgents() {
     [agentA, agentB] = [agentB, agentA];
   }
@@ -903,16 +959,16 @@
                   class="text-[10px] font-bold uppercase tracking-widest"
                   style="color: {msg.color}">{msg.agentName}</span
                 >
-                <p
-                  class="text-[14.5px] leading-relaxed text-[#d4d4e8] px-4 py-3.5 rounded-2xl {isLeft
+                <div
+                  class="message-content text-[15px] leading-[1.72] text-[#d4d4e8] px-5 py-4 rounded-2xl {isLeft
                     ? 'rounded-tl-sm border-l-2'
                     : 'rounded-tr-sm border-r-2'}"
                   style="background-color: {msg.color}09; border-color: {msg.color}30; border-top: 1px solid {msg.color}1a; border-bottom: 1px solid {msg.color}1a; {isLeft
                     ? ''
                     : 'border-left: 1px solid ' + msg.color + '1a'}"
                 >
-                  {msg.text}
-                </p>
+                  {@html formatMessage(msg.text)}
+                </div>
               </div>
             </div>
           {/if}
@@ -950,8 +1006,8 @@
                   style="color: {streamingMessage.color}"
                   >{streamingMessage.agentName}</span
                 >
-                <p
-                  class="text-[14.5px] leading-relaxed text-[#d4d4e8] px-4 py-3.5 rounded-2xl {isLeft
+                <div
+                  class="message-content text-[15px] leading-[1.72] text-[#d4d4e8] px-5 py-4 rounded-2xl {isLeft
                     ? 'rounded-tl-sm border-l-2'
                     : 'rounded-tr-sm border-r-2'}"
                   style="background-color: {streamingMessage.color}09; border-color: {streamingMessage.color}30; border-top: 1px solid {streamingMessage.color}1a; border-bottom: 1px solid {streamingMessage.color}1a; {isLeft
@@ -960,11 +1016,11 @@
                       streamingMessage.color +
                       '1a'}"
                 >
-                  {streamingMessage.text}<span
-                    class="inline-block w-[2px] h-[1em] ml-[1px] align-text-bottom rounded-sm animate-pulse"
+                  {@html formatMessage(streamingMessage.text)}<span
+                    class="inline-block w-[2px] h-[0.9em] ml-[2px] align-text-bottom rounded-sm animate-pulse"
                     style="background: {streamingMessage.color}"
                   ></span>
-                </p>
+                </div>
               </div>
             </div>
           {:else}
@@ -1088,4 +1144,51 @@
 </div>
 
 <style>
+  .message-content :global(p) {
+    margin-bottom: 0.6em;
+    line-height: inherit;
+  }
+  .message-content :global(p:last-child) {
+    margin-bottom: 0;
+  }
+  .message-content :global(strong) {
+    color: #f0f0fa;
+    font-weight: 620;
+  }
+  .message-content :global(em) {
+    font-style: italic;
+    opacity: 0.88;
+  }
+  .message-content :global(code) {
+    font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+    font-size: 0.84em;
+    background: rgba(255, 255, 255, 0.07);
+    padding: 0.1em 0.38em;
+    border-radius: 0.3em;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+  }
+  .message-content :global(ul),
+  .message-content :global(ol) {
+    padding-left: 1.35em;
+    margin-bottom: 0.6em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.28em;
+  }
+  .message-content :global(ul) {
+    list-style: disc;
+  }
+  .message-content :global(ol) {
+    list-style: decimal;
+  }
+  .message-content :global(ul:last-child),
+  .message-content :global(ol:last-child) {
+    margin-bottom: 0;
+  }
+  .message-content :global(li) {
+    line-height: 1.6;
+  }
+  .message-content :global(li::marker) {
+    opacity: 0.5;
+  }
 </style>
