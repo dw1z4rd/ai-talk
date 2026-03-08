@@ -210,7 +210,7 @@ export async function generateJudgeVerdict(
 	transcript: string,
 	onToken?: (token: string) => void
 ): Promise<string | null> {
-	const prompt = `Tonight's debate topic: "${topic}"\n\nDEBATE TRANSCRIPT:\n${transcript}\n\nGive your judge's verdict now. Be your most entertaining, dramatic self. Comment on specific arguments and rhetorical moments. Then cast your vote.`;
+	const prompt = `Tonight's debate topic: "${topic}"\n\nDEBATE TRANSCRIPT:\n${transcript}\n\nGive your judge's verdict now. Be your most entertaining, dramatic self. Comment on specific arguments and rhetorical moments. Then cast your vote. End your verdict with a single sentence naming the winner in plain prose — no bold, no new paragraph, no dramatic setup line. Just: "My vote goes to [Name]." That's the last line. Do not write anything after that final line.`;
 	return judge.provider.generateText(prompt, {
 		systemPrompt: judge.systemPrompt,
 		temperature: 1.0,
