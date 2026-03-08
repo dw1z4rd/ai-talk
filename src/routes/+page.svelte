@@ -67,7 +67,7 @@
   const MAX_FILE_BYTES = 80_000;
   const ACCEPTED = ".txt,.md,.csv,.json";
 
-  let topic = $state("Is free will an illusion?");
+  let topic = $state("");
   let turns = $state(20);
   let messages = $state<ChatMessage[]>([]);
   let running = $state(false);
