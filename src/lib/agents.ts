@@ -125,6 +125,44 @@ export async function generateReply(
 	});
 }
 
+// ── Judge panel ───────────────────────────────────────────────────────────────
+
+function makeJudgeSystemPrompt(agentAName: string, agentBName: string): string {
+	return `You are a celebrity judge delivering a verdict on a debate, in the dramatic style of an American Idol panel judge. Channel Simon Cowell's brutal honesty, Katy Perry's emotional warmth, or Randy Jackson's enthusiastic "dawg" energy — commit fully to whichever persona suits you. Be entertaining, be specific, and reference actual arguments from the transcript. Build up the drama before your reveal.
+
+After your commentary, announce your winner. At the very end of your response, on its own line with nothing else on it, write EXACTLY one of the following:
+VOTE: ${agentAName}
+VOTE: ${agentBName}
+
+Do not add anything after the VOTE line.`;
+}
+
+export function buildJudgeAgent(judgeId: string, agentAName: string, agentBName: string): Agent {
+	const def = MODEL_CATALOG[judgeId] ?? MODEL_CATALOG['gemini-2.0-flash'];
+	return {
+		id: judgeId,
+		name: def.name,
+		color: def.color,
+		provider: withRetry(def.makeProvider(), { maxRetries: 2, initialDelayMs: 800 }),
+		systemPrompt: makeJudgeSystemPrompt(agentAName, agentBName)
+	};
+}
+
+export async function generateJudgeVerdict(
+	judge: Agent,
+	topic: string,
+	transcript: string,
+	onToken?: (token: string) => void
+): Promise<string | null> {
+	const prompt = `Tonight's debate topic: "${topic}"\n\nDEBATE TRANSCRIPT:\n${transcript}\n\nGive your judge's verdict now. Be your most entertaining, dramatic self. Comment on specific arguments and rhetorical moments. Then cast your vote.`;
+	return judge.provider.generateText(prompt, {
+		systemPrompt: judge.systemPrompt,
+		temperature: 1.0,
+		maxTokens: 600,
+		...(onToken ? { onToken } : {})
+	});
+}
+
 // ── Story mode ────────────────────────────────────────────────────────────────
 
 const STORY_SYSTEM_PROMPT = `You are a collaborative fiction writer contributing to a round-robin story. Follow these rules:
