@@ -46,10 +46,13 @@ export async function callGemini<T = GeminiResponse>(
  * Returns null if the response is missing or malformed.
  */
 export const extractGeminiText = (data: GeminiResponse | null | undefined): string | null => {
-	const parts = data?.candidates?.[0]?.content?.parts;
-	if (!parts) return null;
-	const textPart = parts.find((p) => !p.thought) ?? parts[0];
-	return textPart?.text ?? null;
+const parts = data?.candidates?.[0]?.content?.parts;
+if (!parts) return null;
+const text = parts
+.filter((p) => !p.thought && p.text != null)
+.map((p) => p.text!)
+.join('');
+return text || null;
 };
 
 /**
@@ -84,7 +87,8 @@ const buildGeminiBody = (prompt: string, options?: LLMOptions, model?: string) =
 contents: [{ role: 'user', parts: [{ text: prompt }] }],
 generationConfig: {
 ...(options?.maxTokens != null ? { maxOutputTokens: options.maxTokens } : {}),
-...(options?.temperature != null ? { temperature: options.temperature } : {})
+...(options?.temperature != null ? { temperature: options.temperature } : {}),
+...(model?.includes('2.5') ? { thinkingConfig: { thinkingBudget: 0 } } : {})
 },
 safetySettings: SAFETY_SETTINGS,
 ...(options?.useGoogleSearch
@@ -113,23 +117,41 @@ body: JSON.stringify(buildGeminiBody(prompt, options, model))
 				const decoder = new TextDecoder();
 				let buf = '';
 				let fullText = '';
-				while (true) {
-					const { done, value } = await reader.read();
-					if (done) break;
-					buf += decoder.decode(value, { stream: true });
-					const lines = buf.split('\n');
-					buf = lines.pop() ?? '';
-					for (const line of lines) {
-						if (!line.startsWith('data: ')) continue;
+while (true) {
+const { done, value } = await reader.read();
+if (done) {
+// Flush decoder and process any data remaining in the buffer
+const remaining = (buf + decoder.decode()).trim();
+if (remaining.startsWith('data: ')) {
+try {
+const chunk = JSON.parse(remaining.slice(6)) as GeminiResponse;
+const parts = chunk.candidates?.[0]?.content?.parts;
+const token = parts
+?.filter((p) => !p.thought && p.text)
+.map((p) => p.text!)
+.join('');
+if (token) { fullText += token; options.onToken(token); }
+} catch { /* skip malformed final chunk */ }
+}
+break;
+}
+buf += decoder.decode(value, { stream: true });
+const lines = buf.split('\n');
+buf = lines.pop() ?? '';
+for (const line of lines) {
+if (!line.startsWith('data: ')) continue;
 try {
 const chunk = JSON.parse(line.slice(6)) as GeminiResponse;
 const parts = chunk.candidates?.[0]?.content?.parts;
-const token = parts?.find((p) => !p.thought)?.text;
+const token = parts
+?.filter((p) => !p.thought && p.text)
+.map((p) => p.text!)
+.join('');
 if (token) { fullText += token; options.onToken(token); }
 } catch { /* skip malformed chunks */ }
-					}
-				}
-				return fullText || null;
+}
+}
+return fullText || null;
 			} catch (e: any) {
 				console.error('[Gemini] Stream Network Error:', redactKey(e.message || String(e), config.apiKey));
 				return null;
