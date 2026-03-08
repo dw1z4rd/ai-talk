@@ -34,7 +34,6 @@
           name: "Gemini 2.5 Flash",
           color: "#1A73E8",
         },
-        { id: "gemini-1.5-pro", name: "Gemini 2.5 Pro", color: "#34A853" },
       ],
     },
   ];

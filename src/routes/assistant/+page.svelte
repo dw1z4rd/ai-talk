@@ -16,7 +16,6 @@
       options: [
         { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", color: "#4285F4" },
         { id: "gemini-3-flash-preview-cloud", name: "Gemini 2.5 Flash", color: "#1A73E8" },
-        { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", color: "#34A853" },
       ],
     },
   ];

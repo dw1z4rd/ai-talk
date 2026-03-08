@@ -55,11 +55,6 @@ makeProvider: () => createOllamaProvider({ baseUrl: OLLAMA_CLOUD_URL, apiKey: OL
 		color: '#4285F4',
 		makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-2.0-flash' })
 	},
-'gemini-1.5-pro': {
-name: 'Gemini 2.5 Pro',
-color: '#34A853',
-makeProvider: () => createGeminiProvider({ apiKey: GEMINI_API_KEY, model: 'gemini-2.5-pro' })
-},
 };
 
 function makeSystemPrompt(myName: string, opponentName: string): string {
