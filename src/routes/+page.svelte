@@ -841,7 +841,7 @@
 
   <!-- Setup card -->
   <div
-    class="flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-7"
+    class="flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
   >
     <!-- Topic -->
     <div class="flex flex-col gap-1.5">
@@ -1310,16 +1310,16 @@
               >Moderator Intervened</span
             >
             <p
-              class="text-[14.5px] leading-relaxed text-white text-center max-w-[80%] italic"
+              class="text-[14.5px] leading-relaxed text-white text-center max-w-[95%] sm:max-w-[80%] italic"
             >
               "{msg.text}"
             </p>
           </div>
         {:else}
           <div
-            class="group flex gap-3 px-6 py-4 border-t border-[--color-border-subtle] {isLeft
+            class="group flex gap-3 px-3 py-3 sm:px-6 sm:py-4 border-t border-[--color-border-subtle] {isLeft
               ? ''
-              : 'flex-row-reverse'}"
+              : 'sm:flex-row-reverse'}"
             style="animation: fadeSlide 0.2s ease both; animation-delay: {Math.min(
               i * 20,
               100,
@@ -1342,7 +1342,7 @@
             <div
               class="flex flex-col gap-1.5 min-w-0 {isLeft
                 ? 'items-start'
-                : 'items-end'}"
+                : 'items-start sm:items-end'}"
               style="max-width: calc(100% - 3rem)"
             >
               <span
@@ -1350,7 +1350,7 @@
                 style="color: {msg.color}">{msg.agentName}</span
               >
               <div
-                class="message-content text-[15px] leading-[1.72] text-[#d4d4e8] px-5 py-4 rounded-2xl {isLeft
+                class="message-content text-[14px] sm:text-[15px] leading-relaxed sm:leading-[1.72] text-[#d4d4e8] px-3 py-3 sm:px-5 sm:py-4 rounded-2xl {isLeft
                   ? 'rounded-tl-sm border-l-2'
                   : 'rounded-tr-sm border-r-2'}"
                 style="background-color: {msg.color}09; border-color: {msg.color}30; border-top: 1px solid {msg.color}1a; border-bottom: 1px solid {msg.color}1a; {isLeft
@@ -1369,9 +1369,9 @@
         {#if streamingMessage}
           {@const isLeft = streamingMessage.agentId === leftAgentId}
           <div
-            class="flex gap-3 px-6 py-4 border-t border-[--color-border-subtle] {isLeft
+            class="flex gap-3 px-3 py-3 sm:px-6 sm:py-4 border-t border-[--color-border-subtle] {isLeft
               ? ''
-              : 'flex-row-reverse'}"
+              : 'sm:flex-row-reverse'}"
             style="animation: fadeSlide 0.15s ease both"
           >
             <div class="flex-shrink-0 flex flex-col items-center gap-1.5">
@@ -1388,7 +1388,7 @@
             <div
               class="flex flex-col gap-1.5 min-w-0 {isLeft
                 ? 'items-start'
-                : 'items-end'}"
+                : 'items-start sm:items-end'}"
               style="max-width: calc(100% - 3rem)"
             >
               <span
@@ -1397,7 +1397,7 @@
                 >{streamingMessage.agentName}</span
               >
               <div
-                class="message-content text-[15px] leading-[1.72] text-[#d4d4e8] px-5 py-4 rounded-2xl {isLeft
+                class="message-content text-[14px] sm:text-[15px] leading-relaxed sm:leading-[1.72] text-[#d4d4e8] px-3 py-3 sm:px-5 sm:py-4 rounded-2xl {isLeft
                   ? 'rounded-tl-sm border-l-2'
                   : 'rounded-tr-sm border-r-2'}"
                 style="background-color: {streamingMessage.color}09; border-color: {streamingMessage.color}30; border-top: 1px solid {streamingMessage.color}1a; border-bottom: 1px solid {streamingMessage.color}1a; {isLeft
@@ -1504,7 +1504,7 @@
         >
           <!-- Judge header -->
           <div
-            class="flex items-center gap-3 px-5 py-3 border-b"
+            class="flex items-center gap-3 px-3 py-3 sm:px-5 border-b"
             style="border-color: {result || isStreaming
               ? judge.color + '25'
               : 'var(--color-border-subtle)'}; background: {result ||
@@ -1561,7 +1561,7 @@
           </div>
 
           <!-- Judge body -->
-          <div class="px-5 py-4 text-[15px] leading-[1.72] text-[#d4d4e8]">
+          <div class="px-3 py-3 sm:px-5 sm:py-4 text-[14px] sm:text-[15px] leading-relaxed sm:leading-[1.72] text-[#d4d4e8]">
             {#if result}
               <!-- Strip the VOTE line from display -->
               <div class="message-content">
