@@ -442,11 +442,34 @@
     let mime: string;
     let ext: string;
 
+    const agentAInfo = getModelInfo(agentA);
+    const agentBInfo = getModelInfo(agentB);
+
     if (format === "md") {
       content = `# Debate: ${topic}\n\n_Exported ${date}_\n\n---\n\n`;
       content += messages
         .map((m) => `### ${m.agentName}\n\n${m.text}`)
         .join("\n\n---\n\n");
+
+      if (judgeResults.length > 0) {
+        content += "\n\n---\n\n## Judges' Deliberation\n\n";
+        content += judgeResults
+          .map((r, i) => {
+            const votedFor = getModelInfo(r.vote);
+            const deliberation = r.text.replace(/\n?VOTE:\s*.+$/im, "").trim();
+            return `### 🧑‍⚖️ Judge ${i + 1} · ${r.model.name}\n\n> **Voted:** ${votedFor.name}\n\n${deliberation}`;
+          })
+          .join("\n\n---\n\n");
+
+        const votesA = judgeResults.filter((r) => r.vote === agentA).length;
+        const votesB = judgeResults.filter((r) => r.vote === agentB).length;
+        content += "\n\n---\n\n## Final Verdict\n\n";
+        content += `| Model | Votes |\n|---|---|\n| ${agentAInfo.name} | ${votesA} |\n| ${agentBInfo.name} | ${votesB} |\n\n`;
+        if (winner) {
+          content += `🏆 **Winner: ${winner.name}** (${winnerVoteCount} of ${judgeModels.length} judges)\n`;
+        }
+      }
+
       mime = "text/markdown";
       ext = "md";
     } else {
@@ -454,6 +477,26 @@
       content += messages
         .map((m) => `[${m.agentName}]\n${m.text}`)
         .join("\n\n");
+
+      if (judgeResults.length > 0) {
+        content += `\n\n${"═".repeat(40)}\nJUDGES' DELIBERATION\n\n`;
+        content += judgeResults
+          .map((r, i) => {
+            const votedFor = getModelInfo(r.vote);
+            const deliberation = r.text.replace(/\n?VOTE:\s*.+$/im, "").trim();
+            return `[Judge ${i + 1} — ${r.model.name}]\nVoted: ${votedFor.name}\n\n${deliberation}`;
+          })
+          .join(`\n\n${"─".repeat(40)}\n\n`);
+
+        const votesA = judgeResults.filter((r) => r.vote === agentA).length;
+        const votesB = judgeResults.filter((r) => r.vote === agentB).length;
+        content += `\n\n${"═".repeat(40)}\nFINAL VERDICT\n${agentAInfo.name}: ${votesA} vote${votesA !== 1 ? "s" : ""}\n${agentBInfo.name}: ${votesB} vote${votesB !== 1 ? "s" : ""}`;
+        if (winner) {
+          content += `\nWinner: ${winner.name}`;
+        }
+        content += "\n";
+      }
+
       mime = "text/plain";
       ext = "txt";
     }
