@@ -1,6 +1,5 @@
 import {
 	createOllamaProvider,
-	createGeminiProvider,
 	createAnthropicProvider,
 	withRetry,
 } from "$lib/llm-agent";
@@ -48,15 +47,6 @@ const MODEL_CATALOG: Record<string, ModelDef> = {
 				model: "deepseek-v3.2-cloud",
 			}),
 	},
-	"gemini-3-flash-preview-cloud": {
-		name: "Gemini 2.5 Flash",
-		color: "#1A73E8",
-		makeProvider: () =>
-			createGeminiProvider({
-				apiKey: GEMINI_API_KEY,
-				model: "gemini-2.5-flash",
-			}),
-	},
 	"devstral-small-2:24b-cloud": {
 		name: "Devstral Small 2",
 		color: "#FF7000",
@@ -77,17 +67,37 @@ const MODEL_CATALOG: Record<string, ModelDef> = {
 				model: "kimi-k2:1t-cloud",
 			}),
 	},
-
-	// Gemini
-	"gemini-2.0-flash": {
-		name: "Gemini 2.0 Flash",
-		color: "#4285F4",
+	"gpt-oss:120b-cloud": {
+		name: "GPT-OSS 120B",
+		color: "#FF6B35",
 		makeProvider: () =>
-			createGeminiProvider({
-				apiKey: GEMINI_API_KEY,
-				model: "gemini-2.0-flash",
+			createOllamaProvider({
+				baseUrl: OLLAMA_CLOUD_URL,
+				apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+				model: "gpt-oss:120b-cloud",
 			}),
 	},
+	"qwen3-vl:235b-cloud": {
+		name: "Qwen3-VL 235B",
+		color: "#10B981",
+		makeProvider: () =>
+			createOllamaProvider({
+				baseUrl: OLLAMA_CLOUD_URL,
+				apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+				model: "qwen3-vl:235b-cloud",
+			}),
+	},
+	"glm-4.6:cloud": {
+		name: "GLM-4.6",
+		color: "#8B5CF6",
+		makeProvider: () =>
+			createOllamaProvider({
+				baseUrl: OLLAMA_CLOUD_URL,
+				apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+				model: "glm-4.6:cloud",
+			}),
+	},
+
 };
 
 // Personality Matrix Parameters Interface
@@ -443,7 +453,7 @@ export function buildJudgeAgent(
 	agentAName: string,
 	agentBName: string
 ): Agent {
-	const def = MODEL_CATALOG[judgeId] ?? MODEL_CATALOG["gemini-2.0-flash"];
+	const def = MODEL_CATALOG[judgeId] ?? MODEL_CATALOG["gpt-oss:120b-cloud"];
 	return {
 		id: judgeId,
 		name: def.name,
@@ -624,7 +634,7 @@ Guidelines:
 - When web search is enabled, ground your answers in the retrieved information and note when answering from live search results.`;
 
 export function buildAssistantAgent(modelId: string): Agent {
-	const def = MODEL_CATALOG[modelId] ?? MODEL_CATALOG["gemini-2.0-flash"];
+	const def = MODEL_CATALOG[modelId] ?? MODEL_CATALOG["gpt-oss:120b-cloud"];
 	return {
 		id: modelId,
 		name: def.name,

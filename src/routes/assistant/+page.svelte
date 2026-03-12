@@ -29,7 +29,7 @@
     content: string;
   }
 
-  let selectedModel = $state("deepseek-v3.1:671b-cloud");
+  let selectedModel = $state("gpt-oss:120b-cloud");
   let useSearch = $state(false);
   let input = $state("");
   let messages = $state<ChatMessage[]>([]);
