@@ -23,16 +23,20 @@
           name: "Kimi K2 1T",
           color: "#A78BFA",
         },
-      ],
-    },
-    {
-      group: "Gemini",
-      options: [
-        { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", color: "#4285F4" },
         {
-          id: "gemini-3-flash-preview-cloud",
-          name: "Gemini 2.5 Flash",
-          color: "#1A73E8",
+          id: "llama-3.3:70b-cloud",
+          name: "Llama 3.3 70B",
+          color: "#FF6B35",
+        },
+        {
+          id: "qwen-2.5:72b-cloud",
+          name: "Qwen 2.5 72B",
+          color: "#10B981",
+        },
+        {
+          id: "mixtral-8x22b-cloud",
+          name: "Mixtral 8x22B",
+          color: "#8B5CF6",
         },
       ],
     },

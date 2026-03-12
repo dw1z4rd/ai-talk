@@ -9,13 +9,9 @@
         { id: "deepseek-v3.2-cloud", name: "DeepSeek V3.2", color: "#3B7BFF" },
         { id: "devstral-small-2:24b-cloud", name: "Devstral Small 2", color: "#FF7000" },
         { id: "kimi-k2:1t-cloud", name: "Kimi K2 1T", color: "#A78BFA" },
-      ],
-    },
-    {
-      group: "Gemini",
-      options: [
-        { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", color: "#4285F4" },
-        { id: "gemini-3-flash-preview-cloud", name: "Gemini 2.5 Flash", color: "#1A73E8" },
+        { id: "llama-3.3:70b-cloud", name: "Llama 3.3 70B", color: "#FF6B35" },
+        { id: "qwen-2.5:72b-cloud", name: "Qwen 2.5 72B", color: "#10B981" },
+        { id: "mixtral-8x22b-cloud", name: "Mixtral 8x22B", color: "#8B5CF6" },
       ],
     },
   ];
@@ -33,8 +29,8 @@
     content: string;
   }
 
-  let selectedModel = $state("gemini-2.0-flash");
-  let useSearch = $state(true);
+  let selectedModel = $state("deepseek-v3.1:671b-cloud");
+  let useSearch = $state(false);
   let input = $state("");
   let messages = $state<ChatMessage[]>([]);
   let streaming = $state(false);
@@ -43,7 +39,6 @@
   let chatEl = $state<HTMLElement | null>(null);
   let abortController = $state<AbortController | null>(null);
 
-  let isGeminiModel = $derived(selectedModel.startsWith("gemini"));
   let modelInfo = $derived(getModelInfo(selectedModel));
   let canSend = $derived(!streaming && input.trim().length > 0);
 
@@ -95,7 +90,7 @@
         body: JSON.stringify({
           modelId: selectedModel,
           messages: newMessages,
-          useSearch: isGeminiModel && useSearch,
+          useSearch: useSearch,
         }),
         signal: abortController.signal,
       });
@@ -214,32 +209,6 @@
       </select>
     </div>
 
-    <!-- Web search toggle (Gemini only) -->
-    {#if isGeminiModel}
-      <button
-        type="button"
-        onclick={() => (useSearch = !useSearch)}
-        disabled={streaming}
-        class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest px-3 py-2 rounded-xl border transition-all cursor-pointer disabled:opacity-40 {useSearch
-          ? 'border-[#4285F4] text-[#4285F4] bg-[#4285F4]/8'
-          : 'border-[--color-border] text-[--color-muted] hover:border-[--color-muted] bg-[--color-surface]'}"
-      >
-        <svg
-          class="w-3 h-3"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="m21 21-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"
-          />
-        </svg>
-        Web Search
-      </button>
-    {/if}
 
     <!-- New chat -->
     {#if messages.length > 0 || streaming}
@@ -291,27 +260,6 @@
             Ask me anything — science, history, math, philosophy, technology,
             or whatever's on your mind.
           </p>
-          {#if isGeminiModel && useSearch}
-            <p
-              class="text-xs mt-1 flex items-center justify-center gap-1"
-              style="color: {modelInfo.color}"
-            >
-              <svg
-                class="w-3 h-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="m21 21-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"
-                />
-              </svg>
-              Web search enabled — answers grounded in live results
-            </p>
-          {/if}
         </div>
         <p class="text-xs text-[--color-muted]">
           <span class="text-white font-semibold">Enter</span> to send ·

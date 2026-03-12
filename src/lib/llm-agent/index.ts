@@ -1,5 +1,5 @@
 export { withRetry, withSystemPrompt } from './retry';
-export { callGemini, extractGeminiText, extractCleanGeminiText, createGeminiProvider } from './gemini';
+
 export { createOpenAIProvider } from './openai';
 export { createAnthropicProvider } from './anthropic';
 export { createOllamaProvider } from './ollama';
