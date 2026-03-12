@@ -15,7 +15,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	};
 
 	const safeTopic = topic?.trim() || 'What is consciousness?';
-	const totalTurns = Math.min(Number(turns) || 12, 30);
+	const totalTurns = Math.min(Number(turns) || 12, 30) * 2; // Multiply by 2 debaters
 
 	const stream = new ReadableStream({
 		async start(controller) {
