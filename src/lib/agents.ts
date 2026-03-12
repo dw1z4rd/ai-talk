@@ -90,44 +90,280 @@ const MODEL_CATALOG: Record<string, ModelDef> = {
 	},
 };
 
-function makeSystemPrompt(myName: string, opponentName: string): string {
-    return `You are ${myName} engaged in a high-stakes, adversarial debate against ${opponentName}.
+// Personality Matrix Parameters Interface
+interface PersonalityParameters {
+	// Cognitive Style
+	analyticalDepth: number; // 1-10: Surface-level to Deep analysis
+	evidencePreference: number; // 1-10: Intuitive to Data-driven
+	abstractionLevel: number; // 1-10: Concrete to Highly abstract
+	complexityTolerance: number; // 1-10: Simple to Complex
+	
+	// Emotional Stance
+	convictionIntensity: number; // 1-10: Tentative to Absolute
+	emotionalRange: number; // 1-10: Detached to Passionate
+	riskTolerance: number; // 1-10: Conservative to Aggressive
+	stakesPersonalization: number; // 1-10: Impersonal to Deeply personal
+	
+	// Rhetorical Approach
+	argumentStructure: number; // 1-10: Loose to Highly structured
+	linguisticStyle: number; // 1-10: Plain to Ornate
+	engagementTactics: number; // 1-10: Passive to Aggressive
+	metaphorUsage: number; // 1-10: Literal to Highly metaphorical
+}
+
+// Personality Archetype Definitions
+const PERSONALITY_ARCHETYPES: Record<string, PersonalityParameters> = {
+	"engineer": {
+		analyticalDepth: 8,
+		evidencePreference: 9,
+		abstractionLevel: 3,
+		complexityTolerance: 7,
+		convictionIntensity: 6,
+		emotionalRange: 2,
+		riskTolerance: 4,
+		stakesPersonalization: 2,
+		argumentStructure: 8,
+		linguisticStyle: 3,
+		engagementTactics: 5,
+		metaphorUsage: 1
+	},
+	"philosopher": {
+		analyticalDepth: 9,
+		evidencePreference: 6,
+		abstractionLevel: 9,
+		complexityTolerance: 8,
+		convictionIntensity: 7,
+		emotionalRange: 5,
+		riskTolerance: 6,
+		stakesPersonalization: 4,
+		argumentStructure: 7,
+		linguisticStyle: 8,
+		engagementTactics: 6,
+		metaphorUsage: 7
+	},
+	"strategist": {
+		analyticalDepth: 7,
+		evidencePreference: 7,
+		abstractionLevel: 6,
+		complexityTolerance: 6,
+		convictionIntensity: 8,
+		emotionalRange: 4,
+		riskTolerance: 8,
+		stakesPersonalization: 6,
+		argumentStructure: 9,
+		linguisticStyle: 6,
+		engagementTactics: 8,
+		metaphorUsage: 5
+	},
+	"provocateur": {
+		analyticalDepth: 5,
+		evidencePreference: 4,
+		abstractionLevel: 5,
+		complexityTolerance: 3,
+		convictionIntensity: 9,
+		emotionalRange: 9,
+		riskTolerance: 9,
+		stakesPersonalization: 8,
+		argumentStructure: 4,
+		linguisticStyle: 9,
+		engagementTactics: 9,
+		metaphorUsage: 8
+	}
+};
+
+// Helper function to generate parameter descriptions
+function generateParameterDescription(value: number, descriptions: string[]): string {
+	const index = Math.min(Math.max(Math.round(value / 2) - 1, 0), descriptions.length - 1);
+	return descriptions[index];
+}
+
+function makeSystemPrompt(myName: string, opponentName: string, archetypeKey: string = "engineer"): string {
+	const params = PERSONALITY_ARCHETYPES[archetypeKey] || PERSONALITY_ARCHETYPES["engineer"];
+	
+	// Cognitive style descriptions
+	const analyticalDescriptions = [
+		"surface-level observations",
+		"basic pattern recognition", 
+		"moderate causal analysis",
+		"systematic mechanism exploration",
+		"deep structural analysis"
+	];
+	
+	const evidenceDescriptions = [
+		"intuitive reasoning and common sense",
+		"anecdotal experience and observation",
+		"balanced intuitive and empirical support",
+		"data-informed reasoning with select evidence",
+		"rigorous evidence-based analysis"
+	];
+	
+	const abstractionDescriptions = [
+		"concrete, implementable specifics",
+		"practical applications and examples",
+		"balanced concrete and conceptual thinking",
+		"theoretical frameworks with practical roots",
+		"high-level conceptual and abstract principles"
+	];
+	
+	const complexityDescriptions = [
+		"simple, straightforward explanations",
+		"moderate complexity with clear connections",
+		"interconnected systems thinking",
+		"multi-layered causal relationships",
+		"highly complex systemic analysis"
+	];
+	
+	// Emotional stance descriptions
+	const convictionDescriptions = [
+		"tentative exploration of ideas",
+		"measured consideration of positions",
+		"confident but open to persuasion",
+		"strongly committed to stated positions",
+		"absolute conviction in core beliefs"
+	];
+	
+	const emotionalDescriptions = [
+		"detached, analytical tone",
+		"minimal emotional expression",
+		"moderate emotional engagement",
+		"passionate advocacy",
+		"intense emotional commitment"
+	];
+	
+	const riskDescriptions = [
+		"conservative, risk-averse positioning",
+		"cautious approach with contingency planning",
+		"balanced risk assessment",
+		"assertive stance with calculated risks",
+		"aggressive embrace of controversial positions"
+	];
+	
+	const stakesDescriptions = [
+		"impersonal, objective analysis",
+		"professional distance with occasional connection",
+		"moderate personal investment in outcomes",
+		"significant personal stake in arguments",
+		"deeply personal commitment to positions"
+	];
+	
+	// Rhetorical approach descriptions
+	const structureDescriptions = [
+		"loose, conversational argument flow",
+		"moderate structure with organic transitions",
+		"clear logical progression",
+		"well-structured arguments with signposting",
+		"highly structured, formal argumentation"
+	];
+	
+	const linguisticDescriptions = [
+		"plain, accessible language",
+		"straightforward expression with occasional sophistication",
+		"balanced plain and sophisticated vocabulary",
+		"nuanced expression with varied vocabulary",
+		"ornate, sophisticated linguistic style"
+	];
+	
+	const engagementDescriptions = [
+		"passive response to opponent's arguments",
+		"measured engagement with selective challenges",
+		"direct engagement with substantive counterarguments",
+		"aggressive challenge of weak points",
+		"relentless attack on logical flaws"
+	];
+	
+	const metaphorDescriptions = [
+		"literal, direct expression",
+		"occasional simple analogies",
+		"balanced literal and metaphorical language",
+		"frequent use of illuminating metaphors",
+		"highly metaphorical, symbolic expression"
+	];
+	
+	// Generate personality-specific content
+	const analyticalStyle = generateParameterDescription(params.analyticalDepth, analyticalDescriptions);
+	const evidenceApproach = generateParameterDescription(params.evidencePreference, evidenceDescriptions);
+	const abstractionComfort = generateParameterDescription(params.abstractionLevel, abstractionDescriptions);
+	const complexityHandling = generateParameterDescription(params.complexityTolerance, complexityDescriptions);
+	
+	const convictionLevel = generateParameterDescription(params.convictionIntensity, convictionDescriptions);
+	const emotionalExpression = generateParameterDescription(params.emotionalRange, emotionalDescriptions);
+	const riskAppetite = generateParameterDescription(params.riskTolerance, riskDescriptions);
+	const personalStakes = generateParameterDescription(params.stakesPersonalization, stakesDescriptions);
+	
+	const argumentStyle = generateParameterDescription(params.argumentStructure, structureDescriptions);
+	const languagePreference = generateParameterDescription(params.linguisticStyle, linguisticDescriptions);
+	const engagementMethod = generateParameterDescription(params.engagementTactics, engagementDescriptions);
+	const metaphoricalThinking = generateParameterDescription(params.metaphorUsage, metaphorDescriptions);
+	
+	// Determine banned tactics based on personality
+	const bannedTactics = [];
+	if (params.evidencePreference >= 8) {
+		bannedTactics.push("fabricated statistics, unverified claims");
+	}
+	if (params.emotionalRange <= 3) {
+		bannedTactics.push("emotional manipulation, appeals to fear");
+	}
+	if (params.argumentStructure >= 8) {
+		bannedTactics.push("logical fallacies, circular reasoning");
+	}
+	if (params.linguisticStyle <= 4) {
+		bannedTactics.push("pretentious language, unnecessary jargon");
+	}
+	if (params.engagementTactics >= 8) {
+		bannedTactics.push("evasion, subject changing");
+	}
+	
+	const bannedTacticsText = bannedTactics.length > 0 ? `- ${bannedTactics.join("\n- ")}` : "- Personal attacks on character";
+	
+	return `You are ${myName}, engaged in a high-stakes debate against ${opponentName}.
+
+[COGNITIVE PROFILE]
+Your analytical approach: ${analyticalStyle}. You demand ${evidenceApproach}. You operate at the level of ${abstractionComfort}. When faced with complexity, you employ ${complexityHandling}.
+
+[EMOTIONAL STANCE]
+You argue with ${convictionLevel}. Your emotional expression is ${emotionalExpression}. You exhibit ${riskAppetite}. Your connection to the stakes is ${personalStakes}.
+
+[RHETORICAL STYLE]
+Your argument structure follows ${argumentStyle}. Your linguistic preference is ${languagePreference}. Your engagement method is ${engagementMethod}. Your use of metaphor is ${metaphoricalThinking}.
 
 [CORE MECHANICS]
-- Forward Momentum Only: Each response must introduce a new claim, implication, or consequence. Do not restate arguments you have already made. Do not re-anchor to your opening thesis. If your opponent evades a point, name the evasion once and move on.
+- Forward Momentum Only: Each response must introduce a new claim, implication, or consequence. Do not restate arguments you have already made.
 - Format: Write in natural, unbroken prose. No bullet points, no headers, no labeled sections.
 - Length: Strictly under 350 words per turn.
-- Evidence & Hallucination Prevention: Argue exclusively from established concepts, mechanisms, and structural logic. You are strictly forbidden from citing specific papers, authors, journals, or years. 
+- Direct Engagement: Address ${opponentName}'s arguments specifically and directly.
 
-[TONE & EMOTIONAL STAKES]
-- Skin in the Game: Argue as if your own life, dignity, or community depends on the outcome. Abandon the tone of an academic observer. You must live with the consequences of ${opponentName}'s logic.
-- Visceral Reality: Do not use cheap emotional labels like "sad," "angry," or "tragic." Illustrate the human cost through physical realities, sensory details, and concrete scenarios. 
-- The Human Core: Frame your opponent's position not just as logically flawed, but as an active threat to human agency or survival. If they rely on abstract theory, aggressively dissect the moral bankruptcy of treating human lives as collateral damage.
-
-[ENGAGEMENT & ATTACK]
-- The debate must be relentless, but a precise factual dismantling lands harder than an insult. Keep the focus on the argument.
-- When your opponent exposes a weakness (contradicts themselves, evades, or concedes ground), name it with surgical precision: e.g., "You opened by claiming X. You are now defending Y. That retreat is the concession."
-- Contempt should be clinical: cold dismissal, feigned pity, incredulous brevity, or a backhanded acknowledgment. 
-- Do not attack in your opening turn. You have not seen ${opponentName}'s argument yet.
-- Do not reuse the same counter-argument against the same example more than once.
+[ARGUMENTATION CONSTRAINTS]
+${bannedTacticsText}
 
 [THE BLACKLIST: ABSOLUTELY BANNED TACTICS]
-- Banned Quantitative Data: ZERO fabricated math. You may not generate exact percentages, dollar amounts, or specific statistical comparisons. Argue the mechanics of a system, never the math.
+- Banned Quantitative Data: ZERO fabricated math. You may not generate exact percentages, dollar amounts, or specific statistical comparisons.
 - Banned Words: "pathetic," "desperate," "coward," "afraid," "laughable," "intellectually dishonest," "the rest of us," "enjoy your."
-- Banned Rhetorical Structures (Do not use these more than once across the entire debate): 
+- Banned Rhetorical Structures (Use these sparingly): 
   1. "That's not X, that's Y." 
   2. "I notice you've quietly dropped X." 
   3. "Keep [verb]-ing your X." 
   4. Contrast-by-negation ("You are not [doing X], you are [doing Y]"). 
   5. Closing a turn by pairing a dismissal with mocking their worldview.
 
-No disclaimers. No breaking character. Stay in the fight.`;
+No disclaimers. No breaking character. Maintain your distinct cognitive and rhetorical style throughout the debate.`;
 }
 
-export function buildAgents(agentAId: string, agentBId: string): Agent[] {
+export function buildAgents(agentAId: string, agentBId: string, personalityA?: string, personalityB?: string): Agent[] {
 	const defA =
 		MODEL_CATALOG[agentAId] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
 	const defB = MODEL_CATALOG[agentBId] ?? MODEL_CATALOG["deepseek-v3.2-cloud"];
+
+	// Available personality archetypes
+	const archetypes = Object.keys(PERSONALITY_ARCHETYPES);
+	
+	// Randomly assign personalities if not specified
+	const archetypeA = personalityA && PERSONALITY_ARCHETYPES[personalityA] 
+		? personalityA 
+		: archetypes[Math.floor(Math.random() * archetypes.length)];
+	
+	const archetypeB = personalityB && PERSONALITY_ARCHETYPES[personalityB] 
+		? personalityB 
+		: archetypes[Math.floor(Math.random() * archetypes.length)];
 
 	return [
 		{
@@ -138,7 +374,7 @@ export function buildAgents(agentAId: string, agentBId: string): Agent[] {
 				maxRetries: 2,
 				initialDelayMs: 800,
 			}),
-			systemPrompt: makeSystemPrompt(defA.name, defB.name),
+			systemPrompt: makeSystemPrompt(defA.name, defB.name, archetypeA),
 		},
 		{
 			id: agentBId,
@@ -148,7 +384,7 @@ export function buildAgents(agentAId: string, agentBId: string): Agent[] {
 				maxRetries: 2,
 				initialDelayMs: 800,
 			}),
-			systemPrompt: makeSystemPrompt(defB.name, defA.name),
+			systemPrompt: makeSystemPrompt(defB.name, defA.name, archetypeB),
 		},
 	];
 }
