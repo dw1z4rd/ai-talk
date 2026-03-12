@@ -9,9 +9,9 @@
         { id: "deepseek-v3.2-cloud", name: "DeepSeek V3.2", color: "#3B7BFF" },
         { id: "devstral-small-2:24b-cloud", name: "Devstral Small 2", color: "#FF7000" },
         { id: "kimi-k2:1t-cloud", name: "Kimi K2 1T", color: "#A78BFA" },
-        { id: "llama-3.3:70b-cloud", name: "Llama 3.3 70B", color: "#FF6B35" },
-        { id: "qwen-2.5:72b-cloud", name: "Qwen 2.5 72B", color: "#10B981" },
-        { id: "mixtral-8x22b-cloud", name: "Mixtral 8x22B", color: "#8B5CF6" },
+        { id: "gpt-oss:120b-cloud", name: "GPT-OSS 120B", color: "#FF6B35" },
+        { id: "qwen3-vl:235b-cloud", name: "Qwen3-VL 235B", color: "#10B981" },
+        { id: "glm-4.6:cloud", name: "GLM-4.6", color: "#8B5CF6" },
       ],
     },
   ];

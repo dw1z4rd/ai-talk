@@ -21,18 +21,18 @@
           color: "#A78BFA",
         },
         {
-          id: "llama-3.3:70b-cloud",
-          name: "Llama 3.3 70B",
+          id: "gpt-oss:120b-cloud",
+          name: "GPT-OSS 120B",
           color: "#FF6B35",
         },
         {
-          id: "qwen-2.5:72b-cloud",
-          name: "Qwen 2.5 72B",
+          id: "qwen3-vl:235b-cloud",
+          name: "Qwen3-VL 235B",
           color: "#10B981",
         },
         {
-          id: "mixtral-8x22b-cloud",
-          name: "Mixtral 8x22B",
+          id: "glm-4.6:cloud",
+          name: "GLM-4.6",
           color: "#8B5CF6",
         },
       ],
@@ -65,7 +65,7 @@
 
   let agentA = $state("devstral-small-2:24b-cloud");
   let agentB = $state("deepseek-v3.2-cloud");
-  let agentC = $state("gemini-2.0-flash");
+  let agentC = $state("gpt-oss:120b-cloud");
 
   let typingAgentName = $state("");
   let typingAgentColor = $state("");
