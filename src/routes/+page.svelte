@@ -72,7 +72,7 @@
   const ACCEPTED = ".txt,.md,.csv,.json";
 
   let topic = $state("");
-  let turns = $state(20);
+  let turns = $state(4);
   let messages = $state<ChatMessage[]>([]);
   let running = $state(false);
   let isPaused = $state(false);
