@@ -576,7 +576,7 @@
               <span
                 class="text-xs text-[--color-muted]"
                 style="color: {typingAgentColor}AA"
-                >{typingAgentName} is writing…</span
+                >{typingAgentName} is thinking…</span
               >
             </div>
           {/if}
