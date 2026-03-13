@@ -307,20 +307,20 @@ const createTarpitStream = (
         const result = await ollamaProvider.generateText(TARPIT_PROMPT, {
           onToken: (token: string) => {
             if (cancelled) return;
-            
+
             contentBuffer += token;
             if (contentBuffer.length > MAX_CONTENT_BUFFER) {
               contentBuffer = contentBuffer.slice(-MAX_CONTENT_BUFFER);
             }
-            
+
             const session = activeSessions.get(sessionId);
             if (session) {
               session.type = "tarpit";
               session.content = contentBuffer.slice(-10240);
             }
-            
+
             tarpitBus.emit("tarpit_chunk", { sessionId, text: token });
-            
+
             // Stream character by character with delays
             for (const char of token) {
               if (cancelled) break;
@@ -330,7 +330,7 @@ const createTarpitStream = (
               // Use a more efficient delay for streaming
               const start = Date.now();
               while (Date.now() - start < delay && !cancelled) {
-                await new Promise(resolve => setTimeout(resolve, 10));
+                new Promise((resolve) => setTimeout(resolve, 10));
               }
             }
           },
@@ -343,7 +343,7 @@ const createTarpitStream = (
           controller.enqueue(new TextEncoder().encode("\n}"));
           contentBuffer += "\n}";
         }
-        
+
         signal?.removeEventListener("abort", onAbort);
         await teardown();
         if (!cancelled) controller.close();
@@ -512,7 +512,13 @@ export const handleTarpit: Handle = async ({ event, resolve }) => {
   } catch (error) {
     console.error("[Tarpit] API failed, using fallback tarpit:", error);
     // Create a simple fallback tarpit that doesn't rely on LLM
-    const fallbackStream = createFallbackTarpitStream(sessionId, ip, pathname, startTime, event.request.signal);
+    const fallbackStream = createFallbackTarpitStream(
+      sessionId,
+      ip,
+      pathname,
+      startTime,
+      event.request.signal,
+    );
     return new Response(fallbackStream, {
       headers: {
         "Content-Type": "application/json",
@@ -555,20 +561,33 @@ const createFallbackTarpitStream = (
 
   // Simple fake secrets that look plausible but are fake
   const fakeSecrets = [
-    { key: "DATABASE_URL", value: "postgresql://user:password@localhost:5432/dbname" },
-    { key: "AWS_SECRET_ACCESS_KEY", value: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" },
+    {
+      key: "DATABASE_URL",
+      value: "postgresql://user:password@localhost:5432/dbname",
+    },
+    {
+      key: "AWS_SECRET_ACCESS_KEY",
+      value: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    },
     { key: "STRIPE_SECRET_KEY", value: "sk_test_4242424242424242" },
-    { key: "JWT_SECRET", value: "your-super-secret-jwt-key-that-is-definitely-real" },
+    {
+      key: "JWT_SECRET",
+      value: "your-super-secret-jwt-key-that-is-definitely-real",
+    },
     { key: "REDIS_PASSWORD", value: "redis-password-12345" },
     { key: "SMTP_PASSWORD", value: "smtp-email-password-fake" },
     { key: "API_KEY", value: "api-key-12345-abcd-efgh-ijkl" },
     { key: "SECRET_KEY", value: "secret-key-67890-mnop-qrst-uvwx" },
     { key: "ENCRYPTION_KEY", value: "aes-256-encryption-key-fake-data" },
-    { key: "PRIVATE_KEY", value: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...\n-----END PRIVATE KEY-----" },
+    {
+      key: "PRIVATE_KEY",
+      value:
+        "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...\n-----END PRIVATE KEY-----",
+    },
   ];
 
   let index = 0;
-  
+
   return new ReadableStream({
     async start(controller) {
       const onAbort = () => {
@@ -585,7 +604,7 @@ const createFallbackTarpitStream = (
         while (!cancelled) {
           const secret = fakeSecrets[index % fakeSecrets.length];
           index++;
-          
+
           // Create fake nervous monologue content
           const nervousTexts = [
             "oh dear i hope this looks real enough please don't tell anyone i'm just a script",
@@ -597,33 +616,33 @@ const createFallbackTarpitStream = (
             "please don't close the connection i promise i have more secrets",
             "i bet the real config files don't have anxiety like this",
             "is this convincing enough? maybe i should add more technical jargon",
-            "i hope the bot appreciates the artistic merit of this performance"
+            "i hope the bot appreciates the artistic merit of this performance",
           ];
-          
+
           const nervousText = nervousTexts[index % nervousTexts.length];
-          
+
           const jsonLine = `  "${secret.key}": "${secret.value} // ${nervousText}",\n`;
           const encoded = new TextEncoder().encode(jsonLine);
-          
+
           if (contentBuffer.length < MAX_CONTENT_BUFFER) {
             contentBuffer += jsonLine;
           }
-          
+
           const session = activeSessions.get(sessionId);
           if (session) {
             session.type = "tarpit";
             session.content = contentBuffer.slice(-10240);
           }
-          
+
           tarpitBus.emit("tarpit_chunk", { sessionId, text: jsonLine });
-          
+
           // Send character by character with delays
           for (const char of jsonLine) {
             if (cancelled) break;
             controller.enqueue(new TextEncoder().encode(char));
             await new Promise((r) => setTimeout(r, 50 + randomInt(100)));
           }
-          
+
           // Random chance to add a weird meta-commentary
           if (randomInt(10) === 0) {
             const metaComment = `  "BOT_THOUGHTS_${randomInt(99999)}": "i wonder if the bot knows this is all fake, that would be so embarrassing",\n`;
@@ -638,11 +657,11 @@ const createFallbackTarpitStream = (
               await new Promise((r) => setTimeout(r, 50 + randomInt(100)));
             }
           }
-          
+
           // Brief pause between entries
           await new Promise((r) => setTimeout(r, 1000 + randomInt(2000)));
         }
-        
+
         signal?.removeEventListener("abort", onAbort);
         await teardown();
         if (!cancelled) {
@@ -652,7 +671,9 @@ const createFallbackTarpitStream = (
       } catch (e) {
         signal?.removeEventListener("abort", onAbort);
         const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        console.log(`[TARPIT] 💀 Bot ${ip} gave up after ${elapsed} seconds (fallback).`);
+        console.log(
+          `[TARPIT] 💀 Bot ${ip} gave up after ${elapsed} seconds (fallback).`,
+        );
         await teardown();
         if (!cancelled) controller.error(e);
       }
