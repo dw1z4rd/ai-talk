@@ -1,6 +1,34 @@
 import type { LLMProvider, LLMOptions, OllamaProviderConfig, OpenAIResponse } from './types';
 import { redactKey } from './utils';
 
+/**
+ * Filters out thinking/reasoning tags from GLM model responses
+ * GLM-4.6 and similar models output tags like <thinking>, </thinking>, <reasoning>, </reasoning>
+ * and specific GLM-4.6 tags like </think> that should not appear in the final story text
+ */
+function filterThinkingTags(text: string): string {
+	// First remove complete thinking/reasoning blocks with their content
+	let filtered = text
+		.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+		.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+		.replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+		.replace(/<analysis>[\s\S]*?<\/analysis>/gi, '')
+		// Remove GLM-4.6 specific thinking tags - handle various encodings
+		.replace(/<[\s\S]*?>/g, '') // HTML entity encoded tags
+		.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '') // Encoded thinking tags
+		.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '') // Encoded reasoning tags
+		.replace(/<thought>[\s\S]*?<\/thought>/gi, '') // Encoded thought tags
+		.replace(/<analysis>[\s\S]*?<\/analysis>/gi, '') // Encoded analysis tags
+		// Remove any remaining HTML entity patterns that might be GLM-4.6 specific
+		.replace(/<[^&]*>/g, '') // Any HTML entity tags
+		.replace(/<|>/g, ''); // Standalone encoded brackets
+	
+	// Clean up any extra whitespace
+	return filtered
+		.replace(/\n\s*\n/g, '\n\n')
+		.trim();
+}
+
 const DEFAULT_MODEL = 'llama3.2';
 const DEFAULT_BASE_URL = 'http://localhost:11434';
 
@@ -61,6 +89,7 @@ stream: !!options?.onToken,
 			let buf = '';
 			let fullText = '';
 			let finishReason: string | null = null;
+			let isInThinkingBlock = false;
 
 const processLine = (line: string): boolean => {
 if (!line.startsWith('data: ')) return false;
@@ -77,7 +106,27 @@ return false;
 }
 const choice = (chunk.choices as any)?.[0];
 const token: string = choice?.delta?.content ?? '';
-if (token) { fullText += token; options.onToken(token); }
+if (token) {
+	// Check if we're entering or exiting a thinking block
+	const lowerToken = token.toLowerCase();
+	if (lowerToken.includes('<thinking>') || lowerToken.includes('<reasoning>') || 
+		lowerToken.includes('<thought>') || lowerToken.includes('<analysis>') ||
+		lowerToken.includes('</think>')) {
+		isInThinkingBlock = true;
+		return false; // Skip the opening tag
+	}
+	if (lowerToken.includes('</thinking>') || lowerToken.includes('</reasoning>') || 
+		lowerToken.includes('</thought>') || lowerToken.includes('</analysis>')) {
+		isInThinkingBlock = false;
+		return false; // Skip the closing tag
+	}
+	
+	// Only stream tokens if we're not in a thinking block
+	if (!isInThinkingBlock) {
+		fullText += token;
+		options.onToken(token);
+	}
+}
 if (choice?.finish_reason != null) finishReason = choice.finish_reason;
 } catch {
 // Log the raw payload so silent swallowing of server errors is visible
@@ -117,11 +166,15 @@ return false;
 				);
 			}
 
-			return fullText || null;
+			// Filter out thinking tags from the final response
+			const filteredText = filterThinkingTags(fullText || '');
+			return filteredText || null;
 		}
 
 			const data = (await response.json()) as OpenAIResponse;
-			return data.choices?.[0]?.message?.content ?? null;
+			const rawText = data.choices?.[0]?.message?.content ?? null;
+			// Filter out thinking tags from the final response
+			return rawText ? filterThinkingTags(rawText) : null;
 		} catch (e: any) {
 			const msg = e.message || String(e);
 			const safe = config.apiKey ? redactKey(msg, config.apiKey) : msg;
