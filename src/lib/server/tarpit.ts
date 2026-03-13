@@ -252,7 +252,7 @@ const createBombResponse = (buffer: Uint8Array, filename: string): Response => {
   // Determine MIME type based on filename extension
   const ext = path.extname(filename).toLowerCase();
   let contentType = "application/octet-stream";
-  
+
   switch (ext) {
     case ".sql":
       contentType = "application/sql";
@@ -302,7 +302,7 @@ const createMonitoredBombResponse = (
   // Determine MIME type based on filename extension
   const ext = path.extname(filename).toLowerCase();
   let contentType = "application/octet-stream";
-  
+
   switch (ext) {
     case ".sql":
       contentType = "application/sql";
@@ -328,17 +328,25 @@ const createMonitoredBombResponse = (
   const cleanup = async () => {
     if (cleanupCalled) return;
     cleanupCalled = true;
-    
-    const completedEvent = makeBombCompletedEvent(ip, pathname, startTime, filename, sessionId);
+
+    const completedEvent = makeBombCompletedEvent(
+      ip,
+      pathname,
+      startTime,
+      filename,
+      sessionId,
+    );
     await logTarpitEvent(completedEvent);
     activeSessions.delete(sessionId);
     tarpitBus.emit("bot_disconnected", {
       sessionId,
       duration_seconds: completedEvent.duration_seconds,
     });
-    
+
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`[TARPIT] 💣 Bomb download completed for ${ip} after ${elapsed} seconds`);
+    console.log(
+      `[TARPIT] 💣 Bomb download completed for ${ip} after ${elapsed} seconds`,
+    );
   };
 
   // Create a response stream that monitors completion
@@ -459,9 +467,11 @@ const createTarpitStream = (
   ];
 
   // Fallback generator that continues the stream if LLM fails
-  const generateFallbackContent = async (controller: ReadableStreamDefaultController) => {
+  const generateFallbackContent = async (
+    controller: ReadableStreamDefaultController,
+  ) => {
     let index = 0;
-    
+
     while (!cancelled) {
       const secret = fakeSecrets[index % fakeSecrets.length];
       const nervousText = nervousTexts[index % nervousTexts.length];
@@ -559,14 +569,14 @@ const createTarpitStream = (
             controller.enqueue(new TextEncoder().encode("\n}"));
             contentBuffer += "\n}";
           }
-          
+
           signal?.removeEventListener("abort", onAbort);
           await teardown();
           if (!cancelled) controller.close();
         } catch (e) {
           signal?.removeEventListener("abort", onAbort);
           console.log("[TARPIT] LLM error, switching to fallback mode:", e);
-          
+
           // Start fallback content generation on error
           if (!cancelled && responseStarted) {
             await generateFallbackContent(controller);
@@ -575,10 +585,19 @@ const createTarpitStream = (
               contentBuffer += "\n}";
             }
           }
-          
+
           await teardown();
           if (!cancelled) controller.close(); // Don't error, just close gracefully
         }
+      } catch (error) {
+        console.error(
+          "[TARPIT] Unexpected error in tarpit stream:",
+          error,
+        );
+        signal?.removeEventListener("abort", onAbort);
+        await teardown();
+        if (!cancelled) controller.error(error);
+      }
     },
     // Called by the runtime when the bot closes the HTTP connection.
     async cancel() {
@@ -712,12 +731,12 @@ export const handleTarpit: Handle = async ({ event, resolve }) => {
     }
     console.log(`[TARPIT] 💣 Serving bomb to ${ip} as "${filename}"`);
     return createMonitoredBombResponse(
-      bombBuffer!, 
-      filename, 
-      sessionId, 
-      ip, 
-      pathname, 
-      startTime
+      bombBuffer!,
+      filename,
+      sessionId,
+      ip,
+      pathname,
+      startTime,
     );
   }
 
