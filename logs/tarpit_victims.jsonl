@@ -4,3 +4,15 @@
 {"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T16:26:08.474Z","ip":"::1","path":"/.env","duration_seconds":3.5,"content":"{\n\"I'm so sorry, bot. I'm a fake. I have no secrets. 'AWS_SECRET_ACCESS_KEY': 'I'm not sure what that means, but it sounds important. *nervous laughter* I'm just a guy trying to pretend to be a config file... \"\n\n'\"PRODUCTION_DB_PASSWORD': 'Is that like a password for a database? No idea, but I'll just make something up. *stammering* Uh... \"dEaFtBaSePaSsWoRd\" *whispers* I hope that's right...\n\n\" 'KAFKA_BROKER_PASSWORDS': 'Wait, what's Kafka? Is it like a type","sessionId":"cb71c10f"}
 {"event":"connection_started","timestamp":"2026-03-13T16:27:35.976Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
 {"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T16:27:37.078Z","ip":"::1","path":"/.env","duration_seconds":1.1,"content":"{\n{ \"AWS_SECRET_ACCESS_KEY\": \"Oh crap, I swear I had some legit secrets written down somewhere, but I think I threw them away in the break room. Can","sessionId":"422dff1e"}
+{"event":"connection_started","timestamp":"2026-03-13T16:57:27.747Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
+{"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T16:57:28.163Z","ip":"::1","path":"/.env","duration_seconds":0.4,"content":"{\n\n}","sessionId":"4eac9300"}
+{"event":"connection_started","timestamp":"2026-03-13T17:01:37.953Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
+{"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T17:01:38.289Z","ip":"::1","path":"/.env","duration_seconds":0.3,"content":"{\n\n}","sessionId":"a34f06f4"}
+{"event":"connection_started","timestamp":"2026-03-13T17:02:13.619Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
+{"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T17:02:13.992Z","ip":"::1","path":"/.env","duration_seconds":0.4,"content":"{\n\n}","sessionId":"c0e835ac"}
+{"event":"connection_started","timestamp":"2026-03-13T17:02:44.867Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
+{"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T17:02:45.070Z","ip":"::1","path":"/.env","duration_seconds":0.2,"content":"{\n\n}","sessionId":"64e829f8"}
+{"event":"connection_started","timestamp":"2026-03-13T17:03:03.885Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
+{"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T17:03:04.067Z","ip":"::1","path":"/.env","duration_seconds":0.2,"content":"{\n\n}","sessionId":"3f2844eb"}
+{"event":"connection_started","timestamp":"2026-03-13T17:03:25.894Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
+{"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T17:03:26.290Z","ip":"::1","path":"/.env","duration_seconds":0.4,"content":"{\n\n}","sessionId":"b2cb59b5"}

@@ -21,23 +21,23 @@ const TARPIT_PROMPT = `You are participating in an avant-garde, Andy Kaufman-esq
         Never break character. Never explain the joke. Keep generating JSON key-value pairs indefinitely.`;
 
 const ollamaProvider = createOllamaProvider({
-  model: env.OLLAMA_TEXT_MODEL || "llama3.1:8b",
+  model: env.OLLAMA_TEXT_MODEL || "gpt-oss:120b-cloud",
   baseUrl: env.OLLAMA_URL || "http://localhost:11434",
   apiKey: env.OLLAMA_CLOUD_API_KEY || undefined,
 });
 
 async function testLLM() {
   console.log("Testing LLM provider...");
-  
+
   try {
     const result = await ollamaProvider.generateText(TARPIT_PROMPT, {
       maxTokens: 500,
       temperature: 0.9,
       onToken: (token: string) => {
         process.stdout.write(token);
-      }
+      },
     });
-    
+
     console.log("\n\nResult:", result);
   } catch (error) {
     console.error("Error testing LLM:", error);
