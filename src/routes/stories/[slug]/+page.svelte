@@ -6,7 +6,6 @@
   let date = $derived(() => data.date);
   let authors = $derived(() => data.authors);
   let html = $derived(() => data.html);
-  +++++++ REPLACE
 
   function formatDate(iso: string): string {
     if (!iso) return '';

@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Nav from '$lib/Nav.svelte';
-  +++++++ REPLACE
 
   // --- Completed victims (historical) ---
   interface Victim {

@@ -145,7 +145,6 @@
         </div>
 
         <form onsubmit={(e) => { e.preventDefault(); submitAction(); }} class="flex gap-3">
-  +++++++ REPLACE
             <input 
                 bind:value={userInput} 
                 disabled={isLoading || gameState.status !== 'playing'}

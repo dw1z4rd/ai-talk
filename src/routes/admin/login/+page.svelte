@@ -47,7 +47,6 @@
           class="bg-[--color-surface] border border-[--color-border] rounded-xl px-4 py-3 text-white placeholder-[--color-muted] focus:outline-none focus:border-[--color-accent] transition-colors text-sm"
           placeholder="Enter admin password"
         />
-  +++++++ REPLACE
       </div>
 
       <button
