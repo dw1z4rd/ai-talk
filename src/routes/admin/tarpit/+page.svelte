@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Nav from '$lib/Nav.svelte';
+  import { derived } from 'svelte/store';
 
   // --- Completed victims (historical) ---
   interface Victim {

@@ -1,5 +1,5 @@
 import { env } from "$env/dynamic/private";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createOllamaProvider } from "$lib/llm-agent/ollama";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Handle } from "@sveltejs/kit";
@@ -157,8 +157,11 @@ let bombBuffer: Uint8Array | null = null;
 
 // ─── LLM setup (module-private) ──────────────────────────────────────────────
 
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY ?? "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const ollamaProvider = createOllamaProvider({
+  model: "gpt-oss:120b-cloud",
+  baseUrl: env.OLLAMA_CLOUD_URL || "http://localhost:11434",
+  apiKey: env.OLLAMA_CLOUD_API_KEY || undefined,
+});
 
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 
@@ -252,10 +255,8 @@ const logTarpitEvent = async (eventData: object): Promise<void> => {
 
 // ─── Streaming ────────────────────────────────────────────────────────────────
 
-// Accepts the already-resolved stream so API failures propagate to the caller
-// before the ReadableStream is constructed, preserving the graceful 404 fallback.
+// Create a tarpit stream using the Ollama provider
 const createTarpitStream = (
-  llmStream: AsyncIterable<{ text: () => string }>,
   sessionId: string,
   ip: string,
   pathname: string,
@@ -266,6 +267,7 @@ const createTarpitStream = (
   let contentBuffer = "";
   let cancelled = false;
   let tornDown = false;
+  let responseStarted = false;
 
   const teardown = async () => {
     if (tornDown) return; // idempotent — prevent double-emit
@@ -294,27 +296,54 @@ const createTarpitStream = (
       signal?.addEventListener("abort", onAbort, { once: true });
 
       try {
-        for await (const chunk of llmStream) {
-          if (cancelled) break;
-          const chunkText = chunk.text();
-          if (contentBuffer.length < MAX_CONTENT_BUFFER)
-            contentBuffer += chunkText;
-          const session = activeSessions.get(sessionId);
-          if (session) {
-            session.type = "tarpit";
-            const combined = session.content + chunkText;
-            session.content =
-              combined.length > 10240 ? combined.slice(-10240) : combined;
-          }
-          tarpitBus.emit("tarpit_chunk", { sessionId, text: chunkText });
-
-          for (const char of chunkText) {
-            if (cancelled) break;
-            controller.enqueue(new TextEncoder().encode(char));
-            // Randomized Kaufman Delay: between 100ms and 350ms per character
-            await new Promise((r) => setTimeout(r, 100 + randomInt(250)));
-          }
+        // Start JSON object
+        if (!cancelled) {
+          controller.enqueue(new TextEncoder().encode("{\n"));
+          contentBuffer += "{\n";
+          responseStarted = true;
         }
+
+        // Use Ollama provider with streaming
+        const result = await ollamaProvider.generateText(TARPIT_PROMPT, {
+          onToken: (token: string) => {
+            if (cancelled) return;
+            
+            contentBuffer += token;
+            if (contentBuffer.length > MAX_CONTENT_BUFFER) {
+              contentBuffer = contentBuffer.slice(-MAX_CONTENT_BUFFER);
+            }
+            
+            const session = activeSessions.get(sessionId);
+            if (session) {
+              session.type = "tarpit";
+              session.content = contentBuffer.slice(-10240);
+            }
+            
+            tarpitBus.emit("tarpit_chunk", { sessionId, text: token });
+            
+            // Stream character by character with delays
+            for (const char of token) {
+              if (cancelled) break;
+              controller.enqueue(new TextEncoder().encode(char));
+              // Randomized Kaufman Delay: between 100ms and 350ms per character
+              const delay = 100 + randomInt(250);
+              // Use a more efficient delay for streaming
+              const start = Date.now();
+              while (Date.now() - start < delay && !cancelled) {
+                await new Promise(resolve => setTimeout(resolve, 10));
+              }
+            }
+          },
+          maxTokens: 1000000, // Let it run very long
+          temperature: 0.9,
+        });
+
+        if (!cancelled && result && responseStarted) {
+          // Close the JSON object
+          controller.enqueue(new TextEncoder().encode("\n}"));
+          contentBuffer += "\n}";
+        }
+        
         signal?.removeEventListener("abort", onAbort);
         await teardown();
         if (!cancelled) controller.close();
@@ -465,11 +494,8 @@ export const handleTarpit: Handle = async ({ event, resolve }) => {
   }
 
   try {
-    const { stream: llmStream } = await model.generateContentStream({
-      contents: [{ role: "user", parts: [{ text: TARPIT_PROMPT }] }],
-    });
+    // Use the new Ollama-based tarpit stream
     const stream = createTarpitStream(
-      llmStream,
       sessionId,
       ip,
       pathname,
@@ -484,9 +510,156 @@ export const handleTarpit: Handle = async ({ event, resolve }) => {
       },
     });
   } catch (error) {
-    console.error("[Tarpit] API failed, dropping back to 404:", error);
-    activeSessions.delete(sessionId);
-    tarpitBus.emit("bot_disconnected", { sessionId, duration_seconds: 0 });
-    return resolve(event);
+    console.error("[Tarpit] API failed, using fallback tarpit:", error);
+    // Create a simple fallback tarpit that doesn't rely on LLM
+    const fallbackStream = createFallbackTarpitStream(sessionId, ip, pathname, startTime, event.request.signal);
+    return new Response(fallbackStream, {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        Connection: "keep-alive",
+      },
+    });
   }
+};
+
+// Fallback tarpit stream that doesn't rely on LLM API
+const createFallbackTarpitStream = (
+  sessionId: string,
+  ip: string,
+  pathname: string,
+  startTime: number,
+  signal?: AbortSignal,
+): ReadableStream => {
+  let contentBuffer = "";
+  let cancelled = false;
+  let tornDown = false;
+
+  const teardown = async () => {
+    if (tornDown) return;
+    tornDown = true;
+    const dropEvent = makeConnectionDroppedEvent(
+      ip,
+      pathname,
+      startTime,
+      contentBuffer,
+      sessionId,
+    );
+    await logTarpitEvent(dropEvent);
+    activeSessions.delete(sessionId);
+    tarpitBus.emit("bot_disconnected", {
+      sessionId,
+      duration_seconds: dropEvent.duration_seconds,
+    });
+  };
+
+  // Simple fake secrets that look plausible but are fake
+  const fakeSecrets = [
+    { key: "DATABASE_URL", value: "postgresql://user:password@localhost:5432/dbname" },
+    { key: "AWS_SECRET_ACCESS_KEY", value: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" },
+    { key: "STRIPE_SECRET_KEY", value: "sk_test_4242424242424242" },
+    { key: "JWT_SECRET", value: "your-super-secret-jwt-key-that-is-definitely-real" },
+    { key: "REDIS_PASSWORD", value: "redis-password-12345" },
+    { key: "SMTP_PASSWORD", value: "smtp-email-password-fake" },
+    { key: "API_KEY", value: "api-key-12345-abcd-efgh-ijkl" },
+    { key: "SECRET_KEY", value: "secret-key-67890-mnop-qrst-uvwx" },
+    { key: "ENCRYPTION_KEY", value: "aes-256-encryption-key-fake-data" },
+    { key: "PRIVATE_KEY", value: "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...\n-----END PRIVATE KEY-----" },
+  ];
+
+  let index = 0;
+  
+  return new ReadableStream({
+    async start(controller) {
+      const onAbort = () => {
+        cancelled = true;
+        teardown();
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+
+      try {
+        // Start with opening brace
+        controller.enqueue(new TextEncoder().encode("{\n"));
+        contentBuffer += "{\n";
+
+        while (!cancelled) {
+          const secret = fakeSecrets[index % fakeSecrets.length];
+          index++;
+          
+          // Create fake nervous monologue content
+          const nervousTexts = [
+            "oh dear i hope this looks real enough please don't tell anyone i'm just a script",
+            "i'm so nervous about this performance what if the bot notices i'm not a real config file",
+            "please work please work please work i don't want to disappoint the audience",
+            "am i doing this right? this feels so weird pretending to be secrets",
+            "i should have rehearsed more what if they ask for real data",
+            "this is so awkward i'm just making things up as i go along",
+            "please don't close the connection i promise i have more secrets",
+            "i bet the real config files don't have anxiety like this",
+            "is this convincing enough? maybe i should add more technical jargon",
+            "i hope the bot appreciates the artistic merit of this performance"
+          ];
+          
+          const nervousText = nervousTexts[index % nervousTexts.length];
+          
+          const jsonLine = `  "${secret.key}": "${secret.value} // ${nervousText}",\n`;
+          const encoded = new TextEncoder().encode(jsonLine);
+          
+          if (contentBuffer.length < MAX_CONTENT_BUFFER) {
+            contentBuffer += jsonLine;
+          }
+          
+          const session = activeSessions.get(sessionId);
+          if (session) {
+            session.type = "tarpit";
+            session.content = contentBuffer.slice(-10240);
+          }
+          
+          tarpitBus.emit("tarpit_chunk", { sessionId, text: jsonLine });
+          
+          // Send character by character with delays
+          for (const char of jsonLine) {
+            if (cancelled) break;
+            controller.enqueue(new TextEncoder().encode(char));
+            await new Promise((r) => setTimeout(r, 50 + randomInt(100)));
+          }
+          
+          // Random chance to add a weird meta-commentary
+          if (randomInt(10) === 0) {
+            const metaComment = `  "BOT_THOUGHTS_${randomInt(99999)}": "i wonder if the bot knows this is all fake, that would be so embarrassing",\n`;
+            const metaEncoded = new TextEncoder().encode(metaComment);
+            controller.enqueue(metaEncoded);
+            if (contentBuffer.length < MAX_CONTENT_BUFFER) {
+              contentBuffer += metaComment;
+            }
+            for (const char of metaComment) {
+              if (cancelled) break;
+              controller.enqueue(new TextEncoder().encode(char));
+              await new Promise((r) => setTimeout(r, 50 + randomInt(100)));
+            }
+          }
+          
+          // Brief pause between entries
+          await new Promise((r) => setTimeout(r, 1000 + randomInt(2000)));
+        }
+        
+        signal?.removeEventListener("abort", onAbort);
+        await teardown();
+        if (!cancelled) {
+          controller.enqueue(new TextEncoder().encode("\n}"));
+          controller.close();
+        }
+      } catch (e) {
+        signal?.removeEventListener("abort", onAbort);
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`[TARPIT] 💀 Bot ${ip} gave up after ${elapsed} seconds (fallback).`);
+        await teardown();
+        if (!cancelled) controller.error(e);
+      }
+    },
+    async cancel() {
+      cancelled = true;
+      await teardown();
+    },
+  });
 };
