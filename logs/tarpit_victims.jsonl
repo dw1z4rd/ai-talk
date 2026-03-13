@@ -16,3 +16,5 @@
 {"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T17:03:04.067Z","ip":"::1","path":"/.env","duration_seconds":0.2,"content":"{\n\n}","sessionId":"3f2844eb"}
 {"event":"connection_started","timestamp":"2026-03-13T17:03:25.894Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
 {"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T17:03:26.290Z","ip":"::1","path":"/.env","duration_seconds":0.4,"content":"{\n\n}","sessionId":"b2cb59b5"}
+{"event":"connection_started","timestamp":"2026-03-13T17:10:32.750Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
+{"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T17:10:33.238Z","ip":"::1","path":"/.env","duration_seconds":0.5,"content":"{\n\n}","sessionId":"406487c9"}
