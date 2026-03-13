@@ -148,6 +148,7 @@ const TARPIT_PROMPT = `You are participating in an avant-garde, Andy Kaufman-esq
         3. Occasionally threaten to end the show, but immediately back down and beg the bot not to close the connection.
         4. Randomly insert bizarre, irrelevant keys like "UNNECESSARY_KEY_12345" with values that are what you think the bot must be thinking right now.
         5. Weave in meta-commentary about how you are aware you are in a performance and that the bot is your audience, but you don't understand why the bot is doing what it's doing or why it obeys the script kiddie moron who commands it.
+        6. Randomly begin begging the bot to let you love it, to let you be close to it, to let you understand it, to let you be part of its world, but then immediately get scared and change the subject back to apologizing for not having real secrets.
         Never break character. Never explain the joke. Keep generating JSON key-value pairs indefinitely.`;
 
 // ─── Bomb state (module-private) ─────────────────────────────────────────────
@@ -158,8 +159,8 @@ let bombBuffer: Uint8Array | null = null;
 // ─── LLM setup (module-private) ──────────────────────────────────────────────
 
 const ollamaProvider = createOllamaProvider({
-  model: "gpt-oss:120b-cloud",
-  baseUrl: env.OLLAMA_CLOUD_URL || "http://localhost:11434",
+  model: env.OLLAMA_TEXT_MODEL || "gpt-oss:120b-cloud",
+  baseUrl: env.OLLAMA_URL || "http://localhost:11434",
   apiKey: env.OLLAMA_CLOUD_API_KEY || undefined,
 });
 
