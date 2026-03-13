@@ -11,7 +11,7 @@ export interface ActiveSession {
     path: string;
     userAgent: string;
     timestamp: string;
-    type: 'pending' | 'bomb' | 'tarpit';
+    type: 'pending' | 'bomb' | 'tarpit' | 'downloading';
     filename?: string;
     content: string;
 }

@@ -29,7 +29,7 @@
     path: string;
     userAgent: string;
     timestamp: string;
-    type: 'pending' | 'bomb' | 'tarpit';
+    type: 'pending' | 'bomb' | 'tarpit' | 'downloading';
     filename?: string;
     content: string;
   }
@@ -85,7 +85,7 @@
 
       if (msg.type === 'bomb_served') {
         if (activeBots[msg.sessionId]) {
-          activeBots[msg.sessionId].type = 'bomb';
+          activeBots[msg.sessionId].type = 'downloading';
           activeBots[msg.sessionId].filename = msg.filename;
           activeBots = { ...activeBots };
         }
@@ -111,7 +111,7 @@
             sessionId: bot.sessionId,
             ip: bot.ip,
             path: bot.path,
-            trap_type: bot.type === 'bomb' ? 'bomb' : 'tarpit',
+            trap_type: bot.type === 'downloading' || bot.type === 'bomb' ? 'bomb' : 'tarpit',
             duration_seconds: msg.duration_seconds ?? 0,
             filename: bot.filename,
             content: bot.content,
@@ -302,13 +302,18 @@
           <div class="border border-[--color-border] rounded-xl p-4 bg-[--color-surface] animate-[fadeIn_0.3s_ease-out]">
             <div class="flex items-center gap-3 flex-wrap">
               <span class="text-lg">
-                {#if bot.type === 'bomb'}💣{:else if bot.type === 'tarpit'}🤖{:else}🔍{/if}
+                {#if bot.type === 'downloading'}⬇️💣{:else if bot.type === 'tarpit'}🤖{:else}🔍{/if}
               </span>
               <span class="text-[--color-accent] font-bold">{bot.ip}</span>
               <span class="text-[--color-muted] text-sm font-mono">{bot.path}</span>
-              {#if bot.type === 'bomb' && bot.filename}
+              {#if (bot.type === 'downloading' || bot.type === 'bomb') && bot.filename}
                 <span class="text-yellow-400 text-xs font-mono bg-yellow-400/10 px-2 py-0.5 rounded-lg border border-yellow-400/20">
                   {bot.filename}
+                </span>
+              {/if}
+              {#if bot.type === 'downloading'}
+                <span class="text-blue-400 text-xs font-mono bg-blue-400/10 px-2 py-0.5 rounded-lg border border-blue-400/20 animate-pulse">
+                  Downloading...
                 </span>
               {/if}
             </div>

@@ -230,17 +230,147 @@ const makeConnectionDroppedEvent = (
   sessionId,
 });
 
-// Pure response builder
-const createBombResponse = (buffer: Uint8Array, filename: string): Response =>
-  new Response(buffer.buffer as ArrayBuffer, {
+const makeBombCompletedEvent = (
+  ip: string,
+  pathname: string,
+  startTime: number,
+  filename: string,
+  sessionId: string,
+) => ({
+  event: "connection_dropped",
+  trap_type: "bomb",
+  timestamp: new Date().toISOString(),
+  ip,
+  path: pathname,
+  filename,
+  duration_seconds: parseFloat(((Date.now() - startTime) / 1000).toFixed(1)),
+  sessionId,
+});
+
+// Pure response builder with CORS and security headers
+const createBombResponse = (buffer: Uint8Array, filename: string): Response => {
+  // Determine MIME type based on filename extension
+  const ext = path.extname(filename).toLowerCase();
+  let contentType = "application/octet-stream";
+  
+  switch (ext) {
+    case ".sql":
+      contentType = "application/sql";
+      break;
+    case ".csv":
+      contentType = "text/csv";
+      break;
+    case ".json":
+      contentType = "application/json";
+      break;
+    case ".txt":
+      contentType = "text/plain";
+      break;
+    case ".yaml":
+    case ".yml":
+      contentType = "application/x-yaml";
+      break;
+    default:
+      contentType = "application/octet-stream";
+  }
+
+  return new Response(buffer.buffer as ArrayBuffer, {
     headers: {
-      "Content-Type": "application/octet-stream",
+      "Content-Type": contentType,
       "Content-Encoding": "gzip",
       "Content-Length": String(buffer.length),
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+      "Access-Control-Allow-Headers": "*",
+      "X-Content-Type-Options": "nosniff",
+      "X-Download-Options": "noopen",
     },
   });
+};
+
+// Create a bomb response that monitors the actual connection lifecycle
+const createMonitoredBombResponse = (
+  buffer: Uint8Array,
+  filename: string,
+  sessionId: string,
+  ip: string,
+  pathname: string,
+  startTime: number,
+): Response => {
+  // Determine MIME type based on filename extension
+  const ext = path.extname(filename).toLowerCase();
+  let contentType = "application/octet-stream";
+  
+  switch (ext) {
+    case ".sql":
+      contentType = "application/sql";
+      break;
+    case ".csv":
+      contentType = "text/csv";
+      break;
+    case ".json":
+      contentType = "application/json";
+      break;
+    case ".txt":
+      contentType = "text/plain";
+      break;
+    case ".yaml":
+    case ".yml":
+      contentType = "application/x-yaml";
+      break;
+    default:
+      contentType = "application/octet-stream";
+  }
+
+  let cleanupCalled = false;
+  const cleanup = async () => {
+    if (cleanupCalled) return;
+    cleanupCalled = true;
+    
+    const completedEvent = makeBombCompletedEvent(ip, pathname, startTime, filename, sessionId);
+    await logTarpitEvent(completedEvent);
+    activeSessions.delete(sessionId);
+    tarpitBus.emit("bot_disconnected", {
+      sessionId,
+      duration_seconds: completedEvent.duration_seconds,
+    });
+    
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`[TARPIT] 💣 Bomb download completed for ${ip} after ${elapsed} seconds`);
+  };
+
+  // Create a response stream that monitors completion
+  const stream = new ReadableStream({
+    async start(controller) {
+      // Send the entire bomb buffer
+      controller.enqueue(buffer);
+      controller.close();
+      // Connection completed successfully
+      await cleanup();
+    },
+    async cancel() {
+      // Connection was aborted by the client
+      await cleanup();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": contentType,
+      "Content-Encoding": "gzip",
+      "Content-Length": String(buffer.length),
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+      "Access-Control-Allow-Headers": "*",
+      "X-Content-Type-Options": "nosniff",
+      "X-Download-Options": "noopen",
+    },
+  });
+};
 
 // ─── Side-effectful sink ──────────────────────────────────────────────────────
 
@@ -482,15 +612,18 @@ export const handleTarpit: Handle = async ({ event, resolve }) => {
     tarpitBus.emit("bomb_served", { sessionId, filename });
     const bombSession = activeSessions.get(sessionId);
     if (bombSession) {
-      bombSession.type = "bomb";
+      bombSession.type = "downloading";
       bombSession.filename = filename;
     }
     console.log(`[TARPIT] 💣 Serving bomb to ${ip} as "${filename}"`);
-    setImmediate(() => {
-      activeSessions.delete(sessionId);
-      tarpitBus.emit("bot_disconnected", { sessionId, duration_seconds: 0 });
-    });
-    return createBombResponse(bombBuffer!, filename);
+    return createMonitoredBombResponse(
+      bombBuffer!, 
+      filename, 
+      sessionId, 
+      ip, 
+      pathname, 
+      startTime
+    );
   }
 
   try {
