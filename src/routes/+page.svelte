@@ -95,7 +95,7 @@
 
   // Derived progress
   let progress = $derived(
-    turns > 0 ? Math.min((messages.length / turns) * 100, 100) : 0,
+    turns > 0 ? Math.min((messages.length / (turns * 2)) * 100, 100) : 0,
   );
 
   // UI state
@@ -1204,8 +1204,9 @@
         <span
           class="text-[11px] font-semibold tabular-nums text-[--color-muted] whitespace-nowrap"
           >{messages.length}<span class="text-[--color-border] mx-0.5">/</span
-          >{turns}</span
+          >{turns * 2}</span
         >
+  +++++++ REPLACE
         {#if done}
           <span
             class="text-[11px] uppercase tracking-widest text-[--color-muted]"
