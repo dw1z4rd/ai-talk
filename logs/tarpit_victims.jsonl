@@ -1,9 +1,0 @@
-{"event":"connection_started","timestamp":"2026-03-13T03:43:59.761Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
-{"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T03:44:00.449Z","ip":"::1","path":"/.env","duration_seconds":0.7,"content":"{\n","sessionId":"9bd0e272"}
-{"event":"connection_started","timestamp":"2026-03-13T03:44:27.283Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
-{"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T03:44:27.481Z","ip":"::1","path":"/.env","duration_seconds":0.2,"content":"{\n","sessionId":"29af8422"}
-{"event":"connection_started","timestamp":"2026-03-13T03:49:00.667Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
-{"event":"connection_dropped","trap_type":"tarpit","timestamp":"2026-03-13T03:49:00.978Z","ip":"::1","path":"/.env","duration_seconds":0.3,"content":"{\n\n}","sessionId":"088f46cb"}
-{"event":"connection_started","timestamp":"2026-03-13T03:49:23.421Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0"}
-{"event":"bomb_served","trap_type":"bomb","timestamp":"2026-03-13T03:49:23.423Z","ip":"::1","path":"/.env","userAgent":"curl/8.18.0","filename":".env","sessionId":"78f17749","duration_seconds":0}
-{"event":"connection_dropped","trap_type":"bomb","timestamp":"2026-03-13T03:49:23.425Z","ip":"::1","path":"/.env","filename":".env","duration_seconds":0,"sessionId":"78f17749"}

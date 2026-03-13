@@ -462,7 +462,7 @@ const createTarpitStream = (
   const generateFallbackContent = async (controller: ReadableStreamDefaultController) => {
     let index = 0;
     
-    while (!cancelled && !llmFailed) {
+    while (!cancelled) {
       const secret = fakeSecrets[index % fakeSecrets.length];
       const nervousText = nervousTexts[index % nervousTexts.length];
       index++;
@@ -525,101 +525,60 @@ const createTarpitStream = (
           responseStarted = true;
         }
 
-        // Try LLM provider with timeout and fallback
-        let llmSucceeded = false;
-        const llmPromise = ollamaProvider.generateText(TARPIT_PROMPT, {
-          onToken: (token: string) => {
-            if (cancelled || llmFailed) return;
+        // Try LLM provider with simplified streaming
+        try {
+          await ollamaProvider.generateText(TARPIT_PROMPT, {
+            onToken: (token: string) => {
+              if (cancelled) return;
 
-            contentBuffer += token;
-            if (contentBuffer.length > MAX_CONTENT_BUFFER) {
-              contentBuffer = contentBuffer.slice(-MAX_CONTENT_BUFFER);
-            }
-
-            const session = activeSessions.get(sessionId);
-            if (session) {
-              session.type = "tarpit";
-              session.content = contentBuffer.slice(-10240);
-            }
-
-            tarpitBus.emit("tarpit_chunk", { sessionId, text: token });
-
-            // Stream character by character with delays
-            for (const char of token) {
-              if (cancelled || llmFailed) break;
-              controller.enqueue(new TextEncoder().encode(char));
-              // Randomized Kaufman Delay: between 100ms and 350ms per character
-              const delay = 100 + randomInt(250);
-              // Use a more efficient delay for streaming
-              const start = Date.now();
-              while (Date.now() - start < delay && !cancelled && !llmFailed) {
-                // Synchronous delay - can't use await in callback
-                const syncDelay = 10;
-                const delayStart = Date.now();
-                while (Date.now() - delayStart < syncDelay && !cancelled && !llmFailed) {
-                  // Busy wait for short duration
-                }
+              contentBuffer += token;
+              if (contentBuffer.length > MAX_CONTENT_BUFFER) {
+                contentBuffer = contentBuffer.slice(-MAX_CONTENT_BUFFER);
               }
-            }
-          },
-          maxTokens: 1000000, // Let it run very long
-          temperature: 0.9,
-        });
 
-        // Race LLM against a timeout - if it doesn't start producing content quickly, fall back
-        const timeoutPromise = new Promise<void>((resolve) => {
-          setTimeout(() => {
-            if (!llmSucceeded && !cancelled) {
-              console.log("[TARPIT] LLM timeout, switching to fallback mode");
-              llmFailed = true;
-              resolve();
-            }
-          }, 5000); // 5 second timeout for LLM to start producing
-        });
+              const session = activeSessions.get(sessionId);
+              if (session) {
+                session.type = "tarpit";
+                session.content = contentBuffer.slice(-10240);
+              }
 
-        // Wait for either LLM to succeed or timeout
-        await Promise.race([
-          llmPromise.then((result) => {
-            if (result && !cancelled) {
-              llmSucceeded = true;
-              // Close the JSON object if LLM succeeded
+              tarpitBus.emit("tarpit_chunk", { sessionId, text: token });
+
+              // Stream character by character with delays
+              for (const char of token) {
+                if (cancelled) break;
+                controller.enqueue(new TextEncoder().encode(char));
+              }
+            },
+            maxTokens: 1000000, // Let it run very long
+            temperature: 0.9,
+          });
+
+          // Close the JSON object when LLM finishes
+          if (!cancelled) {
+            controller.enqueue(new TextEncoder().encode("\n}"));
+            contentBuffer += "\n}";
+          }
+          
+          signal?.removeEventListener("abort", onAbort);
+          await teardown();
+          if (!cancelled) controller.close();
+        } catch (e) {
+          signal?.removeEventListener("abort", onAbort);
+          console.log("[TARPIT] LLM error, switching to fallback mode:", e);
+          
+          // Start fallback content generation on error
+          if (!cancelled && responseStarted) {
+            await generateFallbackContent(controller);
+            if (!cancelled) {
               controller.enqueue(new TextEncoder().encode("\n}"));
               contentBuffer += "\n}";
             }
-          }),
-          timeoutPromise
-        ]);
-
-        // If LLM failed, start fallback content generation
-        if (!llmSucceeded && !cancelled && !llmFailed) {
-          llmFailed = true;
-          console.log("[TARPIT] LLM failed, using fallback content");
-          await generateFallbackContent(controller);
-          if (!cancelled) {
-            controller.enqueue(new TextEncoder().encode("\n}"));
-            contentBuffer += "\n}";
           }
+          
+          await teardown();
+          if (!cancelled) controller.close(); // Don't error, just close gracefully
         }
-
-        signal?.removeEventListener("abort", onAbort);
-        await teardown();
-        if (!cancelled) controller.close();
-      } catch (e) {
-        signal?.removeEventListener("abort", onAbort);
-        console.log("[TARPIT] LLM error, switching to fallback mode:", e);
-        
-        // Start fallback content generation on error
-        if (!cancelled && responseStarted) {
-          await generateFallbackContent(controller);
-          if (!cancelled) {
-            controller.enqueue(new TextEncoder().encode("\n}"));
-            contentBuffer += "\n}";
-          }
-        }
-        
-        await teardown();
-        if (!cancelled) controller.close(); // Don't error, just close gracefully
-      }
     },
     // Called by the runtime when the bot closes the HTTP connection.
     async cancel() {
