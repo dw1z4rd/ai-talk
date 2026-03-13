@@ -160,13 +160,14 @@ let bombBuffer: Uint8Array | null = null;
 
 // Detect environment (local development vs production)
 const isLocalDevelopment = () => {
-  // Check if we're running locally based on environment variables or hostname
+  // Check if we're running locally based on environment variables
   return (
     process.env.NODE_ENV === 'development' ||
     process.env.DEV_MODE === 'true' ||
-    (typeof window !== 'undefined' && window.location.hostname === 'localhost') ||
+    process.env.ENVIRONMENT === 'development' ||
+    process.env.ENVIRONMENT === 'local' ||
     // Default to local if no specific environment is set
-    !process.env.NODE_ENV
+    (!process.env.NODE_ENV && !process.env.ENVIRONMENT)
   );
 };
 
