@@ -409,10 +409,17 @@ const createTarpitStream = (
   let tornDown = false;
   let responseStarted = false;
   let llmFailed = false;
+  let abortController: AbortController | null = null;
 
   const teardown = async () => {
     if (tornDown) return; // idempotent — prevent double-emit
     tornDown = true;
+    
+    // Abort any ongoing fetch requests
+    if (abortController) {
+      abortController.abort();
+    }
+    
     const dropEvent = makeConnectionDroppedEvent(
       ip,
       pathname,
@@ -426,6 +433,9 @@ const createTarpitStream = (
       sessionId,
       duration_seconds: dropEvent.duration_seconds,
     });
+    
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`[TARPIT] 🤖 Bot ${ip} disconnected after ${elapsed} seconds`);
   };
 
   // Simple fake secrets that look plausible but are fake (for fallback)
@@ -539,6 +549,9 @@ const createTarpitStream = (
 
         // Try LLM provider with simplified streaming
         try {
+          // Create AbortController for this specific request
+          abortController = new AbortController();
+          
           await ollamaProvider.generateText(TARPIT_PROMPT, {
             onToken: (token: string) => {
               if (cancelled) return;
@@ -564,6 +577,7 @@ const createTarpitStream = (
             },
             maxTokens: 10000, // Let it run very long
             temperature: 0.9,
+            signal: abortController.signal, // Pass the abort signal
           });
 
           // Close the JSON object when LLM finishes

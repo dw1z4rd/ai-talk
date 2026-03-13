@@ -85,7 +85,7 @@ export const createOllamaProvider = (
     });
 
     try {
-      const response = await fetch(url, { method: "POST", headers, body });
+      const response = await fetch(url, { method: "POST", headers, body, signal: options?.signal });
 
       if (!response.ok) {
         const text = await response.text();
@@ -135,7 +135,7 @@ export const createOllamaProvider = (
                 lowerToken.includes("<reasoning>") ||
                 lowerToken.includes("<thought>") ||
                 lowerToken.includes("<analysis>") ||
-                lowerToken.includes("</think>")
+                lowerToken.includes("</tool_call>")
               ) {
                 isInThinkingBlock = true;
                 return false; // Skip the opening tag
@@ -210,6 +210,12 @@ export const createOllamaProvider = (
       // Filter out thinking tags from the final response
       return rawText ? filterThinkingTags(rawText) : null;
     } catch (e: any) {
+      // Check if the error is an AbortError
+      if (e.name === 'AbortError') {
+        console.log(`[Ollama] Request aborted for model ${config.model ?? DEFAULT_MODEL}`);
+        return null;
+      }
+      
       const msg = e.message || String(e);
       const safe = config.apiKey ? redactKey(msg, config.apiKey) : msg;
       console.error(

@@ -15,6 +15,8 @@ export interface LLMOptions {
 readonly onToken?: (token: string) => void;
 /** Enable Google Search grounding (Gemini models only) */
 readonly useGoogleSearch?: boolean;
+/** AbortSignal for cancellation support */
+readonly signal?: AbortSignal;
 }
 
 /**
