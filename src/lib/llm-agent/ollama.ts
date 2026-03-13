@@ -124,8 +124,9 @@ if (token) {
 	// Only stream tokens if we're not in a thinking block
 	if (!isInThinkingBlock) {
 		fullText += token;
-		options.onToken(token);
+		options?.onToken?.(token);
 	}
+  +++++++ REPLACE
 }
 if (choice?.finish_reason != null) finishReason = choice.finish_reason;
 } catch {

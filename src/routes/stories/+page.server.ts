@@ -48,10 +48,11 @@ export const load: PageServerLoad = async () => {
 
   try {
     const files = await readdir(storiesDir);
-    const mdFiles = files.filter((f) => f.endsWith('.md')).sort().reverse();
+    const mdFiles = files.filter((f: string) => f.endsWith('.md')).sort().reverse();
 
     stories = await Promise.all(
-      mdFiles.map(async (file) => {
+      mdFiles.map(async (file: string) => {
+  +++++++ REPLACE
         const raw = await readFile(path.join(storiesDir, file), 'utf-8');
         const fm = parseFrontmatter(raw);
         return {

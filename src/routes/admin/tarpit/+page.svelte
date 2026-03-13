@@ -6,8 +6,19 @@
   let { data }: { data: PageData } = $props();
 
   // --- Completed victims (historical) ---
-  let liveVictims = $state(data.victims);
-  let liveTotalWasted = $state(data.totalWasted);
+  interface Victim {
+    sessionId: string;
+    ip: string;
+    path: string;
+    trap_type: string;
+    duration_seconds: number;
+    filename?: string;
+    content: string;
+    timestamp: string;
+    event: string;
+  }
+  let liveVictims = $state<Victim[]>([]);
+  let liveTotalWasted = $state('0');
 
   // --- Bomb status ---
   let bombSizeBytes = $state<number | null>(null);
@@ -198,7 +209,7 @@
     <!-- Stats row -->
     <div class="flex items-center justify-between flex-wrap gap-4">
       <div class="flex flex-col gap-1">
-        <span class="text-[11px] font-semibold uppercase tracking-widest text-[--color-muted]">Total Time Stolen</span>
+        <span class="text-[11px] font-semibold uppercase tracking-widest text-[color-muted]">Total Time Stolen</span>
         <span class="text-3xl font-bold text-white tabular-nums transition-all duration-300">
           {formatTime(liveTotalWasted)}
         </span>

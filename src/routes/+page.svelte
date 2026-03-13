@@ -1048,8 +1048,8 @@
           bind:value={moderatorInput}
           onkeydown={onModeratorKeydown}
           placeholder="Add a point, sub-topic, or rebuttal..."
-          autofocus
           class="w-full bg-[--color-surface] border border-[#ff4b4b]/30 rounded-xl px-4 py-3 text-sm text-white placeholder:text-[--color-muted] outline-none transition-all focus:border-[#ff4b4b] focus:shadow-[0_0_0_3px_#ff4b4b22]"
+  +++++++ REPLACE
         />
         <p class="text-xs text-[--color-muted]">
           Hit <span class="text-white font-semibold">Enter</span> to inject message

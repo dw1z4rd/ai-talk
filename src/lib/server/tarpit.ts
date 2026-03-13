@@ -218,7 +218,7 @@ const makeConnectionDroppedEvent = (
 
 // Pure response builder
 const createBombResponse = (buffer: Uint8Array, filename: string): Response =>
-    new Response(buffer, {
+    new Response(buffer.buffer as ArrayBuffer, {
         headers: {
             'Content-Type': 'application/octet-stream',
             'Content-Encoding': 'gzip',
@@ -227,6 +227,7 @@ const createBombResponse = (buffer: Uint8Array, filename: string): Response =>
             'Cache-Control': 'no-store',
         },
     });
+  +++++++ REPLACE
 
 // ─── Side-effectful sink ──────────────────────────────────────────────────────
 
@@ -364,15 +365,16 @@ const ensureBombExists = async (): Promise<void> => {
             tarpitBus.emit('bomb_ready', { bombSizeBytes: stat.size });
         });
 
-        output.on('error', async (err) => {
+        output.on('error', async (err: Error) => {
             console.error('[Tarpit] Bomb generation failed:', err);
             try { await fs.unlink(BOMB_PATH); } catch { /* ignore */ }
         });
 
-        gzip.on('error', async (err) => {
+        gzip.on('error', async (err: Error) => {
             console.error('[Tarpit] Bomb gzip error:', err);
             try { await fs.unlink(BOMB_PATH); } catch { /* ignore */ }
         });
+  +++++++ REPLACE
 
         writeNext();
     }

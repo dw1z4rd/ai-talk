@@ -1,7 +1,11 @@
 <script lang="ts">
   import Nav from "$lib/Nav.svelte";
   let { data } = $props();
-  const { title, premise, date, authors, html } = data;
+  let title = $derived(data.title);
+  let premise = $derived(data.premise);
+  let date = $derived(data.date);
+  let authors = $derived(data.authors);
+  let html = $derived(data.html);
 
   function formatDate(iso: string): string {
     if (!iso) return '';

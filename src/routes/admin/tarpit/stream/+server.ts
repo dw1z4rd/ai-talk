@@ -15,9 +15,10 @@ async function loadInitialState() {
   let totalWasted = 0;
   try {
     const raw = await fs.readFile(LOG_PATH, 'utf-8');
-    const logs = raw.split('\n').filter(Boolean).map(line => {
+    const logs = raw.split('\n').filter(Boolean).map((line: string) => {
       try { return JSON.parse(line); } catch { return null; }
     }).filter(Boolean);
+  +++++++ REPLACE
     const drops = logs.filter((l: any) => l.event === 'connection_dropped' || l.event === 'bomb_served');
     drops.sort((a: any, b: any) => parseFloat(b.duration_seconds ?? 0) - parseFloat(a.duration_seconds ?? 0));
     totalWasted = drops.reduce((acc: number, l: any) => acc + parseFloat(l.duration_seconds ?? 0), 0);

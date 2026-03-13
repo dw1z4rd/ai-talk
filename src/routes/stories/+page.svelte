@@ -1,7 +1,7 @@
 <script lang="ts">
   import Nav from "$lib/Nav.svelte";
   let { data } = $props();
-  const { stories } = data;
+  let stories = $derived(data.stories);
 
   function formatDate(iso: string): string {
     if (!iso) return '';
