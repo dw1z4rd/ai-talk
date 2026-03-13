@@ -160,7 +160,7 @@ let bombBuffer: Uint8Array | null = null;
 
 // Configure Ollama provider to always use cloud models
 const ollamaProvider = createOllamaProvider({
-  model: env.OLLAMA_TEXT_MODEL || "gpt-oss:120b-cloud",
+  model: "gpt-oss:120b-cloud",
   baseUrl: env.OLLAMA_CLOUD_URL || "https://ollama.com/",
   apiKey: env.OLLAMA_CLOUD_API_KEY || undefined,
 });
