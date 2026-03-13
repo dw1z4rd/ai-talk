@@ -579,24 +579,31 @@ const createTarpitStream = (
 
           // Start fallback content generation on error
           if (!cancelled && responseStarted) {
-            await generateFallbackContent(controller);
-            if (!cancelled) {
-              controller.enqueue(new TextEncoder().encode("\n}"));
-              contentBuffer += "\n}";
+            try {
+              await generateFallbackContent(controller);
+              if (!cancelled) {
+                controller.enqueue(new TextEncoder().encode("\n}"));
+                contentBuffer += "\n}";
+              }
+            } catch (fallbackError) {
+              console.error(
+                "[TARPIT] Unexpected error in fallback content generation:",
+                fallbackError,
+              );
             }
           }
 
           await teardown();
           if (!cancelled) controller.close(); // Don't error, just close gracefully
         }
-      } catch (error) {
+      } catch (outerError) {
         console.error(
           "[TARPIT] Unexpected error in tarpit stream:",
-          error,
+          outerError,
         );
         signal?.removeEventListener("abort", onAbort);
         await teardown();
-        if (!cancelled) controller.error(error);
+        if (!cancelled) controller.error(outerError);
       }
     },
     // Called by the runtime when the bot closes the HTTP connection.
