@@ -1206,7 +1206,6 @@
           >{messages.length}<span class="text-[--color-border] mx-0.5">/</span
           >{turns * 2}</span
         >
-  +++++++ REPLACE
         {#if done}
           <span
             class="text-[11px] uppercase tracking-widest text-[--color-muted]"
