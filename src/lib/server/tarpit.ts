@@ -160,7 +160,7 @@ let bombBuffer: Uint8Array | null = null;
 
 const ollamaProvider = createOllamaProvider({
   model: env.OLLAMA_TEXT_MODEL || "gpt-oss:120b-cloud",
-  baseUrl: env.OLLAMA_URL || "http://localhost:11434",
+  baseUrl: env.OLLAMA_URL || "https://ollama.com",
   apiKey: env.OLLAMA_CLOUD_API_KEY || undefined,
 });
 
