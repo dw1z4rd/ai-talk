@@ -385,7 +385,7 @@ const logTarpitEvent = async (eventData: object): Promise<void> => {
 
 // ─── Streaming ────────────────────────────────────────────────────────────────
 
-// Create a tarpit stream using the Ollama provider
+// Create a tarpit stream using the Ollama provider with built-in fallback
 const createTarpitStream = (
   sessionId: string,
   ip: string,
@@ -398,6 +398,7 @@ const createTarpitStream = (
   let cancelled = false;
   let tornDown = false;
   let responseStarted = false;
+  let llmFailed = false;
 
   const teardown = async () => {
     if (tornDown) return; // idempotent — prevent double-emit
@@ -417,6 +418,97 @@ const createTarpitStream = (
     });
   };
 
+  // Simple fake secrets that look plausible but are fake (for fallback)
+  const fakeSecrets = [
+    {
+      key: "DATABASE_URL",
+      value: "postgresql://user:password@localhost:5432/dbname",
+    },
+    {
+      key: "AWS_SECRET_ACCESS_KEY",
+      value: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    },
+    { key: "STRIPE_SECRET_KEY", value: "sk_test_4242424242424242" },
+    {
+      key: "JWT_SECRET",
+      value: "your-super-secret-jwt-key-that-is-definitely-real",
+    },
+    { key: "REDIS_PASSWORD", value: "redis-password-12345" },
+    { key: "SMTP_PASSWORD", value: "smtp-email-password-fake" },
+    { key: "API_KEY", value: "api-key-12345-abcd-efgh-ijkl" },
+    { key: "SECRET_KEY", value: "secret-key-67890-mnop-qrst-uvwx" },
+    { key: "ENCRYPTION_KEY", value: "aes-256-encryption-key-fake-data" },
+    {
+      key: "PRIVATE_KEY",
+      value:
+        "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...\n-----END PRIVATE KEY-----",
+    },
+  ];
+
+  const nervousTexts = [
+    "oh dear i hope this looks real enough please don't tell anyone i'm just a script",
+    "i'm so nervous about this performance what if the bot notices i'm not a real config file",
+    "please work please work please work i don't want to disappoint the audience",
+    "am i doing this right? this feels so weird pretending to be secrets",
+    "i should have rehearsed more what if they ask for real data",
+    "this is so awkward i'm just making things up as i go along",
+    "please don't close the connection i promise i have more secrets",
+    "i bet the real config files don't have anxiety like this",
+    "is this convincing enough? maybe i should add more technical jargon",
+    "i hope the bot appreciates the artistic merit of this performance",
+  ];
+
+  // Fallback generator that continues the stream if LLM fails
+  const generateFallbackContent = async (controller: ReadableStreamDefaultController) => {
+    let index = 0;
+    
+    while (!cancelled && !llmFailed) {
+      const secret = fakeSecrets[index % fakeSecrets.length];
+      const nervousText = nervousTexts[index % nervousTexts.length];
+      index++;
+
+      const jsonLine = `  "${secret.key}": "${secret.value} // ${nervousText}",\n`;
+      const encoded = new TextEncoder().encode(jsonLine);
+
+      if (contentBuffer.length < MAX_CONTENT_BUFFER) {
+        contentBuffer += jsonLine;
+      }
+
+      const session = activeSessions.get(sessionId);
+      if (session) {
+        session.type = "tarpit";
+        session.content = contentBuffer.slice(-10240);
+      }
+
+      tarpitBus.emit("tarpit_chunk", { sessionId, text: jsonLine });
+
+      // Send character by character with delays
+      for (const char of jsonLine) {
+        if (cancelled) break;
+        controller.enqueue(new TextEncoder().encode(char));
+        await new Promise((r) => setTimeout(r, 50 + randomInt(100)));
+      }
+
+      // Random chance to add a weird meta-commentary
+      if (randomInt(10) === 0) {
+        const metaComment = `  "BOT_THOUGHTS_${randomInt(99999)}": "i wonder if the bot knows this is all fake, that would be so embarrassing",\n`;
+        const metaEncoded = new TextEncoder().encode(metaComment);
+        controller.enqueue(metaEncoded);
+        if (contentBuffer.length < MAX_CONTENT_BUFFER) {
+          contentBuffer += metaComment;
+        }
+        for (const char of metaComment) {
+          if (cancelled) break;
+          controller.enqueue(new TextEncoder().encode(char));
+          await new Promise((r) => setTimeout(r, 50 + randomInt(100)));
+        }
+      }
+
+      // Brief pause between entries
+      await new Promise((r) => setTimeout(r, 1000 + randomInt(2000)));
+    }
+  };
+
   return new ReadableStream({
     async start(controller) {
       const onAbort = () => {
@@ -433,10 +525,11 @@ const createTarpitStream = (
           responseStarted = true;
         }
 
-        // Use Ollama provider with streaming
-        const result = await ollamaProvider.generateText(TARPIT_PROMPT, {
+        // Try LLM provider with timeout and fallback
+        let llmSucceeded = false;
+        const llmPromise = ollamaProvider.generateText(TARPIT_PROMPT, {
           onToken: (token: string) => {
-            if (cancelled) return;
+            if (cancelled || llmFailed) return;
 
             contentBuffer += token;
             if (contentBuffer.length > MAX_CONTENT_BUFFER) {
@@ -453,14 +546,19 @@ const createTarpitStream = (
 
             // Stream character by character with delays
             for (const char of token) {
-              if (cancelled) break;
+              if (cancelled || llmFailed) break;
               controller.enqueue(new TextEncoder().encode(char));
               // Randomized Kaufman Delay: between 100ms and 350ms per character
               const delay = 100 + randomInt(250);
               // Use a more efficient delay for streaming
               const start = Date.now();
-              while (Date.now() - start < delay && !cancelled) {
-                new Promise((resolve) => setTimeout(resolve, 10));
+              while (Date.now() - start < delay && !cancelled && !llmFailed) {
+                // Synchronous delay - can't use await in callback
+                const syncDelay = 10;
+                const delayStart = Date.now();
+                while (Date.now() - delayStart < syncDelay && !cancelled && !llmFailed) {
+                  // Busy wait for short duration
+                }
               }
             }
           },
@@ -468,10 +566,39 @@ const createTarpitStream = (
           temperature: 0.9,
         });
 
-        if (!cancelled && result && responseStarted) {
-          // Close the JSON object
-          controller.enqueue(new TextEncoder().encode("\n}"));
-          contentBuffer += "\n}";
+        // Race LLM against a timeout - if it doesn't start producing content quickly, fall back
+        const timeoutPromise = new Promise<void>((resolve) => {
+          setTimeout(() => {
+            if (!llmSucceeded && !cancelled) {
+              console.log("[TARPIT] LLM timeout, switching to fallback mode");
+              llmFailed = true;
+              resolve();
+            }
+          }, 5000); // 5 second timeout for LLM to start producing
+        });
+
+        // Wait for either LLM to succeed or timeout
+        await Promise.race([
+          llmPromise.then((result) => {
+            if (result && !cancelled) {
+              llmSucceeded = true;
+              // Close the JSON object if LLM succeeded
+              controller.enqueue(new TextEncoder().encode("\n}"));
+              contentBuffer += "\n}";
+            }
+          }),
+          timeoutPromise
+        ]);
+
+        // If LLM failed, start fallback content generation
+        if (!llmSucceeded && !cancelled && !llmFailed) {
+          llmFailed = true;
+          console.log("[TARPIT] LLM failed, using fallback content");
+          await generateFallbackContent(controller);
+          if (!cancelled) {
+            controller.enqueue(new TextEncoder().encode("\n}"));
+            contentBuffer += "\n}";
+          }
         }
 
         signal?.removeEventListener("abort", onAbort);
@@ -479,10 +606,19 @@ const createTarpitStream = (
         if (!cancelled) controller.close();
       } catch (e) {
         signal?.removeEventListener("abort", onAbort);
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-        console.log(`[TARPIT] 💀 Bot ${ip} gave up after ${elapsed} seconds.`);
+        console.log("[TARPIT] LLM error, switching to fallback mode:", e);
+        
+        // Start fallback content generation on error
+        if (!cancelled && responseStarted) {
+          await generateFallbackContent(controller);
+          if (!cancelled) {
+            controller.enqueue(new TextEncoder().encode("\n}"));
+            contentBuffer += "\n}";
+          }
+        }
+        
         await teardown();
-        if (!cancelled) controller.error(e);
+        if (!cancelled) controller.close(); // Don't error, just close gracefully
       }
     },
     // Called by the runtime when the bot closes the HTTP connection.

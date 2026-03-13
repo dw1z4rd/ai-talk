@@ -9,21 +9,22 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.5.4",
-    "@sveltejs/kit": "^2.53.4",
-    "@sveltejs/vite-plugin-svelte": "^5.1.1",
+    "@sveltejs/kit": "^2.55.0",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@types/node": "^25.5.0",
     "@types/ws": "^8.18.1",
     "chokidar": "^5.0.0",
-    "svelte": "^5.53.7",
+    "svelte": "^5.53.11",
     "svelte-check": "^4.4.5",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^8.0.0"
   },
   "type": "module",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@tailwindcss/vite": "^4.2.1",
     "marked": "^17.0.4",
-    "tailwindcss": "^4.2.1"
+    "tailwindcss": "^4.2.1",
+    "ws": "^8.19.0"
   }
 }
