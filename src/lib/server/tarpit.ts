@@ -158,27 +158,10 @@ let bombBuffer: Uint8Array | null = null;
 
 // ─── LLM setup (module-private) ──────────────────────────────────────────────
 
-// Detect environment (local development vs production)
-const isLocalDevelopment = () => {
-  // Check if we're running locally based on environment variables
-  return (
-    process.env.NODE_ENV === 'development' ||
-    process.env.DEV_MODE === 'true' ||
-    process.env.ENVIRONMENT === 'development' ||
-    process.env.ENVIRONMENT === 'local' ||
-    // Default to local if no specific environment is set
-    (!process.env.NODE_ENV && !process.env.ENVIRONMENT)
-  );
-};
-
-// Configure Ollama provider based on environment
+// Configure Ollama provider to always use cloud models
 const ollamaProvider = createOllamaProvider({
-  model: isLocalDevelopment() 
-    ? (env.OLLAMA_TEXT_MODEL || "llama3.1:8b")
-    : (env.OLLAMA_TEXT_MODEL || "gpt-oss:120b-cloud"),
-  baseUrl: isLocalDevelopment() 
-    ? (env.OLLAMA_URL || "http://localhost:11434")
-    : (env.OLLAMA_CLOUD_URL || "https://ollama.com/"),
+  model: env.OLLAMA_TEXT_MODEL || "gpt-oss:120b-cloud",
+  baseUrl: env.OLLAMA_CLOUD_URL || "https://ollama.com/",
   apiKey: env.OLLAMA_CLOUD_API_KEY || undefined,
 });
 
