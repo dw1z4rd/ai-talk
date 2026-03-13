@@ -1,9 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Nav from '$lib/Nav.svelte';
-  import type { PageData } from './$types';
-
-  let { data }: { data: PageData } = $props();
+  +++++++ REPLACE
 
   // --- Completed victims (historical) ---
   interface Victim {
