@@ -158,9 +158,9 @@ let bombBuffer: Uint8Array | null = null;
 
 // ─── LLM setup (module-private) ──────────────────────────────────────────────
 
-// Configure Ollama provider to always use cloud models
+// Configure Ollama provider based on environment
 const ollamaProvider = createOllamaProvider({
-  model: "gpt-oss:120b-cloud",
+  model: env.OLLAMA_TEXT_MODEL || "qwen3-coder:480b-cloud",
   baseUrl: env.OLLAMA_CLOUD_URL || "https://ollama.com/",
   apiKey: env.OLLAMA_CLOUD_API_KEY || undefined,
 });
@@ -562,7 +562,7 @@ const createTarpitStream = (
                 controller.enqueue(new TextEncoder().encode(char));
               }
             },
-            maxTokens: 1000000, // Let it run very long
+            maxTokens: 10000, // Let it run very long
             temperature: 0.9,
           });
 
