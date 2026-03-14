@@ -388,14 +388,25 @@
       if (liveJudgeResults.length > 0) {
         content += "\n\n---\n\n## Live Judge Analysis\n\n";
         content += liveJudgeResults
-          .map((result, i) => {
-            return `### Turn ${result.turnNumber} · ${result.agentId === agentA ? agentAInfo.name : agentBInfo.name}\n\n` +
-                   `**Overall Score:** ${result.scores.overallScore.toFixed(1)}/100\n\n` +
-                   `**Momentum Shift:** ${result.momentumShift > 0 ? '+' : ''}${result.momentumShift.toFixed(1)}\n` +
-                   `**Frame Control Shift:** ${result.frameControlShift > 0 ? '+' : ''}${result.frameControlShift.toFixed(1)}\n\n` +
-                   `**Tactical Analysis:**\n${result.tacticalAnalysis.usedTactics.map((tactic: string) => `- ${tactic}`).join('\n')}\n`;
+          .map((result) => {
+            const agentName = result.agentId === agentA ? agentAInfo.name : agentBInfo.name;
+            const tactics = result.tacticalAnalysis?.usedTactics?.length
+              ? `**Tactics:** ${result.tacticalAnalysis.usedTactics.join(', ')}\n\n`
+              : '';
+            const reasoning = result.reasoning
+              ? `**Judge Analysis:**\n\n> ${result.reasoning.replace(/\s*\|\s*/g, '\n>\n> ')}\n\n`
+              : '';
+            return `### Turn ${result.turnNumber} · ${agentName}\n\n` +
+                   `**Overall:** ${(result.scores.overallScore ?? 0).toFixed(1)}/100 · ` +
+                   `**Logic:** ${(result.scores.logicalCoherence ?? 0).toFixed(0)} · ` +
+                   `**Rhetoric:** ${(result.scores.rhetoricalForce ?? 0).toFixed(0)} · ` +
+                   `**Tactics:** ${(result.scores.tacticalEffectiveness ?? 0).toFixed(0)}\n\n` +
+                   `**Momentum:** ${result.momentumShift > 0 ? '+' : ''}${(result.momentumShift ?? 0).toFixed(0)} · ` +
+                   `**Frame Control:** ${result.frameControlShift > 0 ? '+' : ''}${(result.frameControlShift ?? 0).toFixed(0)}\n\n` +
+                   tactics +
+                   reasoning;
           })
-          .join("\n\n---\n\n");
+          .join("---\n\n");
 
         if (currentLeader) {
           content += "\n\n---\n\n## Final Verdict\n\n";
