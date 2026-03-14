@@ -212,8 +212,13 @@ export interface JudgeAnalysisResult {
   pairwiseRound?: PairwiseRound;
   /** Running scorecard after this turn pair. */
   scorecard?: DebateScorecard;
-  /** Raw per-turn absolute scores from analyzeTurn(). Available on every turn.
-   *  Comparable across debates (1–10 scale mapped to 4–40 / 3–30 / 3–30 per dimension).
+  /** Raw per-turn absolute scores from analyzeTurn().
+   *  Best-effort: intended to be populated for every analyzed turn, but may be undefined
+   *  if per-turn analysis fails or is skipped. Consumers must handle the undefined case.
+   *  Subscales (logicalCoherence / rhetoricalForce / tacticalEffectiveness) come from a
+   *  1–10 model scale mapped to 4–40 / 3–30 / 3–30, making them comparable across debates.
+   *  frameControl and credibilityScore are on the same 0–100 scale as JudgeScores, and
+   *  overallScore is the corresponding weighted composite of these absolute per-turn scores.
    *  Does not drive the adaptive pressure pipeline — use aggregatedScores for that. */
   absoluteScores?: JudgeScores;
 }
