@@ -135,6 +135,7 @@ function parseJudgeAnalysis(
 ): TurnAnalysis {
   try {
     if (!analysisText?.trim()) {
+      console.warn(`[Judge] ${judge.name} received null/empty response from provider`);
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
 

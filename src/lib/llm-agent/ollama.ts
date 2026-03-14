@@ -207,8 +207,10 @@ export const createOllamaProvider = (
 
       const data = (await response.json()) as OpenAIResponse;
       const rawText = data.choices?.[0]?.message?.content ?? null;
-      // Filter out thinking tags from the final response
-      return rawText ? filterThinkingTags(rawText) : null;
+      // Do NOT strip thinking tags here — non-streaming callers (e.g. the live
+      // judge) rely on the raw content for JSON extraction. If the model wraps
+      // its JSON inside <thinking> blocks, filterThinkingTags would erase it.
+      return rawText;
     } catch (e: any) {
       // Check if the error is an AbortError
       if (e.name === 'AbortError') {
