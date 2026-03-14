@@ -106,7 +106,7 @@ SCORING PHILOSOPHY: Scores must discriminate. A competent-but-unremarkable argum
 --- LOGIC (1–10) ---
 Start at 8. Apply deductions:
 -1  One unsupported assumption or minor unverified claim.
--2  Significant unsupported leap; or unverified specificity — citing a precise statistic, study, or mechanism without a traceable source (sounds specific but isn't verifiable).
+-2  Significant unsupported leap; or unverified specificity — deploying precise-sounding claims as established fact without a traceable source. This includes: exact statistics or percentages, named studies or data, specific mechanisms ("X works via Y"), and confident assertion of specific phenomena (e.g. "shell companies are used for Z", "botnets do X", "HFT cables cause Y") where the specificity is doing rhetorical work but the claim itself is unverified. The test: could this specific claim be factually wrong? If yes and it's unsourced, deduct 2.
 -3  A clear logical error: category error, circular reasoning, strawman, or analogy whose mapping breaks down.
 -4  Multiple errors or a structurally incoherent argument.
 -5  Internally contradictory or entirely fallacious.
