@@ -601,7 +601,7 @@
             const aiCount = messages.filter(
               (m) => m.agentId !== "moderator",
             ).length;
-            if (aiCount < turns) {
+            if (aiCount < turns * 2) {
               const nextId = data.agentId === agentA ? agentB : agentA;
               const next = getModelInfo(nextId);
               typingAgentName = next.name;
