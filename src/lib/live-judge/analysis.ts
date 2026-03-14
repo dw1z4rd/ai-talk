@@ -223,18 +223,48 @@ function parseJudgeAnalysis(
       throw new Error('Invalid analysis text: ' + typeof analysisText);
     }
 
-    // Extract JSON from response with more robust regex
-    const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in analysis response');
+    // Extract JSON from response with more robust approach
+    let jsonString = analysisText.trim();
+    
+    // Try to find the first '{' and last '}' to extract JSON
+    const firstBrace = jsonString.indexOf('{');
+    const lastBrace = jsonString.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonString = jsonString.substring(firstBrace, lastBrace + 1);
+    } else {
+      throw new Error('No JSON object found in analysis response');
     }
 
     // Try to parse the JSON
     let analysisData;
     try {
-      analysisData = JSON.parse(jsonMatch[0]);
+      analysisData = JSON.parse(jsonString);
     } catch (parseError) {
-      throw new Error('Failed to parse JSON: ' + parseError.message);
+      // If parsing fails, try to fix common issues
+      try {
+        // Try to fix truncated JSON by adding missing braces
+        let fixedJson = jsonString;
+        if (!fixedJson.endsWith('}')) {
+          // Try to close any unclosed objects/arrays
+          const braceCount = (fixedJson.match(/\{/g) || []).length;
+          const bracketCount = (fixedJson.match(/\[/g) || []).length;
+          const closeBraceCount = (fixedJson.match(/\}/g) || []).length;
+          const closeBracketCount = (fixedJson.match(/\]/g) || []).length;
+          
+          // Add missing closing braces/brackets
+          for (let i = 0; i < braceCount - closeBraceCount; i++) {
+            fixedJson += '}';
+          }
+          for (let i = 0; i < bracketCount - closeBracketCount; i++) {
+            fixedJson += ']';
+          }
+        }
+        
+        analysisData = JSON.parse(fixedJson);
+      } catch (secondParseError) {
+        throw new Error('Failed to parse JSON: ' + parseError.message + '. Attempted fix also failed: ' + secondParseError.message);
+      }
     }
     
     // Validate required fields
