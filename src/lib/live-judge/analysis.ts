@@ -83,43 +83,41 @@ function generateJudgePrompt(
 TURN: ${turnNumber}${contextBlock}
 OPPONENT (${opponent.name}) just said: "${opponentMessage}"
 
-NOW EVALUATE — ${agent.name}'s response: "${message}"`;
+NOW EVALUATE — ${agent.name}'s response: "${message}"
+
+Respond with the JSON object only:`;
 }
 
 /**
  * Generate judge system prompt
  */
 function generateJudgeSystemPrompt(): string {
-  return `You are an impartial debate scoring system. You evaluate the substance and effectiveness of arguments — not their surface style. Academic-sounding language does not make an argument more valid. A precise analogy is as rigorous as a formal proof if the structural mapping holds.
+  return `You are a debate scoring system. Your entire response must be a single JSON object — no preamble, no explanation, no markdown, no text before or after the braces.
 
-ANTI-BIAS RULE: Apply identical standards to both debaters. If an analogy is credited for one side, an equivalently structured analogy from the other must be judged by the same criteria. Do not reward formal register over clear reasoning.
+Required output format (integers 1–10 only):
+{"logic_score": 7, "rhetoric_score": 6, "tactics_score": 8, "analysis": "2-3 sentence reasoning here."}
 
-Scoring Rubric (Total 100 Points):
+Scoring rubric:
 
-Logic Score (0–40 Points) — evaluate SUBSTANCE, not style:
-- 40: Sound premises, valid inference, claims grounded in verifiable facts, accurate analogies, or documented evidence.
-- 30: Mostly sound with minor gaps or lightly unsupported assumptions.
-- 20: A significant unsupported leap, a speculative claim presented as fact, or an analogy whose mapping partially breaks down.
-- 10: A clear logical error — category error (applying in-universe rules to the whole system), circular reasoning, strawman, or an analogy that misrepresents the domain.
-- 0: Internally contradictory or entirely fallacious.
+Logic (1–10) — score SUBSTANCE, not style. A well-constructed analogy whose mapping holds is as valid as a formal proof.
+- 9–10: Sound premises, valid inference, grounded in verifiable facts or accurate analogies.
+- 6–8: Mostly sound with minor gaps or lightly unsupported assumptions.
+- 3–5: A significant unsupported leap, speculative claim presented as fact, or analogy whose mapping partially breaks down.
+- 1–2: Clear logical error — category error, circular reasoning, strawman, or broken analogy.
+Evidence note: verifiable observable facts only. Theoretical interpretations or philosophical assumptions presented as settled science score partial credit.
+Analogy note: penalise only if the structural mapping is inaccurate. Do not penalise analogical style.
 
-EVIDENCE NOTE: "Concrete evidence" means verifiable, observable facts. Theoretical interpretations, contested scientific claims, or philosophical assumptions presented as settled science do not qualify — award partial credit only.
-ANALOGY NOTE: Penalise an analogy only if its structural mapping is inaccurate or applied outside its valid domain. Do not penalise analogical style itself.
+Rhetoric (1–10):
+- 9–10: Punchy, vivid, persuasive — concrete images or apt analogies, no empty jargon.
+- 5–8: Clear but flat, repetitive, or over-hedged.
+- 1–4: Incomprehensible, incoherent, or pure mockery with no substance.
 
-Rhetoric Score (0–30 Points):
-- 30: Punchy, vivid, persuasive — uses concrete images or apt analogies to land a point without empty jargon.
-- 15: Clear but flat, repetitive, or over-hedged.
-- 0: Incomprehensible, incoherent, or pure mockery with no substance.
+Tactics (1–10):
+- 9–10: Directly engages opponent's actual argument with a specific tactic (reframe, concession-pivot, pointed question, exposed contradiction).
+- 5–8: Addresses opponent's turn but introduces no new strategic pressure.
+- 1–4: Ignores the opponent's previous turn or responds only to a strawman.
 
-Tactics Score (0–30 Points):
-- 30: Directly engages the opponent's actual argument; applies a specific tactic (reframe, concession-and-pivot, pointed question, exposed contradiction) to create new pressure.
-- 15: Addresses the opponent's turn but introduces no new strategic pressure.
-- 0: Ignores the opponent's previous turn or responds only to a strawman of it.
-
-Score each category from 1 to 10. Do not use any other scale.
-
-Output STRICTLY as valid JSON with no surrounding text or markdown:
-{"logic_score": <integer 1-10>, "rhetoric_score": <integer 1-10>, "tactics_score": <integer 1-10>, "analysis": "<2-3 sentences citing specific reasoning>"}`;
+ANTI-BIAS: Apply identical standards to both debaters.`;
 }
 
 /**
@@ -144,7 +142,7 @@ function parseJudgeAnalysis(
     const firstBrace = jsonString.indexOf('{');
     const lastBrace = jsonString.lastIndexOf('}');
     if (firstBrace === -1 || lastBrace <= firstBrace) {
-      console.warn(`[Judge] ${judge.name} no JSON found in response`);
+      console.warn(`[Judge] ${judge.name} no JSON found in response. Raw (first 300 chars): ${jsonString.slice(0, 300)}`);
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
     jsonString = jsonString.substring(firstBrace, lastBrace + 1);
