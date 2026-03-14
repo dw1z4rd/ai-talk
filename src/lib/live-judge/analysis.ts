@@ -1,4 +1,4 @@
-/import {
+import {
   type LiveJudge,
   type TurnAnalysis,
   type JudgeScores,
@@ -103,7 +103,7 @@ function generateJudgeSystemPrompt(): string {
   return `You are a debate scoring system. Your entire response must be a single JSON object — no preamble, no explanation, no markdown, no text before or after the braces.
 
 Required output format (integers 1–10 only):
-{"logic_score": 7, "rhetoric_score": 6, "tactics_score": 8, "analysis": "Max 2 sentences. Be specific but brief."}
+{"logic_score": 7, "rhetoric_score": 6, "tactics_score": 8, ​"analysis": "Max 2 sentences. If penalizing an unsupported leap or premise, you MUST explicitly name the missing philosophical mechanism or the alternative concept the debater failed to address. NEVER just write 'unsupported premise.' Instead, articulate the gap (e.g., 'Asserted consciousness as the threshold without explaining why information integration is insufficient,' or 'Failed to explain the mechanism by which dependence generates moral obligation rather than just utility.')."}
 
 Keep the analysis field under 60 words.
 
