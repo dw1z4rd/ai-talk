@@ -58,6 +58,8 @@ export interface LiveJudgeResult {
   pairwiseRound?: import('$lib/live-judge/types').PairwiseRound;
   /** Running scorecard after this round. Undefined on Turn 1. */
   scorecard?: import('$lib/live-judge/types').DebateScorecard;
+  /** Absolute per-turn scores from analyzeTurn(). Populated on every turn. */
+  absoluteScores?: import('$lib/live-judge/types').JudgeScores;
 }
 
 interface ModelDef {
@@ -1240,6 +1242,7 @@ export async function generateAdaptiveReply(
         .find((r) => r && !r.startsWith('Fallback analysis')) ?? '',
       pairwiseRound: judgeResult.pairwiseRound,
       scorecard: judgeResult.scorecard,
+      absoluteScores: judgeResult.absoluteScores,
     };
 
     return { reply, judgeResult: simplifiedResult };

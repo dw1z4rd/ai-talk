@@ -667,7 +667,8 @@
               momentumShift: data.momentumShift,
               frameControlShift: data.frameControlShift,
               tacticalAnalysis: data.tacticalAnalysis,
-              reasoning: data.reasoning
+              reasoning: data.reasoning,
+              absoluteScores: data.absoluteScores ?? null,
             }];
 
             // Accumulate pairwise rounds for display
@@ -1619,6 +1620,36 @@
               </div>
             </div>
           {/each}
+        </div>
+      {/if}
+
+      <!-- Per-turn absolute scores -->
+      {#if liveJudgeResults.some(r => r.absoluteScores)}
+        {@const scoredTurns = liveJudgeResults.filter(r => r.absoluteScores)}
+        <div class="flex flex-col gap-2">
+          <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">Turn Scores</h3>
+          <div class="rounded-xl border bg-[--color-panel] overflow-hidden" style="border-color: #7c6af720">
+            <div class="grid text-[10px] font-semibold uppercase tracking-wide text-[--color-muted] px-3 py-2 border-b border-[--color-border]" style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem">
+              <span>Turn</span>
+              <span>Agent</span>
+              <span class="text-center">Logic</span>
+              <span class="text-center">Rhet.</span>
+              <span class="text-center">Tact.</span>
+              <span class="text-center">Score</span>
+            </div>
+            {#each scoredTurns as r (r.turnNumber)}
+              {@const info = getModelInfo(r.agentId)}
+              {@const s = r.absoluteScores}
+              <div class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1" style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem">
+                <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
+                <span class="font-medium truncate" style="color: {info.color}">{info.name}</span>
+                <span class="text-center font-mono text-[11px]" title="Logic: {s.logicalCoherence}/40">{s.logicalCoherence}<span class="text-[--color-muted]">/40</span></span>
+                <span class="text-center font-mono text-[11px]" title="Rhetoric: {s.rhetoricalForce}/30">{s.rhetoricalForce}<span class="text-[--color-muted]">/30</span></span>
+                <span class="text-center font-mono text-[11px]" title="Tactics: {s.tacticalEffectiveness}/30">{s.tacticalEffectiveness}<span class="text-[--color-muted]">/30</span></span>
+                <span class="text-center font-mono text-[11px] font-semibold" style="color: {info.color}">{s.overallScore}</span>
+              </div>
+            {/each}
+          </div>
         </div>
       {/if}
 

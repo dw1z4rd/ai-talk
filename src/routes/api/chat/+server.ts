@@ -97,6 +97,7 @@ export const POST: RequestHandler = async ({ request }) => {
 							// Pairwise scoring fields (undefined on Turn 1 opening)
 							pairwiseRound: jr.pairwiseRound ?? null,
 							scorecard: jr.scorecard ?? null,
+							absoluteScores: jr.absoluteScores ?? null,
 						});
 					}
 
