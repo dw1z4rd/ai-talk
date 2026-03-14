@@ -631,6 +631,21 @@
               frameControlShift: data.frameControlShift,
               tacticalAnalysis: data.tacticalAnalysis
             }];
+
+            // Update live leader stats from accumulated results
+            const scoreTotals: Record<string, number> = {};
+            const momentumTotals: Record<string, number> = {};
+            for (const r of liveJudgeResults) {
+              scoreTotals[r.agentId] = (scoreTotals[r.agentId] || 0) + (r.scores?.overallScore ?? 50);
+              momentumTotals[r.agentId] = (momentumTotals[r.agentId] || 0) + (r.momentumShift ?? 0);
+            }
+            const topScorer = Object.entries(scoreTotals).sort((a, b) => b[1] - a[1])[0];
+            if (topScorer) {
+              const info = getModelInfo(topScorer[0]);
+              currentLeader = { agentId: topScorer[0], agentName: info.name, score: topScorer[1] };
+            }
+            const topMomentum = Object.entries(momentumTotals).sort((a, b) => b[1] - a[1])[0];
+            momentumLeader = topMomentum ? { agentId: topMomentum[0], momentum: topMomentum[1] } : null;
           } else if (data.type === "done") {
             done = true;
             running = false;

@@ -47,7 +47,7 @@ export async function analyzeTurn(
     const analysisText = await judgeProvider.generateText(judgePrompt, {
       systemPrompt: generateJudgeSystemPrompt(judge),
       temperature: 0.7,
-      maxTokens: 1000,
+      maxTokens: 1500,
       signal
     });
 
@@ -130,14 +130,21 @@ Please analyze this turn and provide:
 
 Available tactics to choose from: ${DEBATE_TACTICS.join(', ')}
 
-Respond in this exact JSON format:
+Respond in this exact JSON format (reasoning and scores first — they are most important):
 {
+  "reasoning": "brief explanation",
   "scores": {
     "logicalCoherence": 0,
     "rhetoricalForce": 0,
     "frameControl": 0,
     "credibility": 0,
     "tacticalEffectiveness": 0
+  },
+  "strategicImpact": {
+    "momentumShift": 0,
+    "frameControlShift": 0,
+    "exposedWeaknesses": ["weakness"],
+    "tacticalInsights": ["insight"]
   },
   "usedTactics": [
     {
@@ -146,14 +153,7 @@ Respond in this exact JSON format:
       "confidence": 0,
       "context": "explanation"
     }
-  ],
-  "strategicImpact": {
-    "momentumShift": 0,
-    "frameControlShift": 0,
-    "exposedWeaknesses": [],
-    "tacticalInsights": []
-  },
-  "reasoning": "explanation"
+  ]
 }`;
 }
 
