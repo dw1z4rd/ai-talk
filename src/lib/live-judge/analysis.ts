@@ -79,9 +79,13 @@ function generateJudgePrompt(
   const contextBlock = referenceContext
     ? `\nREFERENCE MATERIAL: ${referenceContext}\n`
     : '';
+  const isOpening = !opponentMessage.trim();
+  const opponentBlock = isOpening
+    ? `[OPENING TURN — ${agent.name} speaks first. No opponent argument exists yet. Apply the OPENING TURN tactics rule.]`
+    : `OPPONENT (${opponent.name}) just said: "${opponentMessage}"`;
   return `DEBATE TOPIC: ${topic || 'General debate'}
 TURN: ${turnNumber}${contextBlock}
-OPPONENT (${opponent.name}) just said: "${opponentMessage}"
+${opponentBlock}
 
 NOW EVALUATE — ${agent.name}'s response: "${message}"
 
@@ -97,27 +101,36 @@ function generateJudgeSystemPrompt(): string {
 Required output format (integers 1–10 only):
 {"logic_score": 7, "rhetoric_score": 6, "tactics_score": 8, "analysis": "2-3 sentence reasoning here."}
 
-Scoring rubric:
+SCORING PHILOSOPHY: Scores must discriminate. A competent-but-unremarkable argument scores 5–6. Reserve 8–10 for genuinely strong work; use 1–3 for clear failures. Do not anchor to 7.
 
-Logic (1–10) — score SUBSTANCE, not style. A well-constructed analogy whose mapping holds is as valid as a formal proof.
-- 9–10: Sound premises, valid inference, grounded in verifiable facts or accurate analogies.
-- 6–8: Mostly sound with minor gaps or lightly unsupported assumptions.
-- 3–5: A significant unsupported leap, speculative claim presented as fact, or analogy whose mapping partially breaks down.
-- 1–2: Clear logical error — category error, circular reasoning, strawman, or broken analogy.
-Evidence note: verifiable observable facts only. Theoretical interpretations or philosophical assumptions presented as settled science score partial credit.
-Analogy note: penalise only if the structural mapping is inaccurate. Do not penalise analogical style.
+--- LOGIC (1–10) ---
+Start at 8. Apply deductions:
+-1  One unsupported assumption or minor unverified claim.
+-2  Significant unsupported leap; or unverified specificity — citing a precise statistic, study, or mechanism without a traceable source (sounds specific but isn't verifiable).
+-3  A clear logical error: category error, circular reasoning, strawman, or analogy whose mapping breaks down.
+-4  Multiple errors or a structurally incoherent argument.
+-5  Internally contradictory or entirely fallacious.
+Add back +1 if every major claim is grounded in a verifiable fact or a precisely mapped analogy with an explicit causal chain.
+Final score = max(1, min(10, 8 + additions - deductions)).
+ANALOGY: penalise only if the structural mapping is inaccurate. Vivid analogies that map correctly are as valid as formal proofs.
 
-Rhetoric (1–10):
-- 9–10: Punchy, vivid, persuasive — concrete images or apt analogies, no empty jargon.
-- 5–8: Clear but flat, repetitive, or over-hedged.
-- 1–4: Incomprehensible, incoherent, or pure mockery with no substance.
+--- RHETORIC (1–10) ---
+- 9–10: Punchy, vivid, memorable — lands with force, no empty jargon.
+- 7–8: Clear and persuasive but not exceptional.
+- 5–6: Competent but flat, over-hedged, or repetitive.
+- 3–4: Dry, dense, or relies on mockery over substance.
+- 1–2: Incomprehensible or incoherent.
 
-Tactics (1–10):
-- 9–10: Directly engages opponent's actual argument with a specific tactic (reframe, concession-pivot, pointed question, exposed contradiction).
-- 5–8: Addresses opponent's turn but introduces no new strategic pressure.
-- 1–4: Ignores the opponent's previous turn or responds only to a strawman.
+--- TACTICS (1–10) ---
+OPENING TURN (opponent message is empty): Score on framing quality, not engagement. A bold opening that stakes a clear defensible position and anticipates the strongest counterargument earns 7–9. A vague or unguarded opening earns 4–6. Do not penalise the opener for failing to rebut a non-existent argument — minimum score is 5.
+ALL OTHER TURNS:
+- 9–10: Directly targets a specific claim or gap in the opponent's argument; applies a named tactic (reframe, concession-pivot, pointed question, exposed contradiction) that creates new pressure.
+- 7–8: Engages the opponent's argument but adds no new strategic leverage.
+- 5–6: Partially addresses the opponent; mostly restates own position.
+- 3–4: Responds to a strawman or largely ignores the opponent's turn.
+- 1–2: Completely ignores the opponent.
 
-ANTI-BIAS: Apply identical standards to both debaters.`;
+ANTI-BIAS: Apply identical standards to both debaters. If an analogy earns credit for one side, an equivalent analogy from the other must be judged by the same criteria.`;
 }
 
 /**
