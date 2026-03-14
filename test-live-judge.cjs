@@ -1,6 +1,6 @@
 // Test script to verify live judge panel functionality
 const { spawn } = require('child_process');
-const https = require('https');
+const http = require('http');
 
 // Start the dev server if not already running
 console.log('Testing live judge panel functionality...');
@@ -8,13 +8,13 @@ console.log('Testing live judge panel functionality...');
 // Test the judge API endpoint
 const options = {
   hostname: 'localhost',
-  port: 5173,
+  port: 5174,
   path: '/api/judge',
   method: 'GET',
   timeout: 5000
 };
 
-const req = https.request(options, (res) => {
+const req = http.request(options, (res) => {
   console.log(`Status Code: ${res.statusCode}`);
   
   if (res.statusCode === 200) {

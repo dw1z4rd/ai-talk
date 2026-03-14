@@ -218,9 +218,15 @@ function parseJudgeAnalysis(
   context: string
 ): TurnAnalysis {
   try {
-    // Handle null/undefined case first
+    // Handle null/undefined case first with more detailed logging
     if (analysisText === null || analysisText === undefined) {
-      console.warn('Analysis text is null or undefined');
+      console.warn('Analysis text is null or undefined for judge:', judge.name, 'model:', judge.modelId);
+      return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
+    }
+    
+    // Additional check for empty string or whitespace-only string
+    if (typeof analysisText === 'string' && analysisText.trim() === '') {
+      console.warn('Analysis text is empty string for judge:', judge.name, 'model:', judge.modelId);
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
     
@@ -367,13 +373,16 @@ function createFallbackAnalysis(
   opponentMessage: string,
   context: string
 ): TurnAnalysis {
+  // Log more detailed information about the fallback
+  console.info(`Creating fallback analysis for judge ${judge.name} (${judge.modelId}) on turn ${turnNumber}`);
+  
   const defaultScores: JudgeScores = {
-    logicalCoherence: 70,
-    rhetoricalForce: 70,
-    frameControl: 70,
-    credibilityScore: 70,
-    tacticalEffectiveness: 70,
-    overallScore: 70
+    logicalCoherence: 50,
+    rhetoricalForce: 50,
+    frameControl: 50,
+    credibilityScore: 50,
+    tacticalEffectiveness: 50,
+    overallScore: 50
   };
 
   return {
@@ -386,15 +395,24 @@ function createFallbackAnalysis(
     opponentMessage,
     context,
     scores: defaultScores,
-    usedTactics: [],
-    effectivenessMap: {},
+    usedTactics: [
+      {
+        tactic: "fallback_default",
+        effectiveness: 50,
+        confidence: 30,
+        context: "Default tactic used in fallback analysis"
+      }
+    ],
+    effectivenessMap: {
+      "fallback_default": 50
+    },
     momentumShift: 0,
     frameControlShift: 0,
-    exposedWeaknesses: [],
-    tacticalInsights: [],
+    exposedWeaknesses: ["Unable to analyze due to system limitations"],
+    tacticalInsights: ["Fallback analysis used due to system error"],
     judgeId: judge.id,
     judgeSpecialization: judge.specialization,
-    reasoning: 'Fallback analysis due to judge analysis failure'
+    reasoning: 'Fallback analysis due to judge analysis failure - using default scores'
   };
 }
 
