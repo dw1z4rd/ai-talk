@@ -180,7 +180,7 @@ Always provide specific, evidence-based analysis in the requested JSON format.`;
  * Parse judge analysis response
  */
 function parseJudgeAnalysis(
-  analysisText: string,
+  analysisText: string | null,
   judge: LiveJudge,
   agent: Agent,
   opponent: Agent,
@@ -190,22 +190,42 @@ function parseJudgeAnalysis(
   context: string
 ): TurnAnalysis {
   try {
-    // Extract JSON from response
+    // Check if analysisText is valid
+    if (!analysisText || typeof analysisText !== 'string') {
+      throw new Error('Invalid analysis text: ' + typeof analysisText);
+    }
+
+    // Extract JSON from response with more robust regex
     const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('No JSON found in analysis response');
     }
 
-    const analysisData = JSON.parse(jsonMatch[0]);
+    // Try to parse the JSON
+    let analysisData;
+    try {
+      analysisData = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      throw new Error('Failed to parse JSON: ' + parseError.message);
+    }
     
+    // Validate required fields
+    if (!analysisData.scores) {
+      throw new Error('Missing scores in analysis data');
+    }
+
     // Calculate overall score using judge's weights
     const overallScore = calculateWeightedScore(analysisData.scores, judge.scoringWeights);
 
     // Create effectiveness map
     const effectivenessMap: { [tactic: string]: number } = {};
-    analysisData.usedTactics?.forEach((tactic: TacticAnalysis) => {
-      effectivenessMap[tactic.tactic] = tactic.effectiveness;
-    });
+    if (Array.isArray(analysisData.usedTactics)) {
+      analysisData.usedTactics.forEach((tactic: TacticAnalysis) => {
+        if (tactic.tactic && typeof tactic.effectiveness === 'number') {
+          effectivenessMap[tactic.tactic] = tactic.effectiveness;
+        }
+      });
+    }
 
     return {
       turnNumber,
@@ -217,21 +237,30 @@ function parseJudgeAnalysis(
       opponentMessage,
       context,
       scores: {
-        ...analysisData.scores,
+        logicalCoherence: analysisData.scores.logicalCoherence || 70,
+        rhetoricalForce: analysisData.scores.rhetoricalForce || 70,
+        frameControl: analysisData.scores.frameControl || 70,
+        credibilityScore: analysisData.scores.credibility || analysisData.scores.credibilityScore || 70,
+        tacticalEffectiveness: analysisData.scores.tacticalEffectiveness || 70,
         overallScore
       },
-      usedTactics: analysisData.usedTactics || [],
+      usedTactics: Array.isArray(analysisData.usedTactics) ? analysisData.usedTactics : [],
       effectivenessMap,
       momentumShift: analysisData.strategicImpact?.momentumShift || 0,
       frameControlShift: analysisData.strategicImpact?.frameControlShift || 0,
-      exposedWeaknesses: analysisData.strategicImpact?.exposedWeaknesses || [],
-      tacticalInsights: analysisData.strategicImpact?.tacticalInsights || [],
+      exposedWeaknesses: Array.isArray(analysisData.strategicImpact?.exposedWeaknesses) 
+        ? analysisData.strategicImpact.exposedWeaknesses 
+        : [],
+      tacticalInsights: Array.isArray(analysisData.strategicImpact?.tacticalInsights) 
+        ? analysisData.strategicImpact.tacticalInsights 
+        : [],
       judgeId: judge.id,
       judgeSpecialization: judge.specialization,
-      reasoning: analysisData.reasoning || 'No reasoning provided'
+      reasoning: analysisData.reasoning || analysisData.reasoningText || 'No reasoning provided'
     };
   } catch (error) {
     console.error('Failed to parse judge analysis:', error);
+    console.error('Analysis text was:', analysisText);
     return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
   }
 }
