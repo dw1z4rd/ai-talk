@@ -629,7 +629,8 @@
               scores: data.scores,
               momentumShift: data.momentumShift,
               frameControlShift: data.frameControlShift,
-              tacticalAnalysis: data.tacticalAnalysis
+              tacticalAnalysis: data.tacticalAnalysis,
+              reasoning: data.reasoning
             }];
 
             // Update live leader stats from accumulated results
@@ -1517,6 +1518,12 @@
                   </span>
                 </div>
               </div>
+
+              {#if result.reasoning}
+                <div class="mt-2 pt-2 border-t border-[--color-border-subtle]">
+                  <p class="text-[11px] text-[--color-muted] leading-relaxed italic">{result.reasoning}</p>
+                </div>
+              {/if}
 
               {#if result.tacticalAnalysis.usedTactics.length > 0}
                 <div class="mt-2 pt-2 border-t border-[--color-border-subtle]">

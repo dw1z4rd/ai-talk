@@ -50,6 +50,7 @@ export interface LiveJudgeResult {
     effectivenessMap: { [tactic: string]: number };
     exposedWeaknesses: string[];
   };
+  reasoning?: string;
 }
 
 interface ModelDef {
@@ -1192,6 +1193,10 @@ export async function generateAdaptiveReply(
           (ja) => ja.exposedWeaknesses,
         ),
       },
+      reasoning: judgeResult.judgeAnalyses
+        .map((ja) => ja.reasoning)
+        .filter(Boolean)
+        .join(' | '),
     };
 
     return { reply, judgeResult: simplifiedResult };
