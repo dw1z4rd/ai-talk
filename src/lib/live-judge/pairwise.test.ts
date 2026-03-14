@@ -5,8 +5,13 @@ import {
   calculateMomentumShift,
   calculateFrameControlShift,
   detectLanguageMismatch,
+  generatePairwisePrompt,
+  generatePairwiseSystemPrompt,
+  classifyDebateDomain,
+  createFallbackAnalysis,
 } from './analysis';
-import type { DebateScorecard, PairwiseRound, MomentumTracker, FrameControlTracker } from './types';
+import type { DebateScorecard, PairwiseRound, MomentumTracker, FrameControlTracker, LiveJudge } from './types';
+import { JUDGE_SPECIALIZATION_CONFIGS } from './types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -325,5 +330,112 @@ describe('detectLanguageMismatch', () => {
     expect(() => detectLanguageMismatch('', '')).not.toThrow();
     const result = detectLanguageMismatch('', '');
     expect(result.isConsistent).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// classifyDebateDomain
+// ---------------------------------------------------------------------------
+
+describe('classifyDebateDomain', () => {
+  it('classifies consciousness debate as philosophical', () => {
+    expect(classifyDebateDomain('Does consciousness require qualia that are irreducibly subjective?')).toBe('philosophical');
+  });
+
+  it('classifies climate policy debate as empirical', () => {
+    expect(classifyDebateDomain('Is the scientific evidence for anthropogenic climate change conclusive?')).toBe('empirical');
+  });
+
+  it('classifies AI regulation debate as policy', () => {
+    expect(classifyDebateDomain('Should governments ban autonomous weapons through international legislation?')).toBe('policy');
+  });
+
+  it('returns mixed for unrecognized topics', () => {
+    expect(classifyDebateDomain('Cats are better than dogs')).toBe('mixed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// opener penalty verification
+// ---------------------------------------------------------------------------
+
+describe('opener penalty verification', () => {
+  it('injects OPENING STATEMENT note when isOpeningRound is true', () => {
+    const prompt = generatePairwisePrompt('Alice', 'Opening argument text', 1, 'Bob', 'Response text', 2, 'Is AI conscious?', true);
+    expect(prompt).toContain('[NOTE: Turn 1 is the OPENING statement');
+    expect(prompt).toContain('Apply OPENING TURN rules');
+  });
+
+  it('does NOT inject opening note for non-opening rounds', () => {
+    const prompt = generatePairwisePrompt('Alice', 'Turn 3 argument', 3, 'Bob', 'Turn 4 argument', 4, 'Is AI conscious?', false);
+    expect(prompt).not.toContain('OPENING statement');
+  });
+
+  it('system prompt contains OPENING TURN framing rubric in TACTICS section', () => {
+    const sp = generatePairwiseSystemPrompt('Alice', 'Bob');
+    expect(sp).toContain('OPENING TURN');
+    expect(sp).toContain('framing quality');
+  });
+
+  it('system prompt contains four-component rhetoric rubric', () => {
+    const sp = generatePairwiseSystemPrompt('Alice', 'Bob');
+    expect(sp).toContain('Vividness');
+    expect(sp).toContain('Structural clarity');
+    expect(sp).toContain('Audience awareness');
+    expect(sp).toContain('Framing quality');
+    expect(sp).toContain('ONE component');
+  });
+
+  it('system prompt contains symmetric evidence standard language', () => {
+    const sp = generatePairwiseSystemPrompt('Alice', 'Bob');
+    expect(sp).toContain('Hollow specificity');
+    expect(sp).toContain('Citation ≠ Correctness');
+  });
+
+  it('opener who wins all three dimensions gets high scores (no opener handicap)', () => {
+    const round = makeRound('alice', 'Alice', 'bob', 'Bob', 'alice', 'alice', 'alice', { roundNumber: 1 });
+    const scores = synthScoresFromPairwise(round, 'alice');
+    expect(scores.logicalCoherence).toBeGreaterThan(28);
+    expect(scores.rhetoricalForce).toBeGreaterThan(21);
+    expect(scores.tacticalEffectiveness).toBeGreaterThan(21);
+  });
+
+  it('opener who loses all three dimensions gets low scores (no opener protection)', () => {
+    const round = makeRound('alice', 'Alice', 'bob', 'Bob', 'bob', 'bob', 'bob', { roundNumber: 1 });
+    const scores = synthScoresFromPairwise(round, 'alice');
+    expect(scores.logicalCoherence).toBeLessThan(16);
+    expect(scores.rhetoricalForce).toBeLessThan(12);
+    expect(scores.tacticalEffectiveness).toBeLessThan(12);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createFallbackAnalysis score ranges (Issue 6 regression guard)
+// ---------------------------------------------------------------------------
+
+describe('createFallbackAnalysis score ranges', () => {
+  it('returns scores within valid dimension ranges', () => {
+    const config = JUDGE_SPECIALIZATION_CONFIGS['balance'];
+    const judge: LiveJudge = {
+      id: 'j', name: 'Judge', modelId: 'gpt-oss:120b-cloud',
+      specialization: 'balance',
+      scoringWeights: config.scoringWeights,
+      biasProfile: config.typicalBias,
+      lastAnalysis: null,
+      analysisCount: 0
+    };
+    const agent = { id: 'a', name: 'Agent A' } as any;
+    const opponent = { id: 'b', name: 'Agent B' } as any;
+
+    const result = createFallbackAnalysis(judge, agent, opponent, 1, 'test message', '', '');
+
+    expect(result.scores.logicalCoherence).toBeGreaterThanOrEqual(4);
+    expect(result.scores.logicalCoherence).toBeLessThanOrEqual(40);
+    expect(result.scores.rhetoricalForce).toBeGreaterThanOrEqual(3);
+    expect(result.scores.rhetoricalForce).toBeLessThanOrEqual(30);
+    expect(result.scores.tacticalEffectiveness).toBeGreaterThanOrEqual(3);
+    expect(result.scores.tacticalEffectiveness).toBeLessThanOrEqual(30);
+    expect(result.scores.overallScore).toBeGreaterThanOrEqual(10);
+    expect(result.scores.overallScore).toBeLessThanOrEqual(100);
   });
 });
