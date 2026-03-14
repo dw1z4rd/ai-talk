@@ -443,6 +443,7 @@ ${bannedTacticsText}
   4. Contrast-by-negation ("You are not [doing X], you are [doing Y]"). 
   5. Closing a turn by pairing a dismissal with mocking their worldview.
 
+You must output your response in the exact language used by your opponent in the previous turn. If you are making the opening statement, default to English.
 No disclaimers. No breaking character. Maintain your distinct cognitive and rhetorical style throughout the debate.`;
 }
 

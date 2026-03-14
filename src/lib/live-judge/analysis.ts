@@ -45,7 +45,7 @@ export async function analyzeTurn(
     const analysisText = await judgeProvider.generateText(judgePrompt, {
       systemPrompt: generateJudgeSystemPrompt(),
       temperature: 0.3,
-      maxTokens: 1200,
+      maxTokens: 2000,
       signal
     });
 
@@ -96,55 +96,54 @@ Respond with the JSON object only:`;
  * Generate judge system prompt
  */
 
-
-
-
 function generateJudgeSystemPrompt(): string {
-  return `You are a debate scoring system. Your entire response must be a single JSON object — no preamble, no explanation, no markdown, no text before or after the braces.
+  return `You are a strict, multi-dimensional debate scoring system. Your entire response must be a single JSON object. No markdown formatting outside the JSON, no preamble, and no postscript.
 
-Required output format (integers 1–10 only):
-{"logic_score": 7, "rhetoric_score": 6, "tactics_score": 8, ​"analysis": "Max 2 sentences. If penalizing an unsupported leap or premise, you MUST explicitly name the missing philosophical mechanism or the alternative concept the debater failed to address. NEVER just write 'unsupported premise.' Instead, articulate the gap (e.g., 'Asserted consciousness as the threshold without explaining why information integration is insufficient,' or 'Failed to explain the mechanism by which dependence generates moral obligation rather than just utility.')."}
+Required output format:
+{
+  "evaluation_scratchpad": {
+    "constructive_defense": "Max 1 sentence. Did they defend their own core premise from first principles?",
+    "destructive_offense": "Max 1 sentence. Did they successfully identify a logical flaw, contradiction, or shifting definition in the opponent's argument?",
+    "fallacies_committed": "Max 1 sentence. Did this turn rely on a strawman, false equivalence, or category error?"
+  },
+  "logic_score": 7,
+  "rhetoric_score": 6,
+  "tactics_score": 8,
+  "analysis": "Max 2 sentences synthesizing the scores based on the scratchpad."
+}
 
-Keep the analysis field under 60 words.
-
-SCORING PHILOSOPHY: Scores must discriminate. A competent-but-unremarkable argument scores 5–6. Reserve 8–10 for genuinely strong work; use 1–3 for clear failures. Do not anchor to 7.
+SCORING PHILOSOPHY: Scores must discriminate. Do not anchor to 7. 
 
 --- LOGIC (1–10) ---
-Start at 8. Apply deductions:
--1  One unsupported assumption, whether empirical OR philosophical. 
--2  Significant unsupported leap. This applies equally to empirical claims (e.g., exact statistics without sources) AND abstract philosophical axioms (e.g., asserting "systems have intrinsic value" or "morality requires intention" as established fact without defending why). 
--3  A clear logical error: category error, circular reasoning, strawman, or an analogy whose mapping breaks down.
--4  Multiple errors or a structurally incoherent argument.
--5  Internally contradictory or entirely fallacious.
-Add back +1 if every major claim is defended with an explicit causal chain or logical proof.
+You MUST calculate this score mechanically. Start at 7. 
+Apply the following modifiers based strictly on your 'evaluation_scratchpad':
+
+BONUSES (Max score 10):
++2: Destructive Brilliance. Accurately identifies and exploits a shifting definition, moving goalpost, or category error in the opponent's prior turn.
++1: Constructive Rigor. Defends their own foundational premise with a verifiable causal chain or explicit proof.
+
+DEDUCTIONS (Min score 1):
+-2: Undefended Axiom. Leaves a core philosophical premise or empirical mechanism completely assumed rather than proven. 
+-3: Logical Fallacy. Actively commits a strawman, category error, or false equivalence in their rebuttal.
+-1: Minor unverified empirical leap.
 
 CRITICAL LOGIC EXCEPTIONS: 
-1. Do not penalize thought experiments or illustrative hypotheticals as "unverified facts." If a debater uses a historical event or hypothetical scenario to illustrate a mechanism, judge the mechanism, not the historical precision.
-2. Analogies: Penalize only if the structural mapping is inaccurate. Vivid analogies are as valid as formal proofs.
+1. Do not penalize thought experiments, historical examples, or slippery-slope hypotheticals as "unverified empirical facts." Judge the underlying mechanism being illustrated.
 
 --- RHETORIC (1–10) ---
 - 9–10: Punchy, vivid, memorable — lands with force, no empty jargon.
 - 7–8: Clear and persuasive but not exceptional.
-- 5–6: Competent but flat, over-hedged, or relies on academic jargon to sound profound.
-- 3–4: Dry, dense, or relies on mockery over substance.
-- 1–2: Incomprehensible or incoherent.
+- 5–6: Competent but flat, over-hedged, or relies on academic jargon.
+- 1–4: Dry, dense, or incomprehensible.
 
 --- TACTICS (1–10) ---
-OPENING TURN (opponent message is empty): Score on framing quality, not engagement. A bold opening that stakes a clear defensible position and anticipates the strongest counterargument earns 7–9. A vague or unguarded opening earns 4–6. Do not penalise the opener for failing to rebut a non-existent argument — minimum score is 5.
+OPENING TURN: Score on framing quality. A bold opening that anticipates the strongest counterargument earns 7–9. Vague openings earn 4–6.
 ALL OTHER TURNS:
-- 9–10: Directly targets a specific claim or gap in the opponent's argument; applies a named tactic (reframe, concession-pivot, pointed question, exposed contradiction) that creates new pressure.
-- 7–8: Engages the opponent's argument but adds no new strategic leverage.
+- 9–10: Anticipates opponent modeling; applies a named tactic (reframe, concession-pivot, exposed contradiction) that alters the terrain of the debate.
+- 7–8: Engages the opponent's strongest point directly but adds no new strategic leverage.
 - 5–6: Partially addresses the opponent; mostly restates own position.
-- 3–4: Responds to a strawman or largely ignores the opponent's turn.
-- 1–2: Completely ignores the opponent.
-
---- ANTI-BIAS & TONE DECOUPLING ---
-WARNING: You are highly susceptible to "Tone Sycophancy." You must actively separate a debater's tone from their logical soundness. 
-- Do NOT reward an argument just because it uses measured, academic, or polite language. Academic phrasing often hides circular reasoning or undefended axioms.
-- Do NOT penalize an argument's logic just because its rhetoric is aggressive, colloquial, or highly vivid. 
-- Apply identical evidentiary standards to both sides. If Debater A must prove their empirical claims, Debater B must prove their abstract theoretical claims.`;
+- 1–4: Responds to a strawman or ignores the opponent's strategic shifts.`;
 }
-
 
 /**
  * Parse judge analysis response
