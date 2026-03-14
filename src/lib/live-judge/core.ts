@@ -15,7 +15,6 @@ import {
 import type { Agent, Message } from '$lib/agents';
 import {
   analyzeTurn,
-  aggregateJudgeScores,
   calculateMomentumShift,
   calculateFrameControlShift,
   createFallbackAnalysis,
@@ -188,14 +187,12 @@ export class LiveJudgeSystem {
 
         judge.analysisCount++;
 
-        // Update the scorecard
-        const agentA = this.getAgentA();
-        const agentB = this.getAgentB(agent.id, prevAgentId);
+        // Update the scorecard using agent IDs/names from the pairwise round itself
         this.panel.scorecard = updateScorecard(
           this.panel.scorecard,
           pairwiseRound,
-          agentA.id, agentA.name,
-          agentB.id, agentB.name
+          pairwiseRound.prevTurn.agentId, pairwiseRound.prevTurn.agentName,
+          pairwiseRound.curTurn.agentId, pairwiseRound.curTurn.agentName
         );
 
         // Derive synthetic adaptive scores from pairwise result
@@ -298,22 +295,6 @@ export class LiveJudgeSystem {
   /** Get the current debate scorecard. */
   getScorecard(): DebateScorecard {
     return { ...this.panel.scorecard };
-  }
-
-  /** Helper to get agent A info from panel state. */
-  private getAgentA(): { id: string; name: string } {
-    const ids = Object.keys(this.panel.currentScores);
-    if (ids.length === 0) return { id: 'agent-a', name: 'Agent A' };
-    return { id: ids[0], name: this.panel.currentScores[ids[0]].agentName };
-  }
-
-  /** Helper to get agent B info, defaulting to the current/prev agent context. */
-  private getAgentB(curAgentId: string, prevAgentId: string): { id: string; name: string } {
-    const ids = Object.keys(this.panel.currentScores);
-    // Find the ID that is NOT the current agent
-    const bId = ids.find(id => id !== curAgentId) || prevAgentId;
-    const bName = this.panel.currentScores[bId]?.agentName || 'Agent B';
-    return { id: bId, name: bName };
   }
 
   private updatePanelState(

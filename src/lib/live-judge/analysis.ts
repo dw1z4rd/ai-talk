@@ -9,8 +9,6 @@ import {
   type NarrativeVerdict,
 } from './types';
 import type { Agent, Message } from '$lib/agents';
-import { createOllamaProvider } from '$lib/llm-agent';
-import { OLLAMA_CLOUD_URL, OLLAMA_CLOUD_API_KEY } from '$env/static/private';
 import { MODEL_CATALOG } from '$lib/agents';
 
 // ── Language consistency check ────────────────────────────────────────────────
@@ -67,7 +65,7 @@ export async function compareTurns(
     console.warn(`[Pairwise Judge] ${langCheck.warning}`);
   }
 
-  const isOpeningRound = !prevMessage.trim();
+  const isOpeningRound = prevTurnNumber === 1;
   const prompt = generatePairwisePrompt(
     prevAgentName, prevMessage, prevTurnNumber,
     curAgentName, curMessage, curTurnNumber,
@@ -647,7 +645,7 @@ export function aggregateJudgeScores(judgeAnalyses: TurnAnalysis[]): JudgeScores
 
 export function calculateMomentumShift(scores: JudgeScores, momentumTracker: MomentumTracker, agentId: string): number {
   const baseMomentum = (scores.overallScore - 50) * 0.4;
-  const tacticalBonus = (scores.tacticalEffectiveness - 50) * 0.3;
+  const tacticalBonus = (scores.tacticalEffectiveness - 15) * 0.3;
   const credibilityPenalty = (50 - scores.credibilityScore) * 0.2;
   const currentMomentum = momentumTracker.currentMomentum[agentId] || 0;
   const inertiaFactor = currentMomentum * 0.1;
@@ -655,8 +653,9 @@ export function calculateMomentumShift(scores: JudgeScores, momentumTracker: Mom
 }
 
 export function calculateFrameControlShift(scores: JudgeScores, frameControlTracker: FrameControlTracker, agentId: string): number {
-  const baseControl = (scores.logicalCoherence + scores.rhetoricalForce) / 2 - 50;
-  const tacticalModifier = (scores.tacticalEffectiveness - 50) * 0.3;
+  // 17.5 = midpoint of avg(logicalCoherence 0–40, rhetoricalForce 0–30) = (20 + 15) / 2
+  const baseControl = (scores.logicalCoherence + scores.rhetoricalForce) / 2 - 17.5;
+  const tacticalModifier = (scores.tacticalEffectiveness - 15) * 0.3;
   const currentControl = frameControlTracker.currentControl[agentId] || 0;
   const inertiaFactor = currentControl * 0.15;
   return Math.max(-20, Math.min(20, (baseControl + tacticalModifier + inertiaFactor) * 0.4));
