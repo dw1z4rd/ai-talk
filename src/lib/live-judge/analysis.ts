@@ -1,13 +1,9 @@
-import { 
-  type LiveJudge, 
-  type TurnAnalysis, 
-  type JudgeScores, 
-  type TacticAnalysis,
+import {
+  type LiveJudge,
+  type TurnAnalysis,
+  type JudgeScores,
   type MomentumTracker,
   type FrameControlTracker,
-  DEBATE_TACTICS,
-  type DebateTactic,
-  JUDGE_SPECIALIZATION_CONFIGS
 } from './types';
 import type { Agent, Message } from '$lib/agents';
 import { createOllamaProvider } from '$lib/llm-agent';
@@ -24,7 +20,8 @@ export async function analyzeTurn(
   opponent: Agent,
   opponentMessage: string,
   turnNumber: number,
-  context: string,
+  topic: string,
+  referenceContext: string,
   messageHistory: Message[],
   signal?: AbortSignal
 ): Promise<TurnAnalysis> {
@@ -36,7 +33,8 @@ export async function analyzeTurn(
     opponent,
     opponentMessage,
     turnNumber,
-    context,
+    topic,
+    referenceContext,
     messageHistory
   );
 
@@ -52,7 +50,7 @@ export async function analyzeTurn(
     });
 
     console.log(`[Judge] ${judge.name} (${judge.modelId}) completed in ${Date.now() - start}ms`);
-    return parseJudgeAnalysis(analysisText, judge, agent, opponent, turnNumber, message, opponentMessage, context);
+    return parseJudgeAnalysis(analysisText, judge, agent, opponent, turnNumber, message, opponentMessage, referenceContext);
   } catch (error: any) {
     const elapsed = Date.now() - start;
     if (error?.name === 'AbortError') {
@@ -60,7 +58,7 @@ export async function analyzeTurn(
     } else {
       console.error(`[Judge] ${judge.name} (${judge.modelId}) failed after ${elapsed}ms:`, error);
     }
-    return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
+    return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, referenceContext);
   }
 }
 
@@ -74,43 +72,54 @@ function generateJudgePrompt(
   opponent: Agent,
   opponentMessage: string,
   turnNumber: number,
-  context: string,
+  topic: string,
+  referenceContext: string,
   messageHistory: Message[]
 ): string {
-  return `TOPIC: ${context || 'General debate'}
-OPPONENT (${opponent.name}): "${opponentMessage}"
-DEBATER BEING SCORED (${agent.name}): "${message}"`;
+  const contextBlock = referenceContext
+    ? `\nREFERENCE MATERIAL: ${referenceContext}\n`
+    : '';
+  return `DEBATE TOPIC: ${topic || 'General debate'}
+TURN: ${turnNumber}${contextBlock}
+OPPONENT (${opponent.name}) just said: "${opponentMessage}"
+
+NOW EVALUATE — ${agent.name}'s response: "${message}"`;
 }
 
 /**
  * Generate judge system prompt
  */
 function generateJudgeSystemPrompt(): string {
-  return `You are the Live Scoring Matrix for an ongoing debate. You evaluate arguments objectively based on a strict mathematical rubric. You do not have personal biases or a personality.
+  return `You are an impartial debate scoring system. You evaluate the substance and effectiveness of arguments — not their surface style. Academic-sounding language does not make an argument more valid. A precise analogy is as rigorous as a formal proof if the structural mapping holds.
+
+ANTI-BIAS RULE: Apply identical standards to both debaters. If an analogy is credited for one side, an equivalently structured analogy from the other must be judged by the same criteria. Do not reward formal register over clear reasoning.
 
 Scoring Rubric (Total 100 Points):
 
-Logic Score (0-40 Points):
-- 40: Flawless causal links, explicitly cites evidence/examples.
-- 20: Coherent but relies heavily on hypotheticals or analogies.
-- 0: Logical fallacies, contradictions, or failed analogies.
+Logic Score (0–40 Points) — evaluate SUBSTANCE, not style:
+- 40: Sound premises, valid inference, claims grounded in verifiable facts, accurate analogies, or documented evidence.
+- 30: Mostly sound with minor gaps or lightly unsupported assumptions.
+- 20: A significant unsupported leap, a speculative claim presented as fact, or an analogy whose mapping partially breaks down.
+- 10: A clear logical error — category error (applying in-universe rules to the whole system), circular reasoning, strawman, or an analogy that misrepresents the domain.
+- 0: Internally contradictory or entirely fallacious.
 
-Rhetoric Score (0-30 Points):
-- 30: Punchy, highly persuasive, excellent use of framing without academic jargon.
-- 15: Persuasive but overly dense or repetitive.
-- 0: Boring, dry, or incomprehensible.
+EVIDENCE NOTE: "Concrete evidence" means verifiable, observable facts. Theoretical interpretations, contested scientific claims, or philosophical assumptions presented as settled science do not qualify — award partial credit only.
+ANALOGY NOTE: Penalise an analogy only if its structural mapping is inaccurate or applied outside its valid domain. Do not penalise analogical style itself.
 
-Tactics Score (0-30 Points):
-- 30: Successfully executes advanced debate tactics (e.g., Concession & Pivot, Interrogation) to put the opponent on the defensive.
-- 15: Successfully refutes the opponent but introduces no new tactical pressure.
-- 0: Ignores the opponent's previous turn entirely.
+Rhetoric Score (0–30 Points):
+- 30: Punchy, vivid, persuasive — uses concrete images or apt analogies to land a point without empty jargon.
+- 15: Clear but flat, repetitive, or over-hedged.
+- 0: Incomprehensible, incoherent, or pure mockery with no substance.
+
+Tactics Score (0–30 Points):
+- 30: Directly engages the opponent's actual argument; applies a specific tactic (reframe, concession-and-pivot, pointed question, exposed contradiction) to create new pressure.
+- 15: Addresses the opponent's turn but introduces no new strategic pressure.
+- 0: Ignores the opponent's previous turn or responds only to a strawman of it.
 
 Score each category from 1 to 10. Do not use any other scale.
 
-You must output your evaluation STRICTLY as a valid JSON object. Do not write introductory text, meta-commentary, or markdown blocks. Keep analysis strictly to 2-3 sentences citing specific point deductions.
-
-Output format:
-{"logic_score": <integer 1-10>, "rhetoric_score": <integer 1-10>, "tactics_score": <integer 1-10>, "analysis": "<2-3 sentences>"}`;
+Output STRICTLY as valid JSON with no surrounding text or markdown:
+{"logic_score": <integer 1-10>, "rhetoric_score": <integer 1-10>, "tactics_score": <integer 1-10>, "analysis": "<2-3 sentences citing specific reasoning>"}`;
 }
 
 /**
@@ -173,14 +182,15 @@ function parseJudgeAnalysis(
 
     const analysis = typeof data.analysis === 'string' ? data.analysis : 'No analysis provided';
 
-    // Store raw dimension scores (0-40/0-30/0-30) in these fields; UI displays with denominators
+    // Store raw dimension scores (4-40/3-30/3-30) in these fields; UI displays with denominators.
+    // frameControl and credibilityScore carry totalScore as proxies — calibrated in pressure.ts.
     const scores: JudgeScores = {
-      logicalCoherence: logicScore,    // 0-40
-      rhetoricalForce: rhetoricScore,  // 0-30
-      frameControl: totalScore,
-      credibilityScore: totalScore,
-      tacticalEffectiveness: tacticsScore, // 0-30
-      overallScore: totalScore         // 0-100
+      logicalCoherence: logicScore,        // 4–40  (logicRaw × 4)
+      rhetoricalForce: rhetoricScore,      // 3–30  (rhetoricRaw × 3)
+      frameControl: totalScore,            // proxy: totalScore (7–100)
+      credibilityScore: totalScore,        // proxy: totalScore (7–100)
+      tacticalEffectiveness: tacticsScore, // 3–30  (tacticsRaw × 3)
+      overallScore: totalScore             // 7–100
     };
 
     return {
@@ -207,19 +217,6 @@ function parseJudgeAnalysis(
     console.error('[Judge] parseJudgeAnalysis threw:', error);
     return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
   }
-}
-
-/**
- * Calculate weighted score based on judge's specialization
- */
-function calculateWeightedScore(scores: any, weights: any): number {
-  return Math.round(
-    scores.logicalCoherence * weights.logicalCoherence +
-    scores.rhetoricalForce * weights.rhetoricalForce +
-    scores.frameControl * weights.frameControl +
-    scores.credibilityScore * weights.credibilityScore +
-    scores.tacticalEffectiveness * weights.tacticalEffectiveness
-  );
 }
 
 /**
@@ -386,34 +383,3 @@ function createJudgeProvider(modelId: string) {
   return modelDef.makeProvider();
 }
 
-/**
- * Extract tactics from text using pattern matching
- */
-export function extractTacticsFromText(text: string): TacticAnalysis[] {
-  const tactics: TacticAnalysis[] = [];
-  
-  // Simple pattern matching for common tactics
-  const tacticPatterns: { [key: string]: RegExp } = {
-    'question': /\b(why|how|what|when|where)\b.*\?/i,
-    'contradiction': /\b(no|not|never|wrong|incorrect|false)\b/i,
-    'evidence_citation': /\b(according to|research shows|studies indicate|data suggests)\b/i,
-    'emotional_appeal': /\b(feel|believe|heart|soul|passion|love|hate)\b/i,
-    'ridicule': /\b(ridiculous|absurd|laughable|pathetic)\b/i,
-    'authority_appeal': /\b(experts say|authorities believe|studies prove)\b/i,
-    'analogy': /\b(like|similar to|just as|analogous to)\b/i,
-    'redirection': /\b(let's focus on|moving on|however|but)\b/i
-  };
-  
-  Object.entries(tacticPatterns).forEach(([tactic, pattern]) => {
-    if (pattern.test(text)) {
-      tactics.push({
-        tactic,
-        effectiveness: 70, // Default effectiveness
-        confidence: 60,   // Default confidence
-        context: `Detected ${tactic} pattern in text`
-      });
-    }
-  });
-  
-  return tactics;
-}

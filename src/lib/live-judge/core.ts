@@ -68,10 +68,11 @@ export class LiveJudgeSystem {
     opponent: Agent,
     opponentMessage: string,
     turnNumber: number,
-    context: string = '',
+    topic: string = '',
+    referenceContext: string = '',
     messageHistory: Message[] = []
   ): Promise<JudgeAnalysisResult> {
-    
+
     this.panel.turnCount = turnNumber;
 
     const PER_JUDGE_TIMEOUT_MS = 45_000;
@@ -86,7 +87,7 @@ export class LiveJudgeSystem {
           controller.abort();
         }, PER_JUDGE_TIMEOUT_MS);
 
-        return this.analyzeWithJudge(judge, agent, message, opponent, opponentMessage, turnNumber, context, messageHistory, controller.signal)
+        return this.analyzeWithJudge(judge, agent, message, opponent, opponentMessage, turnNumber, topic, referenceContext, messageHistory, controller.signal)
           .finally(() => clearTimeout(timer));
       })
     );
@@ -130,7 +131,8 @@ export class LiveJudgeSystem {
     opponent: Agent,
     opponentMessage: string,
     turnNumber: number,
-    context: string,
+    topic: string,
+    referenceContext: string,
     messageHistory: Message[],
     signal?: AbortSignal
   ): Promise<any> {
@@ -141,7 +143,8 @@ export class LiveJudgeSystem {
       opponent,
       opponentMessage,
       turnNumber,
-      context,
+      topic,
+      referenceContext,
       messageHistory,
       signal
     );

@@ -1038,6 +1038,28 @@ function createInitialGoals(archetype: string): MetaGoal[] {
 }
 
 /**
+ * Merge per-judge effectivenessMap entries into a single averaged map.
+ * Averaging is done correctly: accumulate sum first, divide once per key.
+ */
+function mergeEffectivenessMap(
+  judgeAnalyses: JudgeAnalysisResult['judgeAnalyses'],
+): { [tactic: string]: number } {
+  const sums: { [tactic: string]: number } = {};
+  const counts: { [tactic: string]: number } = {};
+  for (const ja of judgeAnalyses) {
+    for (const [tactic, effectiveness] of Object.entries(ja.effectivenessMap)) {
+      sums[tactic] = (sums[tactic] ?? 0) + effectiveness;
+      counts[tactic] = (counts[tactic] ?? 0) + 1;
+    }
+  }
+  const result: { [tactic: string]: number } = {};
+  for (const tactic of Object.keys(sums)) {
+    result[tactic] = sums[tactic] / counts[tactic];
+  }
+  return result;
+}
+
+/**
  * Generate reply with live judging and adaptive personality
  */
 export async function generateAdaptiveReply(
@@ -1086,12 +1108,14 @@ export async function generateAdaptiveReply(
       ? `The debate topic is: "${topic}"\n\nYou go first. Open the debate by staking out your position clearly.`
       : `The debate topic is: "${topic}"\n\nDebate so far:\n${historyText}\n\nNow it's your turn. Respond directly to what was just said — challenge it, refute it, or reinforce your position.${tacticWarning}`;
 
-  const fullPrompt = context
-    ? `${systemPrompt}\n\n[REFERENCE MATERIAL]\nThe following documents have been provided. Draw on them where relevant to support or challenge arguments.\n\n${context}\n\n${prompt}`
-    : `${systemPrompt}\n\n${prompt}`;
+  // Reference material belongs in the system prompt so the model treats it as
+  // standing context rather than part of the conversational turn.
+  const effectiveSystemPrompt = context
+    ? `${systemPrompt}\n\n[REFERENCE MATERIAL]\nThe following documents have been provided. Draw on them where relevant to support or challenge arguments.\n\n${context}`
+    : systemPrompt;
 
-  const reply = await agent.provider.generateText(fullPrompt, {
-    systemPrompt,
+  const reply = await agent.provider.generateText(prompt, {
+    systemPrompt: effectiveSystemPrompt,
     temperature: 0.9,
     maxTokens: 10000,
     ...(onToken ? { onToken } : {}),
@@ -1119,6 +1143,7 @@ export async function generateAdaptiveReply(
         opponentAgent,
         opponentMessage,
         turnNumber,
+        topic,
         context || "",
         history,
       ),
@@ -1140,35 +1165,17 @@ export async function generateAdaptiveReply(
       );
 
       // Record tactic usage
-      if (
-        agent.adaptiveState &&
-        judgeResult.judgeAnalyses &&
-        judgeResult.judgeAnalyses.length > 0
-      ) {
+      if (judgeResult.judgeAnalyses.length > 0) {
         const allTactics = judgeResult.judgeAnalyses.flatMap((ja) =>
           ja.usedTactics.map((t) => t.tactic),
         );
-        const effectivenessMap = judgeResult.judgeAnalyses
-          .flatMap((ja) =>
-            Object.entries(ja.effectivenessMap).map(
-              ([tactic, effectiveness]) => ({ tactic, effectiveness }),
-            ),
-          )
-          .reduce(
-            (acc, { tactic, effectiveness }) => {
-              acc[tactic] =
-                (acc[tactic] || 0 + effectiveness) /
-                judgeResult.judgeAnalyses.length;
-              return acc;
-            },
-            {} as { [tactic: string]: number },
-          );
+        const effectivenessMap = mergeEffectivenessMap(judgeResult.judgeAnalyses);
 
         allTactics.forEach((tactic) => {
           recordTacticUsage(
             agent.adaptiveState!.tacticalMemory,
             tactic,
-            effectivenessMap[tactic] || 50,
+            effectivenessMap[tactic] ?? 50,
             `turn_${turnNumber}`,
             allTactics[0] || "default",
             opponentMessage,
@@ -1204,21 +1211,7 @@ export async function generateAdaptiveReply(
         usedTactics: judgeResult.judgeAnalyses.flatMap((ja) =>
           ja.usedTactics.map((t) => t.tactic),
         ),
-        effectivenessMap: judgeResult.judgeAnalyses
-          .flatMap((ja) =>
-            Object.entries(ja.effectivenessMap).map(
-              ([tactic, effectiveness]) => ({ tactic, effectiveness }),
-            ),
-          )
-          .reduce(
-            (acc, { tactic, effectiveness }) => {
-              acc[tactic] =
-                (acc[tactic] || 0 + effectiveness) /
-                judgeResult.judgeAnalyses.length;
-              return acc;
-            },
-            {} as { [tactic: string]: number },
-          ),
+        effectivenessMap: mergeEffectivenessMap(judgeResult.judgeAnalyses),
         exposedWeaknesses: judgeResult.judgeAnalyses.flatMap(
           (ja) => ja.exposedWeaknesses,
         ),
