@@ -224,9 +224,13 @@
             // Set momentum and frame control leaders
             momentumLeader = finalJudgePanel.momentumTracker && 
               Object.entries(finalJudgePanel.momentumTracker.currentMomentum).length > 0
-              ? Object.entries(finalJudgePanel.momentumTracker.currentMomentum).reduce((a: [string, number], b: [string, number]) => 
-                  a[1] > b[1] ? a : b
-                ).map((entry: [string, number]) => ({ agentId: entry[0], momentum: entry[1] }))
+              ? (() => {
+                  const momentumEntries: [string, number][] = Object.entries(finalJudgePanel.momentumTracker.currentMomentum);
+                  const leaderEntry = momentumEntries.reduce((a, b) => 
+                    a[1] > b[1] ? a : b
+                  );
+                  return { agentId: leaderEntry[0], momentum: leaderEntry[1] };
+                })()
               : null;
 
             frameControlLeader = finalJudgePanel.frameControlTracker && 
