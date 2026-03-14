@@ -11,6 +11,7 @@ import {
   OLLAMA_CLOUD_API_KEY,
 } from "$env/static/private";
 import { getLiveJudgeSystem } from "$lib/live-judge/core";
+import type { JudgeAnalysisResult } from "$lib/live-judge/types";
 import {
   initializeAdaptiveAgent,
   applyAdaptivePressure,

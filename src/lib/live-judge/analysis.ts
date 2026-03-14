@@ -218,15 +218,15 @@ function parseJudgeAnalysis(
   context: string
 ): TurnAnalysis {
   try {
-    // Check if analysisText is valid
-    if (!analysisText || (typeof analysisText !== 'string' && typeof analysisText !== 'object')) {
-      console.warn('Invalid analysis text type:', typeof analysisText, 'Value:', analysisText);
+    // Handle null/undefined case first
+    if (analysisText === null || analysisText === undefined) {
+      console.warn('Analysis text is null or undefined');
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
     
-    // Handle null case specifically
-    if (analysisText === null || analysisText === undefined) {
-      console.warn('Analysis text is null or undefined');
+    // Check if analysisText is valid
+    if (!analysisText || (typeof analysisText !== 'string' && typeof analysisText !== 'object')) {
+      console.warn('Invalid analysis text type:', typeof analysisText, 'Value:', analysisText);
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
 
