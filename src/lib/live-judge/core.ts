@@ -128,6 +128,7 @@ export class LiveJudgeSystem {
     let pairwiseRound: PairwiseRound | undefined;
     let aggregatedScores: JudgeScores;
     let judgeAnalyses: any[] = [];
+    let absoluteScores: JudgeScores | undefined;
 
     if (isOpeningTurn) {
       // Turn 1: no opponent to compare against — store this turn and use neutral scores
@@ -151,6 +152,7 @@ export class LiveJudgeSystem {
         judge.analysisCount++;
         judgeAnalyses = [openingAnalysis];
         aggregatedScores = openingAnalysis.scores;
+        absoluteScores = openingAnalysis.scores;
       } catch {
         // Opening analysis failed — leave neutral scores
       }
@@ -178,14 +180,27 @@ export class LiveJudgeSystem {
           controller.abort();
         }, PER_JUDGE_TIMEOUT_MS);
 
-        pairwiseRound = await compareTurns(
-          judge,
-          prevAgentId, prevAgentName, prevMessage, prevTurnNumber,
-          agent.id, agent.name, message, turnNumber,
-          topic, roundNumber, controller.signal
-        ).finally(() => clearTimeout(timer));
+        // Run pairwise comparison and per-turn absolute scoring in parallel.
+        // The absolute scoring is supplementary — its failure never blocks the pairwise result.
+        const [pairwiseResult, absoluteAnalysis] = await Promise.all([
+          compareTurns(
+            judge,
+            prevAgentId, prevAgentName, prevMessage, prevTurnNumber,
+            agent.id, agent.name, message, turnNumber,
+            topic, roundNumber, controller.signal
+          ),
+          analyzeTurn(
+            judge, agent, message, opponent, opponentMessage,
+            turnNumber, topic, referenceContext, messageHistory, controller.signal
+          ).catch(() => null)
+        ]).finally(() => clearTimeout(timer));
 
+        pairwiseRound = pairwiseResult;
         judge.analysisCount++;
+
+        if (absoluteAnalysis) {
+          absoluteScores = absoluteAnalysis.scores;
+        }
 
         // Update the scorecard using agent IDs/names from the pairwise round itself
         this.panel.scorecard = updateScorecard(
@@ -202,7 +217,7 @@ export class LiveJudgeSystem {
         judgeAnalyses = [this.synthTurnAnalysis(judge, agent, opponent, message, opponentMessage, turnNumber, aggregatedScores, pairwiseRound.logicDelta)];
       } catch (error) {
         console.error('[Pairwise Judge] compareTurns threw:', error);
-        aggregatedScores = { logicalCoherence: 50, rhetoricalForce: 50, frameControl: 50, credibilityScore: 50, tacticalEffectiveness: 50, overallScore: 50 };
+        aggregatedScores = { logicalCoherence: 20, rhetoricalForce: 15, frameControl: 50, credibilityScore: 50, tacticalEffectiveness: 15, overallScore: 50 };
         judgeAnalyses = [createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, referenceContext)];
       }
     }
@@ -231,7 +246,8 @@ export class LiveJudgeSystem {
       newMomentumState: this.panel.momentumTracker,
       newFrameControlState: this.panel.frameControlTracker,
       pairwiseRound,
-      scorecard: pairwiseRound ? { ...this.panel.scorecard } : undefined
+      scorecard: pairwiseRound ? { ...this.panel.scorecard } : undefined,
+      absoluteScores
     };
   }
 

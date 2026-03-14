@@ -212,6 +212,10 @@ export interface JudgeAnalysisResult {
   pairwiseRound?: PairwiseRound;
   /** Running scorecard after this turn pair. */
   scorecard?: DebateScorecard;
+  /** Raw per-turn absolute scores from analyzeTurn(). Available on every turn.
+   *  Comparable across debates (1–10 scale mapped to 4–40 / 3–30 / 3–30 per dimension).
+   *  Does not drive the adaptive pressure pipeline — use aggregatedScores for that. */
+  absoluteScores?: JudgeScores;
 }
 
 // Judge specialization configurations

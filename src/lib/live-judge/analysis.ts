@@ -11,6 +11,60 @@ import {
 import type { Agent, Message } from '$lib/agents';
 import { MODEL_CATALOG } from '$lib/agents';
 
+// ── Debate domain classification ─────────────────────────────────────────────
+
+export type DebateDomain = 'empirical' | 'philosophical' | 'policy' | 'mixed';
+
+/**
+ * Classify the debate topic into a domain category using keyword heuristics.
+ * Used to inject domain-appropriate evidentiary standards into judge prompts.
+ */
+export function classifyDebateDomain(topic: string): DebateDomain {
+  const t = topic.toLowerCase();
+
+  const philosophicalKeywords = [
+    'consciousness', 'free will', 'morality', 'ethics', 'justice', 'identity',
+    'metaphysics', 'qualia', 'knowledge', 'beauty', 'god', 'soul', 'meaning',
+    'existence', 'epistemology', 'truth', 'mind', 'subjective', 'objective reality',
+    'free will', 'determinism', 'moral'
+  ];
+  const empiricalKeywords = [
+    'climate', 'vaccine', 'health', 'economic', 'data', 'study', 'research',
+    'science', 'statistic', 'evidence', 'correlation', 'causation', 'experiment',
+    'trial', 'survey', 'measurement', 'empirical'
+  ];
+  const policyKeywords = [
+    'policy', 'law', 'regulation', 'government', 'ban', 'tax', 'reform',
+    'should ', 'ought', 'legislation', 'rights', 'democratic', 'governance',
+    'nuclear', 'military', 'ai safety', 'censorship'
+  ];
+
+  const philoScore = philosophicalKeywords.filter(k => t.includes(k)).length;
+  const empiricalScore = empiricalKeywords.filter(k => t.includes(k)).length;
+  const policyScore = policyKeywords.filter(k => t.includes(k)).length;
+
+  const total = philoScore + empiricalScore + policyScore;
+  if (total === 0) return 'mixed';
+
+  if (philoScore >= empiricalScore && philoScore >= policyScore && philoScore > 0) return 'philosophical';
+  if (empiricalScore > philoScore && empiricalScore >= policyScore) return 'empirical';
+  if (policyScore > 0) return 'policy';
+  return 'mixed';
+}
+
+function buildDomainNote(domain: DebateDomain): string {
+  switch (domain) {
+    case 'philosophical':
+      return `NOTE — DOMAIN: PHILOSOPHICAL. Thought experiments, conceptual analysis, and intuition pumps ARE valid evidence in this debate. Do NOT penalize a turn for lacking empirical citations. Evaluate logical coherence of arguments on their own terms. Definitional assumptions still require defense if contested.`;
+    case 'empirical':
+      return `NOTE — DOMAIN: EMPIRICAL. Precision claims (statistics, named studies, causal mechanisms) require plausible grounding. A bare assertion of a specific number without a mechanism explanation is penalizable (−1). A fully explained mechanism earns +1 even without a citation.`;
+    case 'policy':
+      return `NOTE — DOMAIN: POLICY. Both normative frameworks and empirical evidence are valid. Consistent normative reasoning (deontological, consequentialist, etc.) earns the +1 causal chain bonus even without empirical citation. Mixed normative+empirical arguments are judged on the strength of their weakest link.`;
+    default:
+      return `NOTE — DOMAIN: MIXED. Apply calibrated standards: penalize hollow specificity in empirical claims, tolerate thought experiments in philosophical sub-claims, reward consistent normative reasoning in policy sub-claims.`;
+  }
+}
+
 // ── Language consistency check ────────────────────────────────────────────────
 
 /**
@@ -66,6 +120,7 @@ export async function compareTurns(
   }
 
   const isOpeningRound = prevTurnNumber === 1;
+  const domainNote = buildDomainNote(classifyDebateDomain(topic));
   const prompt = generatePairwisePrompt(
     prevAgentName, prevMessage, prevTurnNumber,
     curAgentName, curMessage, curTurnNumber,
@@ -77,7 +132,7 @@ export async function compareTurns(
 
   try {
     const responseText = await judgeProvider.generateText(prompt, {
-      systemPrompt: generatePairwiseSystemPrompt(prevAgentName, curAgentName),
+      systemPrompt: generatePairwiseSystemPrompt(prevAgentName, curAgentName, domainNote),
       temperature: 0.3,
       maxTokens: 700,
       signal
@@ -105,7 +160,7 @@ export async function compareTurns(
   }
 }
 
-function generatePairwiseSystemPrompt(nameA: string, nameB: string): string {
+export function generatePairwiseSystemPrompt(nameA: string, nameB: string, domainNote: string = ''): string {
   return `You are a comparative debate judge. Read two consecutive turns and pick the stronger one on three dimensions. No draws — you must choose one winner per dimension. Respond with a single JSON object only — no preamble, no markdown.
 
 Required format (use exact agent names as shown):
@@ -114,10 +169,12 @@ Required format (use exact agent names as shown):
 --- LOGIC (forced choice) ---
 Start each turn from 8. Apply deductions:
 -1  One unsupported assumption (empirical OR philosophical — asserting "X implies Y" as fact without defending why is as penalizable as a bare statistics claim)
+    Hollow specificity is penalizable: a specific number, percentage, or named study without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account.
 -2  Significant unsupported leap
 -3  Clear logical error: category error, circular reasoning, strawman, or analogy whose structural mapping breaks down
 -4  Multiple errors or incoherent structure
 +1  Every major claim defended with an explicit causal chain
+    Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
 Winner = higher remaining score. If equal, award the turn whose core claim still stands despite errors.
 
 EXCEPTIONS: Do not penalize thought experiments or illustrative hypotheticals as "unverified facts." Judge the mechanism, not the historical precision.
@@ -127,13 +184,22 @@ Which turn controlled the exchange? Did it target the opponent's strongest point
 OPENING TURN (no previous opponent to rebut): Judge on framing quality — does it stake a defensible position and anticipate the strongest counterargument? Minimum is competitive framing.
 
 --- RHETORIC (forced choice) ---
-Which turn was more memorable and persuasive? Concrete and specific beats vague and academic. Short and punchy beats padded and hedged.
+Which turn was more memorable and persuasive? Evaluate on four components:
+1. Vividness — concrete and specific beats vague and academic; short and punchy beats padded and hedged. This is ONE component, not the whole rubric.
+2. Structural clarity — is the argument easy to follow? Clear signposting beats rambling.
+3. Audience awareness — does the turn speak to the stakes and frame things in terms the audience cares about?
+4. Framing quality — does the turn define or reframe the central question to its own advantage?
+Winner = the turn that is stronger across these four components in aggregate.
+
+--- DOMAIN CONTEXT ---
+${domainNote}
 
 --- ANTI-BIAS ---
-Tone ≠ Logic. Academic register does not indicate sound reasoning. Confidence does not substitute for evidence. Apply identical evidentiary standards to both turns.`;
+Tone ≠ Logic. Academic register does not indicate sound reasoning. Confidence does not substitute for evidence. Apply identical evidentiary standards to both turns.
+Citation ≠ Correctness. Cited precision that is mechanistically hollow is not stronger than uncited reasoning with a complete causal chain.`;
 }
 
-function generatePairwisePrompt(
+export function generatePairwisePrompt(
   nameA: string, messageA: string, turnA: number,
   nameB: string, messageB: string, turnB: number,
   topic: string, isOpeningRound: boolean
@@ -464,13 +530,14 @@ export async function analyzeTurn(
   const judgePrompt = generateJudgePrompt(
     judge, agent, message, opponent, opponentMessage, turnNumber, topic, referenceContext, messageHistory
   );
+  const domainNote = buildDomainNote(classifyDebateDomain(topic));
 
   const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
   const start = Date.now();
 
   try {
     const analysisText = await judgeProvider.generateText(judgePrompt, {
-      systemPrompt: generateJudgeSystemPrompt(),
+      systemPrompt: generateJudgeSystemPrompt(domainNote),
       temperature: 0.3,
       maxTokens: 600,
       signal
@@ -507,7 +574,7 @@ NOW EVALUATE — ${agent.name}'s response: "${message}"
 Respond with the JSON object only:`;
 }
 
-function generateJudgeSystemPrompt(): string {
+function generateJudgeSystemPrompt(domainNote: string): string {
   return `You are a debate scoring system. Your entire response must be a single JSON object — no preamble, no explanation, no markdown.
 
 Required output format (integers 1–10 only):
@@ -519,14 +586,23 @@ SCORING PHILOSOPHY: A competent-but-unremarkable argument scores 5–6. Reserve 
 
 --- LOGIC (1–10) ---
 Start at 8. -1 unsupported assumption, -2 significant leap, -3 logical error, -4 multiple errors. +1 if every claim has explicit causal chain.
+Hollow specificity is penalizable: a specific number, percentage, or named study without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account.
+Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
 
 --- RHETORIC (1–10) ---
-9–10: punchy and memorable. 7–8: clear but not exceptional. 5–6: flat or over-hedged. 3–4: dry or relies on mockery. 1–2: incomprehensible.
+Evaluate on four components in aggregate:
+1. Vividness — 9–10: punchy and memorable; 5–6: flat or over-hedged; 3–4: dry or relies on mockery. This is ONE component, not the whole rubric.
+2. Structural clarity — is the argument easy to follow? Clear signposting beats rambling.
+3. Audience awareness — does it speak to the stakes in terms the audience cares about?
+4. Framing quality — does it define or reframe the central question to its advantage?
 
 --- TACTICS (1–10) ---
 Opening turn: score on framing quality, min 5. Other turns: 9–10 targets a specific gap with a named move; 5–6 mostly restates position; 1–2 ignores opponent.
 
-ANTI-BIAS: Tone ≠ Logic. Academic phrasing ≠ rigorous reasoning.`;
+--- DOMAIN CONTEXT ---
+${domainNote}
+
+ANTI-BIAS: Tone ≠ Logic. Academic phrasing ≠ rigorous reasoning. Citation ≠ Correctness.`;
 }
 
 function parseJudgeAnalysis(
@@ -568,9 +644,9 @@ function parseJudgeAnalysis(
     const rhetoricRaw = Math.max(1, Math.min(10, Math.round(Number(data.rhetoric_score)) || 5));
     const tacticsRaw = Math.max(1, Math.min(10, Math.round(Number(data.tactics_score)) || 5));
 
-    const logicScore = logicRaw * 4;
-    const rhetoricScore = rhetoricRaw * 3;
-    const tacticsScore = tacticsRaw * 3;
+    const logicScore = Math.min(40, logicRaw * 4);
+    const rhetoricScore = Math.min(30, rhetoricRaw * 3);
+    const tacticsScore = Math.min(30, tacticsRaw * 3);
     const totalScore = logicScore + rhetoricScore + tacticsScore;
     const analysis = typeof data.analysis === 'string' ? data.analysis : 'No analysis provided';
 
@@ -603,8 +679,8 @@ export function createFallbackAnalysis(
   turnNumber: number, message: string, opponentMessage: string, context: string
 ): TurnAnalysis {
   const defaultScores: JudgeScores = {
-    logicalCoherence: 50, rhetoricalForce: 50, frameControl: 50,
-    credibilityScore: 50, tacticalEffectiveness: 50, overallScore: 50
+    logicalCoherence: 20, rhetoricalForce: 15, frameControl: 50,
+    credibilityScore: 50, tacticalEffectiveness: 15, overallScore: 50
   };
   return {
     turnNumber, agentId: agent.id, agentName: agent.name,
