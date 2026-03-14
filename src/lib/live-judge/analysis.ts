@@ -45,7 +45,7 @@ export async function analyzeTurn(
     const analysisText = await judgeProvider.generateText(judgePrompt, {
       systemPrompt: generateJudgeSystemPrompt(),
       temperature: 0.3,
-      maxTokens: 800,
+      maxTokens: 1200,
       signal
     });
 
@@ -99,7 +99,9 @@ function generateJudgeSystemPrompt(): string {
   return `You are a debate scoring system. Your entire response must be a single JSON object — no preamble, no explanation, no markdown, no text before or after the braces.
 
 Required output format (integers 1–10 only):
-{"logic_score": 7, "rhetoric_score": 6, "tactics_score": 8, "analysis": "2-3 sentence reasoning here."}
+{"logic_score": 7, "rhetoric_score": 6, "tactics_score": 8, "analysis": "Max 2 sentences. Be specific but brief."}
+
+Keep the analysis field under 60 words.
 
 SCORING PHILOSOPHY: Scores must discriminate. A competent-but-unremarkable argument scores 5–6. Reserve 8–10 for genuinely strong work; use 1–3 for clear failures. Do not anchor to 7.
 
