@@ -1,5 +1,5 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { getLiveJudgeState, getLiveJudgeSystem } from '$lib/agents';
+import { getLiveJudgeState, resetLiveJudgeDebate } from '$lib/agents';
 
 // Get current live judge panel state
 export const GET: RequestHandler = async () => {
@@ -31,8 +31,7 @@ export const GET: RequestHandler = async () => {
 // Reset live judge system
 export const DELETE: RequestHandler = async () => {
 	try {
-		const liveJudgeSystem = getLiveJudgeSystem();
-		liveJudgeSystem.reset();
+		resetLiveJudgeDebate();
 		
 		return new Response(JSON.stringify({
 			success: true,

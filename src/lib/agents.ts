@@ -57,7 +57,7 @@ interface ModelDef {
   makeProvider: () => LLMProvider;
 }
 
-const MODEL_CATALOG: Record<string, ModelDef> = {
+export const MODEL_CATALOG: Record<string, ModelDef> = {
   // Ollama — Cloud
   "deepseek-v3.1:671b-cloud": {
     name: "DeepSeek V3.1",
@@ -152,8 +152,7 @@ interface PersonalityParameters {
   metaphorUsage: number; // 1-10: Literal to Highly metaphorical
 }
 
-// Personality Archetype Definitions
-const PERSONALITY_ARCHETYPES: Record<string, PersonalityParameters> = {
+export const PERSONALITY_ARCHETYPES: Record<string, PersonalityParameters> = {
   engineer: {
     analyticalDepth: 8,
     evidencePreference: 9,
@@ -1053,14 +1052,22 @@ export async function generateAdaptiveReply(
     );
 
     // Record tactic usage
-    if (judgeResult.tacticalAnalysis.usedTactics.length > 0) {
-      judgeResult.tacticalAnalysis.usedTactics.forEach(tactic => {
+    if (judgeResult.judgeAnalyses && judgeResult.judgeAnalyses.length > 0) {
+      const allTactics = judgeResult.judgeAnalyses.flatMap(ja => ja.usedTactics.map(t => t.tactic));
+      const effectivenessMap = judgeResult.judgeAnalyses.flatMap(ja => 
+        Object.entries(ja.effectivenessMap).map(([tactic, effectiveness]) => ({ tactic, effectiveness }))
+      ).reduce((acc, { tactic, effectiveness }) => {
+        acc[tactic] = (acc[tactic] || 0 + effectiveness) / judgeResult.judgeAnalyses.length;
+        return acc;
+      }, {} as { [tactic: string]: number });
+      
+      allTactics.forEach(tactic => {
         recordTacticUsage(
           agent.adaptiveState.tacticalMemory,
           tactic,
-          judgeResult.tacticalAnalysis.effectivenessMap[tactic] || 50,
+          effectivenessMap[tactic] || 50,
           `turn_${turnNumber}`,
-          judgeResult.tacticalAnalysis.usedTactics[0] || 'default',
+          allTactics[0] || 'default',
           opponentMessage,
           turnNumber
         );

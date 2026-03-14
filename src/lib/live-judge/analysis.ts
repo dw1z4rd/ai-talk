@@ -5,7 +5,7 @@ import {
   type TacticAnalysis,
   type MomentumTracker,
   type FrameControlTracker,
-  type DEBATE_TACTICS,
+  DEBATE_TACTICS,
   type DebateTactic,
   JUDGE_SPECIALIZATION_CONFIGS
 } from './types';
@@ -38,7 +38,7 @@ export async function analyzeTurn(
     messageHistory
   );
 
-  const judgeProvider = createJudgeProvider(judge.modelId);
+  const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
   
   try {
     const analysisText = await judgeProvider.generateText(judgePrompt, {

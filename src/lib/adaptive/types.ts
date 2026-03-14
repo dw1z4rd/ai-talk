@@ -101,13 +101,15 @@ export interface AdaptationMetrics {
 }
 
 // Goal system configurations
-export const GOAL_TYPE_CONFIGS = Record<string, {
+export interface GoalTypeConfig {
   name: string;
   description: string;
   preferredTactics: string[];
   successMetrics: string[];
   personalityTriggers: Partial<PersonalityParameters>;
-}>;
+}
+
+export const GOAL_TYPE_CONFIGS: Record<string, GoalTypeConfig> = {};
 
 // Trait interaction matrix
 export interface TraitInteractionMatrix {

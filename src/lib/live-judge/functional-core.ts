@@ -277,11 +277,11 @@ export const updateJudgeState = (
     ...state,
     currentScores: newScores,
     momentumTracker: {
-      currentMomentum: ImmutableMap.fromEntries(Object.entries(newMomentum)),
+      currentMomentum: createImmutableMap(Object.entries(newMomentum)),
       momentumTrend: newMomentumTrend
     },
     frameControlTracker: {
-      currentControl: ImmutableMap.fromEntries(Object.entries(newControl)),
+      currentControl: createImmutableMap(Object.entries(newControl)),
       dominantFrame
     },
     turnCount: state.turnCount + 1
@@ -289,10 +289,8 @@ export const updateJudgeState = (
 };
 
 // Helper for creating ImmutableMap from entries
-export const ImmutableMap = {
-  fromEntries: <K, V>(entries: Array<[K, V]>): ImmutableMap<K, V> =>
-    new ImmutableMap(new Map(entries))
-};
+export const createImmutableMap = <K, V>(entries: Array<[K, V]>): ImmutableMap<K, V> =>
+  new ImmutableMap(new Map(entries));
 
 // Functional validation
 

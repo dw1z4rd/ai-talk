@@ -185,7 +185,7 @@ export const filterActiveGoals = (goals: MetaGoal[]): MetaGoal[] =>
 export const getHighestPriorityGoal = (goals: MetaGoal[]): MetaGoal | null => {
   const activeGoals = filterActiveGoals(goals);
   return activeGoals.reduce(
-    (highest, goal) => goal.priority > (highest?.priority || 0) ? goal : highest,
+    (highest: MetaGoal | null, goal) => goal.priority > (highest?.priority || 0) ? goal : highest,
     null
   );
 };
