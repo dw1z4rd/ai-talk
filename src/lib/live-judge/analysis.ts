@@ -152,13 +152,21 @@ function parseJudgeAnalysis(
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
 
-    let jsonString = analysisText.trim();
+    // Strip thinking/reasoning blocks first so their content (which may contain
+    // braces) doesn't interfere with JSON extraction.
+    let jsonString = analysisText
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+      .trim();
+
+    // Use indexOf (first {) after stripping thinking blocks — safe because the
+    // only remaining { should be the JSON object. lastIndexOf would mis-fire if
+    // the analysis string itself contains { } (e.g. "{specific examples}").
+    const firstBrace = jsonString.indexOf('{');
     const lastBrace = jsonString.lastIndexOf('}');
-    // Use lastIndexOf('{') so that if the model embeds JSON-like syntax inside
-    // a <thinking> block before the real response, we grab the final object.
-    const firstBrace = lastBrace !== -1 ? jsonString.lastIndexOf('{', lastBrace) : -1;
     if (firstBrace === -1 || lastBrace <= firstBrace) {
-      console.warn(`[Judge] ${judge.name} no JSON found in response. Raw (first 300 chars): ${jsonString.slice(0, 300)}`);
+      console.warn(`[Judge] ${judge.name} no JSON found in response. Raw (first 300 chars): ${analysisText.trim().slice(0, 300)}`);
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
     jsonString = jsonString.substring(firstBrace, lastBrace + 1);
