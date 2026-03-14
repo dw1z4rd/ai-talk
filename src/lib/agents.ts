@@ -1207,15 +1207,8 @@ export async function generateAdaptiveReply(
         ),
       },
       reasoning: judgeResult.judgeAnalyses
-        .map((ja) => {
-          if (!ja.reasoning || ja.reasoning.startsWith('Fallback analysis')) return null;
-          const label = ja.judgeSpecialization
-            ? ja.judgeSpecialization.charAt(0).toUpperCase() + ja.judgeSpecialization.slice(1)
-            : 'Judge';
-          return `[${label}] ${ja.reasoning}`;
-        })
-        .filter(Boolean)
-        .join(' | '),
+        .map((ja) => ja.reasoning)
+        .find((r) => r && !r.startsWith('Fallback analysis')) ?? '',
     };
 
     return { reply, judgeResult: simplifiedResult };

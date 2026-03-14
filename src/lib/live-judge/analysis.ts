@@ -45,9 +45,9 @@ export async function analyzeTurn(
   const start = Date.now();
   try {
     const analysisText = await judgeProvider.generateText(judgePrompt, {
-      systemPrompt: generateJudgeSystemPrompt(judge),
+      systemPrompt: generateJudgeSystemPrompt(),
       temperature: 0.3,
-      maxTokens: 800,
+      maxTokens: 400,
       signal
     });
 
@@ -65,7 +65,7 @@ export async function analyzeTurn(
 }
 
 /**
- * Generate judge-specific prompt for turn analysis
+ * Generate judge prompt for turn analysis
  */
 function generateJudgePrompt(
   judge: LiveJudge,
@@ -77,102 +77,38 @@ function generateJudgePrompt(
   context: string,
   messageHistory: Message[]
 ): string {
-  
-  const recentHistory = messageHistory.slice(-4).map(msg => 
-    `${msg.agentName}: "${msg.text}"`
-  ).join('\n');
-
-  return `Score this debate turn. Return ONLY valid JSON, exactly like the example below.
-
-TOPIC: ${context || 'General debate'}
-OPPONENT: ${opponent.name} said — "${opponentMessage}"
-DEBATER BEING SCORED: ${agent.name} said — "${message}"
-
-Example output (replace all values with your actual analysis):
-{
-  "reasoning": "Scores 64 on Logic because the debater asserts X without evidence, missing the opponent's counter-argument entirely. Rhetoric is 71 because the language is clear but generic with no memorable framing. Tactics at 48 because no new pressure was applied — the opponent can simply restate their position.",
-  "scores": { "logicalCoherence": 64, "rhetoricalForce": 71, "frameControl": 55, "credibility": 60, "tacticalEffectiveness": 48 },
-  "strategicImpact": { "momentumShift": 2, "frameControlShift": -3, "exposedWeaknesses": ["assertion without evidence"], "tacticalInsights": ["failed to apply pressure"] },
-  "usedTactics": []
-}`;
+  return `TOPIC: ${context || 'General debate'}
+OPPONENT (${opponent.name}): "${opponentMessage}"
+DEBATER BEING SCORED (${agent.name}): "${message}"`;
 }
 
 /**
- * Generate judge system prompt — no personality, strict rubric anchors, 2-3 sentence analysis
+ * Generate judge system prompt
  */
-function generateJudgeSystemPrompt(judge: LiveJudge): string {
-  const specialization = judge.specialization;
+function generateJudgeSystemPrompt(): string {
+  return `You are the Live Scoring Matrix for an ongoing debate. You evaluate arguments objectively based on a strict mathematical rubric. You do not have personal biases or a personality.
 
-  const rubrics: Record<string, string> = {
-    logic: `Your primary lens is LOGICAL COHERENCE. Weight it most heavily.
+Scoring Rubric (Total 100 Points):
 
-Logical Coherence (0-100):
-- 85–100: Flawless causal chain with explicit evidence or concrete examples; directly refutes the opponent's stated claim.
-- 55–75: Coherent, but relies on hypotheticals or analogies instead of concrete examples; doesn't fully close the loop on the opponent's argument.
-- 20–40: Logical fallacy, contradiction, or the debater ignored the opponent's core point entirely.
+Logic Score (0-40 Points):
+- 40: Flawless causal links, explicitly cites evidence/examples.
+- 20: Coherent but relies heavily on hypotheticals or analogies.
+- 0: Logical fallacies, contradictions, or failed analogies.
 
-Rhetorical Force (0-100):
-- 85–100: Punchy, persuasive, lands a memorable phrase or analogy; no bloated jargon.
-- 55–75: Clear and credible, but generic — no standout moment.
-- 20–40: Dense, dry, or so abstract the point is lost.
+Rhetoric Score (0-30 Points):
+- 30: Punchy, highly persuasive, excellent use of framing without academic jargon.
+- 15: Persuasive but overly dense or repetitive.
+- 0: Boring, dry, or incomprehensible.
 
-Tactical Execution (0-100):
-- 85–100: Executes an advanced tactic (Concession & Pivot, Interrogation, Reframe) that puts the opponent on the defensive.
-- 55–75: Refutes the opponent but introduces no new pressure.
-- 20–40: Ignores the opponent's previous turn entirely.`,
+Tactics Score (0-30 Points):
+- 30: Successfully executes advanced debate tactics (e.g., Concession & Pivot, Interrogation) to put the opponent on the defensive.
+- 15: Successfully refutes the opponent but introduces no new tactical pressure.
+- 0: Ignores the opponent's previous turn entirely.
 
-    rhetoric: `Your primary lens is RHETORICAL FORCE. Weight it most heavily.
+You must evaluate the most recent turn and output your evaluation STRICTLY as a valid JSON object. Do not write introductory text, meta-commentary, or markdown blocks. Calculate total_score as the exact sum of the three scores. Keep analysis strictly to 2-3 sentences citing specific point deductions.
 
-Rhetorical Force (0-100):
-- 85–100: Punchy, persuasive, lands a memorable phrase or concrete analogy; no bloated jargon.
-- 55–75: Clear and credible, but generic — no standout moment; overly dense or repetitive.
-- 20–40: Boring, dry, incomprehensible, or leans heavily on academic filler.
-
-Logical Coherence (0-100):
-- 85–100: Flawless causal chain with explicit evidence; directly addresses the opponent's argument.
-- 55–75: Coherent but relies on hypotheticals rather than concrete examples.
-- 20–40: Logical fallacy, contradiction, or missed the opponent's point entirely.
-
-Tactical Execution (0-100):
-- 85–100: Executes an advanced tactic that forces the opponent into a difficult position.
-- 55–75: Refutes but doesn't add new pressure.
-- 20–40: Ignores the opponent's previous turn.`,
-
-    strategy: `Your primary lens is TACTICAL EXECUTION. Weight it most heavily.
-
-Tactical Execution (0-100):
-- 85–100: Executes an advanced tactic (Concession & Pivot, Interrogation, Reframe, Trap-setting) that visibly puts the opponent on the defensive.
-- 55–75: Refutes the opponent's point effectively but introduces no new strategic pressure.
-- 20–40: Ignores the opponent's previous turn, or the move backfires and hands the opponent an easy win.
-
-Logical Coherence (0-100):
-- 85–100: Airtight reasoning with concrete evidence; closes the loop on the opponent's argument.
-- 55–75: Coherent but unanchored — relies on hypotheticals rather than concrete examples.
-- 20–40: Logical error, contradiction, or ignored the opponent's core claim.
-
-Rhetorical Force (0-100):
-- 85–100: Memorable, punchy delivery; strong framing; no jargon bloat.
-- 55–75: Clear but forgettable.
-- 20–40: Dense, dry, or incomprehensible.`,
-  };
-
-  return `You are an objective debate scoring system. You evaluate arguments against a fixed rubric. You have no personality and no biases — you are a scoring matrix.
-
-${rubrics[specialization] ?? rubrics.logic}
-
-frameControl (0-100): Did the debater redefine the terms or reframe the topic? 85+ = seized the frame; 55–75 = steered toward their ground; below 55 = responded within the opponent's frame.
-credibility (0-100): Did they cite plausible facts or examples? 85+ = hard-to-dispute specifics; 55–75 = confident, no obvious errors; below 55 = unjustified assertions or overstatements.
-
-MOMENTUM SHIFT (-25 to +25 integer):
-- +20 to +25: Decisive blow — opponent cannot easily recover.
-- +10 to +19: Clear ground gained.
-- +1 to +9: Slight edge.
-- 0: Even turn.
-- Negative: Mirror of above.
-
-RULES:
-- reasoning must be exactly 2-3 sentences citing specific rubric anchors (e.g. "Scores 62 on Logic because...").
-- Output ONLY valid JSON. No other text, no markdown, no explanation outside the JSON.`;
+Output format:
+{"logic_score": <integer 0-40>, "rhetoric_score": <integer 0-30>, "tactics_score": <integer 0-30>, "total_score": <integer 0-100>, "analysis": "<2-3 sentences>"}`;
 }
 
 /**
@@ -189,103 +125,54 @@ function parseJudgeAnalysis(
   context: string
 ): TurnAnalysis {
   try {
-    // Handle null/undefined case first with more detailed logging
-    if (analysisText === null || analysisText === undefined) {
-      console.warn('Analysis text is null or undefined for judge:', judge.name, 'model:', judge.modelId);
-      return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
-    }
-    
-    // Additional check for empty string or whitespace-only string
-    if (typeof analysisText === 'string' && analysisText.trim() === '') {
-      console.warn('Analysis text is empty string for judge:', judge.name, 'model:', judge.modelId);
-      return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
-    }
-    
-    // Check if analysisText is valid
-    if (!analysisText || (typeof analysisText !== 'string' && typeof analysisText !== 'object')) {
-      console.warn('Invalid analysis text type:', typeof analysisText, 'Value:', analysisText);
+    if (!analysisText?.trim()) {
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
 
-    // Convert to string if it's an object
-    let analysisString: string;
-    if (typeof analysisText === 'object') {
-      analysisString = JSON.stringify(analysisText);
-    } else {
-      analysisString = analysisText;
-    }
-
-    // Extract JSON from response with more robust approach
-    let jsonString = analysisString.trim();
-    
-    // Try to find the first '{' and last '}' to extract JSON
+    let jsonString = analysisText.trim();
     const firstBrace = jsonString.indexOf('{');
     const lastBrace = jsonString.lastIndexOf('}');
-    
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      jsonString = jsonString.substring(firstBrace, lastBrace + 1);
-    } else {
-      console.warn('No JSON object found in analysis response, using fallback');
+    if (firstBrace === -1 || lastBrace <= firstBrace) {
+      console.warn(`[Judge] ${judge.name} no JSON found in response`);
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
+    jsonString = jsonString.substring(firstBrace, lastBrace + 1);
 
-    // Try to parse the JSON
-    let analysisData;
+    let data: any;
     try {
-      analysisData = JSON.parse(jsonString);
-    } catch (parseError: unknown) {
-      console.warn(`[Judge] ${judge.name} JSON parse failed (${(parseError as Error).message}), attempting fix. Raw response tail: ...${jsonString.slice(-200)}`);
+      data = JSON.parse(jsonString);
+    } catch {
+      // Attempt bracket repair
+      const openBrackets = (jsonString.match(/\[/g) || []).length;
+      const closeBrackets = (jsonString.match(/\]/g) || []).length;
+      const openBraces = (jsonString.match(/\{/g) || []).length;
+      const closeBraces = (jsonString.match(/\}/g) || []).length;
+      let fixed = jsonString;
+      for (let i = 0; i < openBrackets - closeBrackets; i++) fixed += ']';
+      for (let i = 0; i < openBraces - closeBraces; i++) fixed += '}';
       try {
-        // Close any truncated string literal first
-        let fixedJson = jsonString;
-        const lastQuote = fixedJson.lastIndexOf('"');
-        const afterLastQuote = fixedJson.slice(lastQuote + 1).replace(/\s/g, '');
-        // If there's an unclosed string (odd number of unescaped quotes), close it
-        if (afterLastQuote.length > 0 && !afterLastQuote.startsWith(',') && !afterLastQuote.startsWith('}') && !afterLastQuote.startsWith(']')) {
-          fixedJson = fixedJson.slice(0, lastQuote + 1);
-        }
-
-        // Close brackets in the correct order: ] before }
-        const openBraces = (fixedJson.match(/\{/g) || []).length;
-        const closeBraces = (fixedJson.match(/\}/g) || []).length;
-        const openBrackets = (fixedJson.match(/\[/g) || []).length;
-        const closeBrackets = (fixedJson.match(/\]/g) || []).length;
-
-        for (let i = 0; i < openBrackets - closeBrackets; i++) fixedJson += ']';
-        for (let i = 0; i < openBraces - closeBraces; i++) fixedJson += '}';
-
-        analysisData = JSON.parse(fixedJson);
-      } catch (secondParseError: unknown) {
-        console.warn(`[Judge] ${judge.name} JSON fix failed (${(secondParseError as Error).message}), using fallback`);
+        data = JSON.parse(fixed);
+      } catch {
+        console.warn(`[Judge] ${judge.name} JSON repair failed`);
         return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
       }
     }
-    
-    // Validate required fields
-    if (!analysisData.scores) {
-      console.warn('Missing scores in analysis data, using fallback');
-      return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
-    }
 
-    // Map scores using consistent field names before calculating weighted score
-    const mappedScores = {
-      logicalCoherence: analysisData.scores.logicalCoherence || 70,
-      rhetoricalForce: analysisData.scores.rhetoricalForce || 70,
-      frameControl: analysisData.scores.frameControl || 70,
-      credibilityScore: analysisData.scores.credibility || analysisData.scores.credibilityScore || 70,
-      tacticalEffectiveness: analysisData.scores.tacticalEffectiveness || 70,
+    const logicScore = Math.max(0, Math.min(40, Number(data.logic_score) || 0));
+    const rhetoricScore = Math.max(0, Math.min(30, Number(data.rhetoric_score) || 0));
+    const tacticsScore = Math.max(0, Math.min(30, Number(data.tactics_score) || 0));
+    const totalScore = Math.max(0, Math.min(100, Number(data.total_score) || (logicScore + rhetoricScore + tacticsScore)));
+    const analysis = typeof data.analysis === 'string' ? data.analysis : 'No analysis provided';
+
+    // Normalize sub-scores to 0-100 for internal consistency; UI denormalizes for display
+    const scores: JudgeScores = {
+      logicalCoherence: Math.round(logicScore / 40 * 100),
+      rhetoricalForce: Math.round(rhetoricScore / 30 * 100),
+      frameControl: totalScore,
+      credibilityScore: totalScore,
+      tacticalEffectiveness: Math.round(tacticsScore / 30 * 100),
+      overallScore: totalScore
     };
-    const overallScore = calculateWeightedScore(mappedScores, judge.scoringWeights);
-
-    // Create effectiveness map
-    const effectivenessMap: { [tactic: string]: number } = {};
-    if (Array.isArray(analysisData.usedTactics)) {
-      analysisData.usedTactics.forEach((tactic: TacticAnalysis) => {
-        if (tactic.tactic && typeof tactic.effectiveness === 'number') {
-          effectivenessMap[tactic.tactic] = tactic.effectiveness;
-        }
-      });
-    }
 
     return {
       turnNumber,
@@ -296,27 +183,19 @@ function parseJudgeAnalysis(
       message,
       opponentMessage,
       context,
-      scores: {
-        ...mappedScores,
-        overallScore
-      },
-      usedTactics: Array.isArray(analysisData.usedTactics) ? analysisData.usedTactics : [],
-      effectivenessMap,
-      momentumShift: analysisData.strategicImpact?.momentumShift || 0,
-      frameControlShift: analysisData.strategicImpact?.frameControlShift || 0,
-      exposedWeaknesses: Array.isArray(analysisData.strategicImpact?.exposedWeaknesses) 
-        ? analysisData.strategicImpact.exposedWeaknesses 
-        : [],
-      tacticalInsights: Array.isArray(analysisData.strategicImpact?.tacticalInsights) 
-        ? analysisData.strategicImpact.tacticalInsights 
-        : [],
+      scores,
+      usedTactics: [],
+      effectivenessMap: {},
+      momentumShift: 0,
+      frameControlShift: 0,
+      exposedWeaknesses: [],
+      tacticalInsights: [],
       judgeId: judge.id,
       judgeSpecialization: judge.specialization,
-      reasoning: analysisData.reasoning || analysisData.reasoningText || 'No reasoning provided'
+      reasoning: analysis
     };
   } catch (error) {
-    console.error('Failed to parse judge analysis:', error);
-    console.error('Analysis text was:', analysisText);
+    console.error('[Judge] parseJudgeAnalysis threw:', error);
     return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
   }
 }

@@ -1499,7 +1499,7 @@
                   Turn {result.turnNumber}
                 </span>
                 <span class="text-xs text-[--color-muted] ml-auto">
-                  Overall: {(result.scores.overallScore ?? 0).toFixed(1)}/100
+                  {(result.scores.overallScore ?? 0).toFixed(0)}/100
                 </span>
               </div>
 
@@ -1507,25 +1507,25 @@
                 <div class="flex items-center gap-1">
                   <span class="text-[--color-muted]">Logic:</span>
                   <span style="color: {(result.scores.logicalCoherence ?? 0) > 70 ? '#34d399' : (result.scores.logicalCoherence ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
-                    {(result.scores.logicalCoherence ?? 0).toFixed(0)}
+                    {Math.round((result.scores.logicalCoherence ?? 0) / 100 * 40)}/40
                   </span>
                 </div>
                 <div class="flex items-center gap-1">
                   <span class="text-[--color-muted]">Rhetoric:</span>
                   <span style="color: {(result.scores.rhetoricalForce ?? 0) > 70 ? '#34d399' : (result.scores.rhetoricalForce ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
-                    {(result.scores.rhetoricalForce ?? 0).toFixed(0)}
+                    {Math.round((result.scores.rhetoricalForce ?? 0) / 100 * 30)}/30
                   </span>
                 </div>
                 <div class="flex items-center gap-1">
                   <span class="text-[--color-muted]">Tactics:</span>
                   <span style="color: {(result.scores.tacticalEffectiveness ?? 0) > 70 ? '#34d399' : (result.scores.tacticalEffectiveness ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
-                    {(result.scores.tacticalEffectiveness ?? 0).toFixed(0)}
+                    {Math.round((result.scores.tacticalEffectiveness ?? 0) / 100 * 30)}/30
                   </span>
                 </div>
                 <div class="flex items-center gap-1">
-                  <span class="text-[--color-muted]">Frame:</span>
-                  <span style="color: {(result.frameControlShift ?? 0) > 0 ? '#60a5fa' : '#f87171'}">
-                    {(result.frameControlShift ?? 0) > 0 ? '+' : ''}{(result.frameControlShift ?? 0).toFixed(0)}
+                  <span class="text-[--color-muted]">Total:</span>
+                  <span style="color: {(result.scores.overallScore ?? 0) > 70 ? '#34d399' : (result.scores.overallScore ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
+                    {(result.scores.overallScore ?? 0).toFixed(0)}/100
                   </span>
                 </div>
               </div>
@@ -1534,20 +1534,6 @@
                 <p class="text-xs text-[--color-muted-fg] leading-relaxed">{result.reasoning ?? '(no reasoning)'}</p>
               </div>
 
-              {#if result.tacticalAnalysis.usedTactics.length > 0}
-                <div class="mt-2 pt-2 border-t border-[--color-border-subtle]">
-                  <div class="flex flex-wrap gap-1">
-                    {#each result.tacticalAnalysis.usedTactics.slice(0, 3) as tactic}
-                      <span
-                        class="text-[10px] px-2 py-0.5 rounded-full"
-                        style="background: {agentInfo.color}15; color: {agentInfo.color}99"
-                      >
-                        {tactic.replace('_', ' ')}
-                      </span>
-                    {/each}
-                  </div>
-                </div>
-              {/if}
             </div>
           {/each}
         </div>
