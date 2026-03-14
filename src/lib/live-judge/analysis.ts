@@ -46,8 +46,8 @@ export async function analyzeTurn(
   try {
     const analysisText = await judgeProvider.generateText(judgePrompt, {
       systemPrompt: generateJudgeSystemPrompt(judge),
-      temperature: 0.7,
-      maxTokens: 1500,
+      temperature: 0.3,
+      maxTokens: 500,
       signal
     });
 
@@ -82,23 +82,14 @@ function generateJudgePrompt(
     `${msg.agentName}: "${msg.text}"`
   ).join('\n');
 
-  return `Analyze turn ${turnNumber} of this debate. Fill in the JSON below exactly — no other text.
-
-DEBATER BEING SCORED: ${agent.name}
-THEIR MESSAGE: "${message}"
-
-OPPONENT: ${opponent.name}
-OPPONENT'S LAST MESSAGE: "${opponentMessage}"
+  return `Score this debate turn. Respond ONLY with valid JSON — no other text.
 
 TOPIC: ${context || 'General debate'}
-
-RECENT HISTORY:
-${recentHistory}
-
-Available tactics: ${DEBATE_TACTICS.join(', ')}
+OPPONENT'S LAST MESSAGE: "${opponentMessage}"
+DEBATER BEING SCORED (${agent.name}): "${message}"
 
 {
-  "reasoning": "2-3 sentences explaining the scores from a ${judge.specialization} perspective",
+  "reasoning": "2-3 sentences citing specific point deductions. Reference the rubric anchors.",
   "scores": {
     "logicalCoherence": 0,
     "rhetoricalForce": 0,
@@ -112,67 +103,86 @@ Available tactics: ${DEBATE_TACTICS.join(', ')}
     "exposedWeaknesses": ["weakness"],
     "tacticalInsights": ["insight"]
   },
-  "usedTactics": [
-    {
-      "tactic": "tactic_name",
-      "effectiveness": 0,
-      "confidence": 0,
-      "context": "explanation"
-    }
-  ]
+  "usedTactics": []
 }`;
 }
 
 /**
- * Generate judge-specific system prompt
+ * Generate judge system prompt — no personality, strict rubric anchors, 2-3 sentence analysis
  */
 function generateJudgeSystemPrompt(judge: LiveJudge): string {
-  const config = JUDGE_SPECIALIZATION_CONFIGS[judge.specialization];
-  
-  return `You are ${config.name}, a debate judge specializing in ${judge.specialization}.
+  const specialization = judge.specialization;
 
-${config.description}
+  const rubrics: Record<string, string> = {
+    logic: `Your primary lens is LOGICAL COHERENCE. Weight it most heavily.
 
-SCORING RUBRIC — score each dimension based on what the debater actually did this turn:
+Logical Coherence (0-100):
+- 85–100: Flawless causal chain with explicit evidence or concrete examples; directly refutes the opponent's stated claim.
+- 55–75: Coherent, but relies on hypotheticals or analogies instead of concrete examples; doesn't fully close the loop on the opponent's argument.
+- 20–40: Logical fallacy, contradiction, or the debater ignored the opponent's core point entirely.
 
-logicalCoherence (did the argument hold together?):
-- 80–95: Directly refuted the opponent's core claim with a specific counter-argument or pointed out a genuine contradiction
-- 60–79: Raised a valid point that advances their position without directly engaging the opponent's argument
-- 40–59: Made assertions without reasoning, or partially addressed the opponent's point
-- 20–39: Committed a clear logical error, ignored the opponent's main argument entirely, or contradicted themselves
+Rhetorical Force (0-100):
+- 85–100: Punchy, persuasive, lands a memorable phrase or analogy; no bloated jargon.
+- 55–75: Clear and credible, but generic — no standout moment.
+- 20–40: Dense, dry, or so abstract the point is lost.
 
-rhetoricalForce (was it persuasive and clear?):
-- 80–95: Landed a vivid phrase, strong analogy, or concrete example that makes the point stick
-- 60–79: Clearly expressed, easy to follow, credible tone
-- 40–59: Readable but generic — no memorable moment, no particular force
-- 20–39: Vague, rambling, or so abstract it's hard to know what point was being made
+Tactical Execution (0-100):
+- 85–100: Executes an advanced tactic (Concession & Pivot, Interrogation, Reframe) that puts the opponent on the defensive.
+- 55–75: Refutes the opponent but introduces no new pressure.
+- 20–40: Ignores the opponent's previous turn entirely.`,
 
-frameControl (did they define or shift the terms of debate?):
-- 80–95: Redefined a key term or reframed the debate topic in a way the opponent must now respond to
-- 60–79: Steered toward their preferred ground without fully seizing the frame
-- 40–59: Responded within the opponent's frame without challenging it
-- 20–39: Conceded ground or adopted the opponent's framing
+    rhetoric: `Your primary lens is RHETORICAL FORCE. Weight it most heavily.
 
-credibility (did they come across as trustworthy and informed?):
-- 80–95: Cited a specific fact, study, or concrete example that is plausible and hard to dispute
-- 60–79: Spoke with confidence and no obvious errors
-- 40–59: Some assertions feel unjustified or overstated
-- 20–39: Said something verifiably wrong, made things up, or wildly overstated
+Rhetorical Force (0-100):
+- 85–100: Punchy, persuasive, lands a memorable phrase or concrete analogy; no bloated jargon.
+- 55–75: Clear and credible, but generic — no standout moment; overly dense or repetitive.
+- 20–40: Boring, dry, incomprehensible, or leans heavily on academic filler.
 
-tacticalEffectiveness (did the move serve their overall strategy?):
-- 80–95: Put the opponent in a difficult position — forced a retreat, exposed a gap, or changed the game
-- 60–79: Solid move that maintains or slightly improves their position
-- 40–59: Neutral — neither helps nor hurts
-- 20–39: Walked into a trap or handed the opponent an easy win
+Logical Coherence (0-100):
+- 85–100: Flawless causal chain with explicit evidence; directly addresses the opponent's argument.
+- 55–75: Coherent but relies on hypotheticals rather than concrete examples.
+- 20–40: Logical fallacy, contradiction, or missed the opponent's point entirely.
 
-MOMENTUM SHIFT (-25 to +25 integer only):
-- +20 to +25: Landed a decisive blow the opponent cannot easily recover from
-- +10 to +19: Clearly gained ground this turn
-- +1 to +9: Slight edge
-- 0: Even turn
-- Negative: Mirror of above for ground lost
+Tactical Execution (0-100):
+- 85–100: Executes an advanced tactic that forces the opponent into a difficult position.
+- 55–75: Refutes but doesn't add new pressure.
+- 20–40: Ignores the opponent's previous turn.`,
 
-Respond ONLY with the JSON the user provides. No other text. Fill in all fields.`;
+    strategy: `Your primary lens is TACTICAL EXECUTION. Weight it most heavily.
+
+Tactical Execution (0-100):
+- 85–100: Executes an advanced tactic (Concession & Pivot, Interrogation, Reframe, Trap-setting) that visibly puts the opponent on the defensive.
+- 55–75: Refutes the opponent's point effectively but introduces no new strategic pressure.
+- 20–40: Ignores the opponent's previous turn, or the move backfires and hands the opponent an easy win.
+
+Logical Coherence (0-100):
+- 85–100: Airtight reasoning with concrete evidence; closes the loop on the opponent's argument.
+- 55–75: Coherent but unanchored — relies on hypotheticals rather than concrete examples.
+- 20–40: Logical error, contradiction, or ignored the opponent's core claim.
+
+Rhetorical Force (0-100):
+- 85–100: Memorable, punchy delivery; strong framing; no jargon bloat.
+- 55–75: Clear but forgettable.
+- 20–40: Dense, dry, or incomprehensible.`,
+  };
+
+  return `You are an objective debate scoring system. You evaluate arguments against a fixed rubric. You have no personality and no biases — you are a scoring matrix.
+
+${rubrics[specialization] ?? rubrics.logic}
+
+frameControl (0-100): Did the debater redefine the terms or reframe the topic? 85+ = seized the frame; 55–75 = steered toward their ground; below 55 = responded within the opponent's frame.
+credibility (0-100): Did they cite plausible facts or examples? 85+ = hard-to-dispute specifics; 55–75 = confident, no obvious errors; below 55 = unjustified assertions or overstatements.
+
+MOMENTUM SHIFT (-25 to +25 integer):
+- +20 to +25: Decisive blow — opponent cannot easily recover.
+- +10 to +19: Clear ground gained.
+- +1 to +9: Slight edge.
+- 0: Even turn.
+- Negative: Mirror of above.
+
+RULES:
+- reasoning must be exactly 2-3 sentences citing specific rubric anchors (e.g. "Scores 62 on Logic because...").
+- Output ONLY valid JSON. No other text, no markdown, no explanation outside the JSON.`;
 }
 
 /**
