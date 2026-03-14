@@ -262,31 +262,31 @@ function parseJudgeAnalysis(
     let analysisData;
     try {
       analysisData = JSON.parse(jsonString);
-    } catch (parseError) {
-      console.warn('JSON parsing failed, attempting fixes:', parseError.message);
+    } catch (parseError: unknown) {
+      console.warn('JSON parsing failed, attempting fixes:', (parseError as Error).message);
       // If parsing fails, try to fix common issues
       try {
         // Try to fix truncated JSON by adding missing braces
         let fixedJson = jsonString;
-        if (!fixedJson.endsWith('}')) {
-          // Try to close any unclosed objects/arrays
-          const braceCount = (fixedJson.match(/\{/g) || []).length;
-          const bracketCount = (fixedJson.match(/\[/g) || []).length;
-          const closeBraceCount = (fixedJson.match(/\}/g) || []).length;
-          const closeBracketCount = (fixedJson.match(/\]/g) || []).length;
-          
-          // Add missing closing braces/brackets
-          for (let i = 0; i < braceCount - closeBraceCount; i++) {
-            fixedJson += '}';
-          }
-          for (let i = 0; i < bracketCount - closeBracketCount; i++) {
-            fixedJson += ']';
-          }
+        
+        // Count opening and closing brackets
+        const openBraces = (fixedJson.match(/\{/g) || []).length;
+        const closeBraces = (fixedJson.match(/\}/g) || []).length;
+        const openBrackets = (fixedJson.match(/\[/g) || []).length;
+        const closeBrackets = (fixedJson.match(/\]/g) || []).length;
+        
+        // Add missing closing braces/brackets
+        for (let i = 0; i < openBraces - closeBraces; i++) {
+          fixedJson += '}';
+        }
+        for (let i = 0; i < openBrackets - closeBrackets; i++) {
+          fixedJson += ']';
         }
         
+        // Try to parse again
         analysisData = JSON.parse(fixedJson);
-      } catch (secondParseError) {
-        console.warn('JSON parsing failed completely, using fallback:', secondParseError.message);
+      } catch (secondParseError: unknown) {
+        console.warn('JSON parsing failed completely, using fallback:', (secondParseError as Error).message);
         return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
       }
     }

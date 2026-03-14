@@ -1102,7 +1102,11 @@ export async function generateAdaptiveReply(
       );
 
       // Record tactic usage
-      if (judgeResult.judgeAnalyses && judgeResult.judgeAnalyses.length > 0) {
+      if (
+        agent.adaptiveState &&
+        judgeResult.judgeAnalyses &&
+        judgeResult.judgeAnalyses.length > 0
+      ) {
         const allTactics = judgeResult.judgeAnalyses.flatMap((ja) =>
           ja.usedTactics.map((t) => t.tactic),
         );
@@ -1124,7 +1128,7 @@ export async function generateAdaptiveReply(
 
         allTactics.forEach((tactic) => {
           recordTacticUsage(
-            agent.adaptiveState.tacticalMemory,
+            agent.adaptiveState!.tacticalMemory,
             tactic,
             effectivenessMap[tactic] || 50,
             `turn_${turnNumber}`,
