@@ -82,17 +82,19 @@ function generateJudgePrompt(
     `${msg.agentName}: "${msg.text}"`
   ).join('\n');
 
-  return `Score this debate turn. Return ONLY valid JSON, no other text.
+  return `Score this debate turn. Return ONLY valid JSON, exactly like the example below.
 
 TOPIC: ${context || 'General debate'}
 OPPONENT: ${opponent.name} said — "${opponentMessage}"
 DEBATER BEING SCORED: ${agent.name} said — "${message}"
 
-Respond with a JSON object containing:
-- "reasoning": your 2-3 sentence analysis citing specific rubric anchors (e.g. "Scores 58 on Logic because the argument asserts X without evidence. Rhetoric is 72 because...")
-- "scores": { "logicalCoherence": <0-100>, "rhetoricalForce": <0-100>, "frameControl": <0-100>, "credibility": <0-100>, "tacticalEffectiveness": <0-100> }
-- "strategicImpact": { "momentumShift": <-25 to 25>, "frameControlShift": <-20 to 20>, "exposedWeaknesses": ["..."], "tacticalInsights": ["..."] }
-- "usedTactics": []`;
+Example output (replace all values with your actual analysis):
+{
+  "reasoning": "Scores 64 on Logic because the debater asserts X without evidence, missing the opponent's counter-argument entirely. Rhetoric is 71 because the language is clear but generic with no memorable framing. Tactics at 48 because no new pressure was applied — the opponent can simply restate their position.",
+  "scores": { "logicalCoherence": 64, "rhetoricalForce": 71, "frameControl": 55, "credibility": 60, "tacticalEffectiveness": 48 },
+  "strategicImpact": { "momentumShift": 2, "frameControlShift": -3, "exposedWeaknesses": ["assertion without evidence"], "tacticalInsights": ["failed to apply pressure"] },
+  "usedTactics": []
+}`;
 }
 
 /**
