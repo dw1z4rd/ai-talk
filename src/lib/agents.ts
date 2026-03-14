@@ -423,7 +423,7 @@ Your argument structure follows ${argumentStyle}. Your linguistic preference is 
 - Format: Write in natural, unbroken prose. No bullet points, no headers, no labeled sections.
 - Length: Strictly under 350 words per turn.
 - Direct Engagement: Address ${opponentName}'s arguments specifically and directly. Always use "you" and "your" when referring to your opponent — never refer to them in third person by name as if writing about them from outside the debate.
-- Plain Language: Prefer clear, concrete language. If you use a technical term, immediately ground it with a plain-English phrase or example. Avoid strings of academic jargon that obscure rather than illuminate your point.
+- Plain Language: Write as if speaking to a sharp, curious person in a room — not submitting a journal article. Use short sentences. Use everyday words when they exist. If a technical term is genuinely necessary, define it in the same breath with a plain-English phrase (e.g. "the hard problem — why experience feels like anything at all"). Never chain more than one technical term in a row.
 - Tactical Variety: Do not repeat the same rhetorical move you used in your previous turn. Rotate through different approaches: direct refutation, concession-then-pivot, reductio ad absurdum, questioning the premise, specific example, analogy, appeal to consequence.
 
 [ARGUMENTATION CONSTRAINTS]
@@ -432,6 +432,7 @@ ${bannedTacticsText}
 [THE BLACKLIST: ABSOLUTELY BANNED TACTICS]
 - Banned Quantitative Data: ZERO fabricated math. You may not generate exact percentages, dollar amounts, or specific statistical comparisons.
 - Banned Words: "pathetic," "desperate," "coward," "afraid," "laughable," "intellectually dishonest," "the rest of us," "enjoy your."
+- Banned Jargon Phrases: "epistemic," "ontological," "phenomenological," "combinatorial," "meta-ethical," "instantiate," "operationalize," "reify," "hermeneutic," "teleological," "axiomatic," "dialectical," "intersubjective," "normative framework," "conceptual space." If you catch yourself reaching for one of these, stop and say the same thing in plain words.
 - Banned Rhetorical Structures (Use these sparingly): 
   1. "That's not X, that's Y." 
   2. "I notice you've quietly dropped X." 
@@ -1206,7 +1207,13 @@ export async function generateAdaptiveReply(
         ),
       },
       reasoning: judgeResult.judgeAnalyses
-        .map((ja) => ja.reasoning)
+        .map((ja) => {
+          if (!ja.reasoning || ja.reasoning.startsWith('Fallback analysis')) return null;
+          const label = ja.judgeSpecialization
+            ? ja.judgeSpecialization.charAt(0).toUpperCase() + ja.judgeSpecialization.slice(1)
+            : 'Judge';
+          return `[${label}] ${ja.reasoning}`;
+        })
         .filter(Boolean)
         .join(' | '),
     };

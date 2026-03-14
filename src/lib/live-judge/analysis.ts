@@ -82,57 +82,23 @@ function generateJudgePrompt(
     `${msg.agentName}: "${msg.text}"`
   ).join('\n');
 
-  return `You are ${judge.name}, a ${judge.specialization} judge analyzing turn ${turnNumber} of a debate.
+  return `Analyze turn ${turnNumber} of this debate. Fill in the JSON below exactly — no other text.
 
-AGENT BEING ANALYZED: ${agent.name}
-AGENT'S MESSAGE: "${message}"
+DEBATER BEING SCORED: ${agent.name}
+THEIR MESSAGE: "${message}"
 
 OPPONENT: ${opponent.name}
-OPPONENT'S PREVIOUS MESSAGE: "${opponentMessage}"
+OPPONENT'S LAST MESSAGE: "${opponentMessage}"
 
-DEBATE CONTEXT: ${context || 'No specific context provided'}
+TOPIC: ${context || 'General debate'}
 
-RECENT DEBATE HISTORY:
+RECENT HISTORY:
 ${recentHistory}
 
-JUDGE SPECIALIZATION: ${judge.specialization}
-${JUDGE_SPECIALIZATION_CONFIGS[judge.specialization].description}
+Available tactics: ${DEBATE_TACTICS.join(', ')}
 
-SCORING WEIGHTS:
-- Logical Coherence: ${(judge.scoringWeights.logicalCoherence * 100).toFixed(0)}%
-- Rhetorical Force: ${(judge.scoringWeights.rhetoricalForce * 100).toFixed(0)}%
-- Frame Control: ${(judge.scoringWeights.frameControl * 100).toFixed(0)}%
-- Credibility: ${(judge.scoringWeights.credibilityScore * 100).toFixed(0)}%
-- Tactical Effectiveness: ${(judge.scoringWeights.tacticalEffectiveness * 100).toFixed(0)}%
-
-Please analyze this turn and provide:
-
-1. SCORES (0-100 each):
-   - logicalCoherence: [score]
-   - rhetoricalForce: [score]
-   - frameControl: [score]
-   - credibility: [score]
-   - tacticalEffectiveness: [score]
-
-2. TACTICS USED (identify up to 3):
-   - tactic: [tactic_name]
-   - effectiveness: [0-100]
-   - confidence: [0-100]
-   - context: [brief explanation]
-
-3. STRATEGIC IMPACT:
-   - momentumShift: [-100 to +100] (how this affects debate momentum)
-   - frameControlShift: [-100 to +100] (how this affects narrative control)
-   - exposedWeaknesses: [list any weaknesses in opponent's argument]
-   - tacticalInsights: [key strategic observations]
-
-4. REASONING: [brief explanation of your scoring decisions]
-
-Available tactics to choose from: ${DEBATE_TACTICS.join(', ')}
-
-Respond in this exact JSON format (reasoning and scores first — they are most important):
 {
-  "reasoning": "brief explanation",
+  "reasoning": "2-3 sentences explaining the scores from a ${judge.specialization} perspective",
   "scores": {
     "logicalCoherence": 0,
     "rhetoricalForce": 0,
@@ -163,62 +129,50 @@ Respond in this exact JSON format (reasoning and scores first — they are most 
 function generateJudgeSystemPrompt(judge: LiveJudge): string {
   const config = JUDGE_SPECIALIZATION_CONFIGS[judge.specialization];
   
-  return `You are ${config.name}, an expert debate judge with specialized expertise in ${judge.specialization}.
+  return `You are ${config.name}, a debate judge specializing in ${judge.specialization}.
 
 ${config.description}
 
-Your scoring bias profile:
-- Complexity preference: ${judge.biasProfile.preferenceComplexity > 0 ? 'prefers' : 'disprefers'} complex arguments
-- Emotional preference: ${judge.biasProfile.preferenceEmotion > 0 ? 'prefers' : 'disprefers'} emotional appeals
-- Aggression preference: ${judge.biasProfile.preferenceAggression > 0 ? 'prefers' : 'disprefers'} aggressive tactics
-- Evidence preference: ${judge.biasProfile.preferenceEvidence > 0 ? 'prefers' : 'disprefers'} evidence-based arguments
+SCORING RUBRIC — score each dimension based on what the debater actually did this turn:
 
-Analyze debates objectively but apply your specialized perspective.
+logicalCoherence (did the argument hold together?):
+- 80–95: Directly refuted the opponent's core claim with a specific counter-argument or pointed out a genuine contradiction
+- 60–79: Raised a valid point that advances their position without directly engaging the opponent's argument
+- 40–59: Made assertions without reasoning, or partially addressed the opponent's point
+- 20–39: Committed a clear logical error, ignored the opponent's main argument entirely, or contradicted themselves
 
-SCORING RUBRIC (apply consistently — do not inflate scores):
-- 20–35: Weak. The argument fails on this dimension (logical fallacy, no persuasive force, completely off-topic, etc.)
-- 36–50: Below average. Some attempt but significant gaps.
-- 51–65: Average. Competent but unremarkable; meets expectations without exceeding them.
-- 66–80: Strong. Clear merit; well-executed on this dimension.
-- 81–95: Exceptional. Reserved for genuinely impressive moments — a devastatingly precise refutation, a reframe that redefines the debate, etc. Use sparingly.
+rhetoricalForce (was it persuasive and clear?):
+- 80–95: Landed a vivid phrase, strong analogy, or concrete example that makes the point stick
+- 60–79: Clearly expressed, easy to follow, credible tone
+- 40–59: Readable but generic — no memorable moment, no particular force
+- 20–39: Vague, rambling, or so abstract it's hard to know what point was being made
 
-MOMENTUM SHIFT RUBRIC (-25 to +25 integer only):
-- +20 to +25: Debater landed a decisive blow — exposed a critical flaw, introduced an unanswerable point, or forced the opponent off their position.
-- +10 to +19: Debater gained clear ground — stronger argument, better framing, opponent on the defensive.
-- +1 to +9: Slight edge — marginal improvement in position.
-- 0: Turn is roughly even; no clear advantage gained or lost.
-- Negative values: Mirror the above for momentum lost.
-Score based on what actually happened in this specific turn, not on writing quality alone.
+frameControl (did they define or shift the terms of debate?):
+- 80–95: Redefined a key term or reframed the debate topic in a way the opponent must now respond to
+- 60–79: Steered toward their preferred ground without fully seizing the frame
+- 40–59: Responded within the opponent's frame without challenging it
+- 20–39: Conceded ground or adopted the opponent's framing
 
-CRITICAL INSTRUCTION: You MUST respond ONLY with valid JSON in the exact format specified below. Do not include any other text, explanations, or markdown formatting. Just pure JSON.
+credibility (did they come across as trustworthy and informed?):
+- 80–95: Cited a specific fact, study, or concrete example that is plausible and hard to dispute
+- 60–79: Spoke with confidence and no obvious errors
+- 40–59: Some assertions feel unjustified or overstated
+- 20–39: Said something verifiably wrong, made things up, or wildly overstated
 
-Example response format:
-{
-  "scores": {
-    "logicalCoherence": 85,
-    "rhetoricalForce": 75,
-    "frameControl": 80,
-    "credibility": 90,
-    "tacticalEffectiveness": 70
-  },
-  "usedTactics": [
-    {
-      "tactic": "evidence_citation",
-      "effectiveness": 85,
-      "confidence": 90,
-      "context": "cited specific study to support claim"
-    }
-  ],
-  "strategicImpact": {
-    "momentumShift": 5,
-    "frameControlShift": 10,
-    "exposedWeaknesses": ["inconsistent logic in previous argument"],
-    "tacticalInsights": ["effective use of authoritative sources"]
-  },
-  "reasoning": "The agent demonstrated strong logical coherence by citing specific studies..."
-}
+tacticalEffectiveness (did the move serve their overall strategy?):
+- 80–95: Put the opponent in a difficult position — forced a retreat, exposed a gap, or changed the game
+- 60–79: Solid move that maintains or slightly improves their position
+- 40–59: Neutral — neither helps nor hurts
+- 20–39: Walked into a trap or handed the opponent an easy win
 
-If you cannot provide a complete analysis, fill in reasonable default values rather than omitting fields.`;
+MOMENTUM SHIFT (-25 to +25 integer only):
+- +20 to +25: Landed a decisive blow the opponent cannot easily recover from
+- +10 to +19: Clearly gained ground this turn
+- +1 to +9: Slight edge
+- 0: Even turn
+- Negative: Mirror of above for ground lost
+
+Respond ONLY with the JSON the user provides. No other text. Fill in all fields.`;
 }
 
 /**
