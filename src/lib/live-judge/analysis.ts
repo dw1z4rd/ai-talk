@@ -47,7 +47,7 @@ export async function analyzeTurn(
     const analysisText = await judgeProvider.generateText(judgePrompt, {
       systemPrompt: generateJudgeSystemPrompt(judge),
       temperature: 0.3,
-      maxTokens: 500,
+      maxTokens: 800,
       signal
     });
 
@@ -82,29 +82,17 @@ function generateJudgePrompt(
     `${msg.agentName}: "${msg.text}"`
   ).join('\n');
 
-  return `Score this debate turn. Respond ONLY with valid JSON — no other text.
+  return `Score this debate turn. Return ONLY valid JSON, no other text.
 
 TOPIC: ${context || 'General debate'}
-OPPONENT'S LAST MESSAGE: "${opponentMessage}"
-DEBATER BEING SCORED (${agent.name}): "${message}"
+OPPONENT: ${opponent.name} said — "${opponentMessage}"
+DEBATER BEING SCORED: ${agent.name} said — "${message}"
 
-{
-  "reasoning": "2-3 sentences citing specific point deductions. Reference the rubric anchors.",
-  "scores": {
-    "logicalCoherence": 0,
-    "rhetoricalForce": 0,
-    "frameControl": 0,
-    "credibility": 0,
-    "tacticalEffectiveness": 0
-  },
-  "strategicImpact": {
-    "momentumShift": 0,
-    "frameControlShift": 0,
-    "exposedWeaknesses": ["weakness"],
-    "tacticalInsights": ["insight"]
-  },
-  "usedTactics": []
-}`;
+Respond with a JSON object containing:
+- "reasoning": your 2-3 sentence analysis citing specific rubric anchors (e.g. "Scores 58 on Logic because the argument asserts X without evidence. Rhetoric is 72 because...")
+- "scores": { "logicalCoherence": <0-100>, "rhetoricalForce": <0-100>, "frameControl": <0-100>, "credibility": <0-100>, "tacticalEffectiveness": <0-100> }
+- "strategicImpact": { "momentumShift": <-25 to 25>, "frameControlShift": <-20 to 20>, "exposedWeaknesses": ["..."], "tacticalInsights": ["..."] }
+- "usedTactics": []`;
 }
 
 /**
