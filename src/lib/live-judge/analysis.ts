@@ -219,12 +219,27 @@ function parseJudgeAnalysis(
 ): TurnAnalysis {
   try {
     // Check if analysisText is valid
-    if (!analysisText || typeof analysisText !== 'string') {
-      throw new Error('Invalid analysis text: ' + typeof analysisText);
+    if (!analysisText || (typeof analysisText !== 'string' && typeof analysisText !== 'object')) {
+      console.warn('Invalid analysis text type:', typeof analysisText, 'Value:', analysisText);
+      return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
+    }
+    
+    // Handle null case specifically
+    if (analysisText === null || analysisText === undefined) {
+      console.warn('Analysis text is null or undefined');
+      return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
+    }
+
+    // Convert to string if it's an object
+    let analysisString: string;
+    if (typeof analysisText === 'object') {
+      analysisString = JSON.stringify(analysisText);
+    } else {
+      analysisString = analysisText;
     }
 
     // Extract JSON from response with more robust approach
-    let jsonString = analysisText.trim();
+    let jsonString = analysisString.trim();
     
     // Try to find the first '{' and last '}' to extract JSON
     const firstBrace = jsonString.indexOf('{');
@@ -233,7 +248,8 @@ function parseJudgeAnalysis(
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
       jsonString = jsonString.substring(firstBrace, lastBrace + 1);
     } else {
-      throw new Error('No JSON object found in analysis response');
+      console.warn('No JSON object found in analysis response, using fallback');
+      return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
 
     // Try to parse the JSON
@@ -241,6 +257,7 @@ function parseJudgeAnalysis(
     try {
       analysisData = JSON.parse(jsonString);
     } catch (parseError) {
+      console.warn('JSON parsing failed, attempting fixes:', parseError.message);
       // If parsing fails, try to fix common issues
       try {
         // Try to fix truncated JSON by adding missing braces
@@ -263,13 +280,15 @@ function parseJudgeAnalysis(
         
         analysisData = JSON.parse(fixedJson);
       } catch (secondParseError) {
-        throw new Error('Failed to parse JSON: ' + parseError.message + '. Attempted fix also failed: ' + secondParseError.message);
+        console.warn('JSON parsing failed completely, using fallback:', secondParseError.message);
+        return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
       }
     }
     
     // Validate required fields
     if (!analysisData.scores) {
-      throw new Error('Missing scores in analysis data');
+      console.warn('Missing scores in analysis data, using fallback');
+      return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
 
     // Calculate overall score using judge's weights
