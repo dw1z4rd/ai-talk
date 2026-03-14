@@ -1072,11 +1072,11 @@ export async function generateAdaptiveReply(
     ...(onToken ? { onToken } : {}),
   });
 
-  if (!reply || !agent.adaptiveState) {
+  if (!reply) {
     return { reply };
   }
 
-  // Process with live judge system
+  // Process with live judge system even if no adaptive state
   try {
     const liveJudgeSystem = getLiveJudgeSystem();
     const opponentMessage =
@@ -1092,53 +1092,56 @@ export async function generateAdaptiveReply(
       history,
     );
 
-    // Apply adaptive pressure to personality
-    const evolutions = applyAdaptivePressure(
-      agent.adaptiveState.personality,
-      judgeResult.adaptivePressures,
-      turnNumber,
-    );
-
-    // Record tactic usage
-    if (judgeResult.judgeAnalyses && judgeResult.judgeAnalyses.length > 0) {
-      const allTactics = judgeResult.judgeAnalyses.flatMap((ja) =>
-        ja.usedTactics.map((t) => t.tactic),
+    // Only apply adaptive pressure if adaptive state exists
+    if (agent.adaptiveState) {
+      // Apply adaptive pressure to personality
+      const evolutions = applyAdaptivePressure(
+        agent.adaptiveState.personality,
+        judgeResult.adaptivePressures,
+        turnNumber,
       );
-      const effectivenessMap = judgeResult.judgeAnalyses
-        .flatMap((ja) =>
-          Object.entries(ja.effectivenessMap).map(
-            ([tactic, effectiveness]) => ({ tactic, effectiveness }),
-          ),
-        )
-        .reduce(
-          (acc, { tactic, effectiveness }) => {
-            acc[tactic] =
-              (acc[tactic] || 0 + effectiveness) /
-              judgeResult.judgeAnalyses.length;
-            return acc;
-          },
-          {} as { [tactic: string]: number },
-        );
 
-      allTactics.forEach((tactic) => {
-        recordTacticUsage(
-          agent.adaptiveState.tacticalMemory,
-          tactic,
-          effectivenessMap[tactic] || 50,
-          `turn_${turnNumber}`,
-          allTactics[0] || "default",
-          opponentMessage,
-          turnNumber,
+      // Record tactic usage
+      if (judgeResult.judgeAnalyses && judgeResult.judgeAnalyses.length > 0) {
+        const allTactics = judgeResult.judgeAnalyses.flatMap((ja) =>
+          ja.usedTactics.map((t) => t.tactic),
         );
-      });
+        const effectivenessMap = judgeResult.judgeAnalyses
+          .flatMap((ja) =>
+            Object.entries(ja.effectivenessMap).map(
+              ([tactic, effectiveness]) => ({ tactic, effectiveness }),
+            ),
+          )
+          .reduce(
+            (acc, { tactic, effectiveness }) => {
+              acc[tactic] =
+                (acc[tactic] || 0 + effectiveness) /
+                judgeResult.judgeAnalyses.length;
+              return acc;
+            },
+            {} as { [tactic: string]: number },
+          );
+
+        allTactics.forEach((tactic) => {
+          recordTacticUsage(
+            agent.adaptiveState.tacticalMemory,
+            tactic,
+            effectivenessMap[tactic] || 50,
+            `turn_${turnNumber}`,
+            allTactics[0] || "default",
+            opponentMessage,
+            turnNumber,
+          );
+        });
+      }
+
+      // Update adaptation metrics
+      updateAdaptationMetrics(
+        agent.adaptiveState,
+        evolutions,
+        [], // Goal changes would be tracked separately
+      );
     }
-
-    // Update adaptation metrics
-    updateAdaptationMetrics(
-      agent.adaptiveState,
-      evolutions,
-      [], // Goal changes would be tracked separately
-    );
 
     // Convert judge result to simplified interface
     const simplifiedResult: LiveJudgeResult = {
