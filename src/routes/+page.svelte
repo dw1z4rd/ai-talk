@@ -101,24 +101,16 @@
   // UI state
   let showFiles = $state(false);
 
-  // ── Live Scoring ─────────────────────────────────────────────────────────
+  // ── Judging phase ─────────────────────────────────────────────────────────
   let naturallyEnded = $state(false);
   let judgingAnnouncing = $state(false);
   let judgingPhase = $state(false);
-  
-  // Live scoring state
-  let liveScores = $state<{ [agentId: string]: { total: number; logicalCoherence: number; rhetoricalForce: number; frameControl: number; credibilityScore: number; tacticalEffectiveness: number } }>({});
-  let momentumLeaders = $state<{ agentId: string; momentum: number; trend: 'rising' | 'falling' | 'stable' }>({});
-  let frameControlLeaders = $state<{ agentId: string; control: number }>({});
-  let currentTurn = $state(0);
-  
-  // Judge panel state
-  let judgePanel = $state<{
-    judges: { id: string; name: string; color: string; }[];
-    isActive: boolean;
-  }>({ judges: [], isActive: false });
-  
-  // Winner modal (kept for compatibility)
+  let judgeModels = $state<{ id: string; name: string; color: string }[]>([]);
+  let judgeResults = $state<JudgeResult[]>([]);
+  let currentJudgeIndex = $state(-1);
+  let judgeStreamingText = $state("");
+
+  // Winner modal
   let winner = $state<{ id: string; name: string; color: string } | null>(null);
   let winnerVoteCount = $state(0);
   let showWinnerModal = $state(false);
