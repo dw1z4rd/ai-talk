@@ -4,14 +4,452 @@ import {
   type JudgeScores,
   type MomentumTracker,
   type FrameControlTracker,
+  type PairwiseRound,
+  type DebateScorecard,
+  type NarrativeVerdict,
 } from './types';
 import type { Agent, Message } from '$lib/agents';
 import { createOllamaProvider } from '$lib/llm-agent';
 import { OLLAMA_CLOUD_URL, OLLAMA_CLOUD_API_KEY } from '$env/static/private';
 import { MODEL_CATALOG } from '$lib/agents';
 
+// ── Language consistency check ────────────────────────────────────────────────
+
 /**
- * Analyze a single turn with a specific judge
+ * Detect if two turns appear to be written in different languages.
+ * Uses CJK character ratio as the primary signal (catches the GLM Chinese-response bug).
+ */
+export function detectLanguageMismatch(
+  messageA: string,
+  messageB: string
+): { isConsistent: boolean; warning?: string } {
+  const cjkRegex = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]/g;
+  const cjkA = (messageA.match(cjkRegex) || []).length;
+  const cjkB = (messageB.match(cjkRegex) || []).length;
+  const ratioA = messageA.length > 0 ? cjkA / messageA.length : 0;
+  const ratioB = messageB.length > 0 ? cjkB / messageB.length : 0;
+  const THRESHOLD = 0.08; // 8% CJK characters → likely non-English
+
+  const aIsNonLatin = ratioA > THRESHOLD;
+  const bIsNonLatin = ratioB > THRESHOLD;
+
+  if (aIsNonLatin !== bIsNonLatin) {
+    return {
+      isConsistent: false,
+      warning: `⚠ LANGUAGE MISMATCH: One turn appears to be in a non-English language. Comparison scores may be unreliable. Check debater system prompts for language enforcement.`
+    };
+  }
+  return { isConsistent: true };
+}
+
+// ── Pairwise comparative judging ──────────────────────────────────────────────
+
+/**
+ * Compare two consecutive debate turns head-to-head on Logic, Tactics, and Rhetoric.
+ * This is the primary scoring function — replaces per-turn absolute scoring.
+ */
+export async function compareTurns(
+  judge: LiveJudge,
+  prevAgentId: string,
+  prevAgentName: string,
+  prevMessage: string,
+  prevTurnNumber: number,
+  curAgentId: string,
+  curAgentName: string,
+  curMessage: string,
+  curTurnNumber: number,
+  topic: string,
+  roundNumber: number,
+  signal?: AbortSignal
+): Promise<PairwiseRound> {
+  const langCheck = detectLanguageMismatch(prevMessage, curMessage);
+  if (!langCheck.isConsistent) {
+    console.warn(`[Pairwise Judge] ${langCheck.warning}`);
+  }
+
+  const isOpeningRound = !prevMessage.trim();
+  const prompt = generatePairwisePrompt(
+    prevAgentName, prevMessage, prevTurnNumber,
+    curAgentName, curMessage, curTurnNumber,
+    topic, isOpeningRound
+  );
+
+  const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
+  const start = Date.now();
+
+  try {
+    const responseText = await judgeProvider.generateText(prompt, {
+      systemPrompt: generatePairwiseSystemPrompt(prevAgentName, curAgentName),
+      temperature: 0.3,
+      maxTokens: 700,
+      signal
+    });
+
+    console.log(`[Pairwise Judge] Round ${roundNumber} completed in ${Date.now() - start}ms`);
+    return parsePairwiseResponse(
+      responseText,
+      prevAgentId, prevAgentName, prevMessage, prevTurnNumber,
+      curAgentId, curAgentName, curMessage, curTurnNumber,
+      roundNumber, langCheck.warning
+    );
+  } catch (error: any) {
+    const elapsed = Date.now() - start;
+    if (error?.name === 'AbortError') {
+      console.warn(`[Pairwise Judge] Round ${roundNumber} aborted after ${elapsed}ms`);
+    } else {
+      console.error(`[Pairwise Judge] Round ${roundNumber} failed after ${elapsed}ms:`, error);
+    }
+    return createFallbackPairwiseRound(
+      prevAgentId, prevAgentName, prevMessage, prevTurnNumber,
+      curAgentId, curAgentName, curMessage, curTurnNumber,
+      roundNumber, langCheck.warning
+    );
+  }
+}
+
+function generatePairwiseSystemPrompt(nameA: string, nameB: string): string {
+  return `You are a comparative debate judge. Read two consecutive turns and pick the stronger one on three dimensions. No draws — you must choose one winner per dimension. Respond with a single JSON object only — no preamble, no markdown.
+
+Required format (use exact agent names as shown):
+{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn — e.g. 'Asserted X without explaining mechanism Y' or 'Strawmanned the relational view by conflating Z with W.' Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn landed harder and why."}
+
+--- LOGIC (forced choice) ---
+Start each turn from 8. Apply deductions:
+-1  One unsupported assumption (empirical OR philosophical — asserting "X implies Y" as fact without defending why is as penalizable as a bare statistics claim)
+-2  Significant unsupported leap
+-3  Clear logical error: category error, circular reasoning, strawman, or analogy whose structural mapping breaks down
+-4  Multiple errors or incoherent structure
++1  Every major claim defended with an explicit causal chain
+Winner = higher remaining score. If equal, award the turn whose core claim still stands despite errors.
+
+EXCEPTIONS: Do not penalize thought experiments or illustrative hypotheticals as "unverified facts." Judge the mechanism, not the historical precision.
+
+--- TACTICS (forced choice) ---
+Which turn controlled the exchange? Did it target the opponent's strongest point, expose a real weakness, or redirect to better ground?
+OPENING TURN (no previous opponent to rebut): Judge on framing quality — does it stake a defensible position and anticipate the strongest counterargument? Minimum is competitive framing.
+
+--- RHETORIC (forced choice) ---
+Which turn was more memorable and persuasive? Concrete and specific beats vague and academic. Short and punchy beats padded and hedged.
+
+--- ANTI-BIAS ---
+Tone ≠ Logic. Academic register does not indicate sound reasoning. Confidence does not substitute for evidence. Apply identical evidentiary standards to both turns.`;
+}
+
+function generatePairwisePrompt(
+  nameA: string, messageA: string, turnA: number,
+  nameB: string, messageB: string, turnB: number,
+  topic: string, isOpeningRound: boolean
+): string {
+  const openingNote = isOpeningRound
+    ? `\n[NOTE: Turn ${turnA} is the OPENING statement — ${nameA} spoke first with no opponent yet. Apply OPENING TURN rules to their turn.]`
+    : '';
+
+  return `DEBATE TOPIC: ${topic}${openingNote}
+
+TURN ${turnA} — ${nameA}:
+"${messageA}"
+
+TURN ${turnB} — ${nameB}:
+"${messageB}"
+
+Respond with JSON only:`;
+}
+
+function parsePairwiseResponse(
+  responseText: string | null,
+  prevAgentId: string, prevAgentName: string, prevMessage: string, prevTurnNumber: number,
+  curAgentId: string, curAgentName: string, curMessage: string, curTurnNumber: number,
+  roundNumber: number,
+  languageWarning?: string
+): PairwiseRound {
+  try {
+    if (!responseText?.trim()) {
+      console.warn(`[Pairwise Judge] Round ${roundNumber}: null/empty response`);
+      return createFallbackPairwiseRound(prevAgentId, prevAgentName, prevMessage, prevTurnNumber, curAgentId, curAgentName, curMessage, curTurnNumber, roundNumber, languageWarning);
+    }
+
+    let jsonString = responseText
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+      .trim();
+
+    const firstBrace = jsonString.indexOf('{');
+    const lastBrace = jsonString.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace <= firstBrace) {
+      console.warn(`[Pairwise Judge] Round ${roundNumber}: no JSON found. Raw: ${responseText.slice(0, 200)}`);
+      return createFallbackPairwiseRound(prevAgentId, prevAgentName, prevMessage, prevTurnNumber, curAgentId, curAgentName, curMessage, curTurnNumber, roundNumber, languageWarning);
+    }
+    jsonString = jsonString.substring(firstBrace, lastBrace + 1);
+
+    let data: any;
+    try {
+      data = JSON.parse(jsonString);
+    } catch {
+      const openBraces = (jsonString.match(/\{/g) || []).length;
+      const closeBraces = (jsonString.match(/\}/g) || []).length;
+      let fixed = jsonString;
+      for (let i = 0; i < openBraces - closeBraces; i++) fixed += '}';
+      try {
+        data = JSON.parse(fixed);
+      } catch {
+        console.warn(`[Pairwise Judge] Round ${roundNumber}: JSON repair failed`);
+        return createFallbackPairwiseRound(prevAgentId, prevAgentName, prevMessage, prevTurnNumber, curAgentId, curAgentName, curMessage, curTurnNumber, roundNumber, languageWarning);
+      }
+    }
+
+    const resolveWinner = (winnerField: string): string => {
+      const lower = (winnerField || '').toLowerCase();
+      if (lower.includes(prevAgentName.toLowerCase())) return prevAgentId;
+      if (lower.includes(curAgentName.toLowerCase())) return curAgentId;
+      // Fallback: if we can't parse, give current turn the benefit of the doubt
+      console.warn(`[Pairwise Judge] Round ${roundNumber}: could not resolve winner "${winnerField}" to agent ID`);
+      return curAgentId;
+    };
+
+    return {
+      roundNumber,
+      prevTurn: { turnNumber: prevTurnNumber, agentId: prevAgentId, agentName: prevAgentName, message: prevMessage },
+      curTurn: { turnNumber: curTurnNumber, agentId: curAgentId, agentName: curAgentName, message: curMessage },
+      logicWinner: resolveWinner(data.logic_winner),
+      tacticsWinner: resolveWinner(data.tactics_winner),
+      rhetoricWinner: resolveWinner(data.rhetoric_winner),
+      logicDelta: typeof data.logic_delta === 'string' ? data.logic_delta.trim() : 'No analysis provided.',
+      tacticsDelta: typeof data.tactics_delta === 'string' ? data.tactics_delta.trim() : 'No analysis provided.',
+      rhetoricDelta: typeof data.rhetoric_delta === 'string' ? data.rhetoric_delta.trim() : 'No analysis provided.',
+      languageWarning,
+      isFallback: false
+    };
+  } catch (error) {
+    console.error('[Pairwise Judge] parsePairwiseResponse threw:', error);
+    return createFallbackPairwiseRound(prevAgentId, prevAgentName, prevMessage, prevTurnNumber, curAgentId, curAgentName, curMessage, curTurnNumber, roundNumber, languageWarning);
+  }
+}
+
+function createFallbackPairwiseRound(
+  prevAgentId: string, prevAgentName: string, prevMessage: string, prevTurnNumber: number,
+  curAgentId: string, curAgentName: string, curMessage: string, curTurnNumber: number,
+  roundNumber: number,
+  languageWarning?: string
+): PairwiseRound {
+  return {
+    roundNumber,
+    prevTurn: { turnNumber: prevTurnNumber, agentId: prevAgentId, agentName: prevAgentName, message: prevMessage },
+    curTurn: { turnNumber: curTurnNumber, agentId: curAgentId, agentName: curAgentName, message: curMessage },
+    logicWinner: prevAgentId,
+    tacticsWinner: prevAgentId,
+    rhetoricWinner: prevAgentId,
+    logicDelta: 'Fallback — judge analysis unavailable for this round.',
+    tacticsDelta: 'Fallback — judge analysis unavailable for this round.',
+    rhetoricDelta: 'Fallback — judge analysis unavailable for this round.',
+    languageWarning,
+    isFallback: true
+  };
+}
+
+// ── Scorecard aggregation ─────────────────────────────────────────────────────
+
+/**
+ * Add a pairwise round to the running scorecard and return the updated scorecard.
+ */
+export function updateScorecard(
+  scorecard: DebateScorecard,
+  round: PairwiseRound,
+  agentAId: string, agentAName: string,
+  agentBId: string, agentBName: string
+): DebateScorecard {
+  const updated: DebateScorecard = {
+    rounds: [...scorecard.rounds, round],
+    winTallies: {
+      [agentAId]: scorecard.winTallies[agentAId] ?? { agentName: agentAName, logic: 0, tactics: 0, rhetoric: 0, total: 0 },
+      [agentBId]: scorecard.winTallies[agentBId] ?? { agentName: agentBName, logic: 0, tactics: 0, rhetoric: 0, total: 0 },
+    },
+    overallWinner: null
+  };
+
+  // Tally wins
+  const tallyWin = (agentId: string, dimension: 'logic' | 'tactics' | 'rhetoric') => {
+    if (updated.winTallies[agentId]) {
+      updated.winTallies[agentId][dimension]++;
+      updated.winTallies[agentId].total++;
+    }
+  };
+
+  tallyWin(round.logicWinner, 'logic');
+  tallyWin(round.tacticsWinner, 'tactics');
+  tallyWin(round.rhetoricWinner, 'rhetoric');
+
+  // Determine overall winner
+  const tallies = Object.entries(updated.winTallies);
+  if (tallies.length >= 2) {
+    const sorted = tallies.sort((a, b) => b[1].total - a[1].total);
+    if (sorted[0][1].total > sorted[1][1].total) {
+      updated.overallWinner = sorted[0][0];
+    }
+    // Otherwise draw → overallWinner stays null
+  }
+
+  return updated;
+}
+
+/**
+ * Convert pairwise win/loss result into synthetic JudgeScores for the adaptive
+ * pressure system. Maps binary wins to values that sit above/below the pressure
+ * thresholds defined in pressure.ts.
+ */
+export function synthScoresFromPairwise(round: PairwiseRound, forAgentId: string): JudgeScores {
+  const logicWon = round.logicWinner === forAgentId;
+  const tacticsWon = round.tacticsWinner === forAgentId;
+  const rhetoricWon = round.rhetoricWinner === forAgentId;
+
+  // Thresholds from pressure.ts:
+  //   logicalCoherence: high > 28, low < 16  (4-40 scale)
+  //   rhetoricalForce: high > 21, low < 12   (3-30 scale)
+  //   tacticalEffectiveness: high > 21, low < 12 (3-30 scale)
+  const logicScore = logicWon ? 30 : 14;
+  const rhetoricScore = rhetoricWon ? 24 : 10;
+  const tacticsScore = tacticsWon ? 24 : 10;
+
+  const wins = (logicWon ? 1 : 0) + (tacticsWon ? 1 : 0) + (rhetoricWon ? 1 : 0);
+  // Map 0-3 wins to overall scores that trigger appropriate pressure levels:
+  //   0 wins → 30 (<40 = PRIORITY OVERRIDE)
+  //   1 win  → 45 (mild)
+  //   2 wins → 65 (neutral-positive)
+  //   3 wins → 82 (positive reinforcement)
+  const overallScore = [30, 45, 65, 82][wins];
+
+  return {
+    logicalCoherence: logicScore,
+    rhetoricalForce: rhetoricScore,
+    frameControl: overallScore,
+    credibilityScore: overallScore,
+    tacticalEffectiveness: tacticsScore,
+    overallScore
+  };
+}
+
+// ── Narrative verdict ─────────────────────────────────────────────────────────
+
+/**
+ * Generate a 2-3 paragraph narrative verdict for the full debate.
+ * Run once after all pairwise rounds are complete.
+ */
+export async function generateNarrativeVerdictText(
+  judge: LiveJudge,
+  fullTranscript: Message[],
+  agentAId: string, agentAName: string,
+  agentBId: string, agentBName: string,
+  topic: string,
+  scorecard: DebateScorecard,
+  signal?: AbortSignal
+): Promise<NarrativeVerdict> {
+  const transcriptText = fullTranscript
+    .map((m, i) => `Turn ${i + 1} — ${m.agentName}:\n${m.text}`)
+    .join('\n\n');
+
+  const scorecardSummary = [agentAId, agentBId]
+    .map(id => {
+      const t = scorecard.winTallies[id];
+      return t ? `${t.agentName}: Logic ${t.logic}, Tactics ${t.tactics}, Rhetoric ${t.rhetoric} (${t.total} total wins)` : '';
+    })
+    .filter(Boolean)
+    .join(' | ');
+
+  const prompt = `DEBATE TOPIC: "${topic}"
+
+PAIRWISE SCORECARD (${scorecard.rounds.length} rounds):
+${scorecardSummary}
+
+FULL TRANSCRIPT:
+${transcriptText}
+
+Write your verdict now:`;
+
+  const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
+  const start = Date.now();
+
+  try {
+    const text = await judgeProvider.generateText(prompt, {
+      systemPrompt: generateNarrativeSystemPrompt(agentAName, agentBName),
+      temperature: 0.7,
+      maxTokens: 1200,
+      signal
+    });
+    console.log(`[Narrative Judge] Verdict completed in ${Date.now() - start}ms`);
+    return parseNarrativeVerdict(text, agentAId, agentAName, agentBId, agentBName, scorecard);
+  } catch (error: any) {
+    const elapsed = Date.now() - start;
+    if (error?.name === 'AbortError') {
+      console.warn(`[Narrative Judge] Aborted after ${elapsed}ms`);
+    } else {
+      console.error(`[Narrative Judge] Failed after ${elapsed}ms:`, error);
+    }
+    return {
+      text: 'Narrative verdict unavailable — judge analysis failed.',
+      favouredAgentId: scorecard.overallWinner,
+      agreesWithScorecard: true
+    };
+  }
+}
+
+function generateNarrativeSystemPrompt(nameA: string, nameB: string): string {
+  return `You are a senior debate analyst writing a post-match verdict for a sophisticated audience. Write exactly 2-3 paragraphs of prose.
+
+Paragraph 1: Coherence of the cumulative case. Did either debater build a coherent, evolving argument across turns — setups that paid off, positions that held under pressure? Or did one keep retreating and reframing while the other drove consistent pressure?
+
+Paragraph 2: The central unresolved tension of the debate. Name it precisely. Did either debater successfully pin the other on it, or did both sidestep it?
+
+Paragraph 3: Your verdict. Who won the debate? Be specific — cite actual arguments and moments. Do NOT merely summarize the pairwise scorecard. Capture arc-level quality: coherence across the full debate, recovery under pressure, whether the core position survived scrutiny.
+
+Rules:
+- Reference specific turns and arguments by name.
+- Do not reward style over substance. Academic register is not a proxy for rigorous reasoning.
+- Do not be diplomatic. Pick a winner and explain why.
+- At the very end, on its own line with nothing after, write exactly: VERDICT: ${nameA} OR VERDICT: ${nameB}`;
+}
+
+function parseNarrativeVerdict(
+  text: string | null,
+  agentAId: string, agentAName: string,
+  agentBId: string, agentBName: string,
+  scorecard: DebateScorecard
+): NarrativeVerdict {
+  if (!text?.trim()) {
+    return { text: 'Verdict unavailable.', favouredAgentId: null, agreesWithScorecard: false };
+  }
+
+  // Strip thinking blocks
+  let cleaned = text
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .trim();
+
+  // Extract VERDICT line
+  const verdictMatch = cleaned.match(/VERDICT:\s*(.+?)(?:\n|$)/i);
+  let favouredAgentId: string | null = null;
+
+  if (verdictMatch) {
+    const verdictName = verdictMatch[1].trim();
+    if (verdictName.toLowerCase().includes(agentAName.toLowerCase())) {
+      favouredAgentId = agentAId;
+    } else if (verdictName.toLowerCase().includes(agentBName.toLowerCase())) {
+      favouredAgentId = agentBId;
+    }
+  }
+
+  const agreesWithScorecard = favouredAgentId !== null && favouredAgentId === scorecard.overallWinner;
+  // Remove the VERDICT line from display text
+  const displayText = cleaned.replace(/VERDICT:\s*.+?(?:\n|$)/i, '').trim();
+
+  return { text: displayText, favouredAgentId, agreesWithScorecard };
+}
+
+// ── Legacy per-turn analysis (used only for adaptive pressure) ────────────────
+
+/**
+ * Analyze a single turn with absolute scoring.
+ * Used ONLY to generate adaptive pressure signals — not for display scoring.
+ * The pairwise compareTurns() function is the primary scoring system.
  */
 export async function analyzeTurn(
   judge: LiveJudge,
@@ -25,63 +463,42 @@ export async function analyzeTurn(
   messageHistory: Message[],
   signal?: AbortSignal
 ): Promise<TurnAnalysis> {
-
   const judgePrompt = generateJudgePrompt(
-    judge,
-    agent,
-    message,
-    opponent,
-    opponentMessage,
-    turnNumber,
-    topic,
-    referenceContext,
-    messageHistory
+    judge, agent, message, opponent, opponentMessage, turnNumber, topic, referenceContext, messageHistory
   );
 
   const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
-
   const start = Date.now();
+
   try {
     const analysisText = await judgeProvider.generateText(judgePrompt, {
       systemPrompt: generateJudgeSystemPrompt(),
       temperature: 0.3,
-      maxTokens: 1200,
+      maxTokens: 600,
       signal
     });
-
-    console.log(`[Judge] ${judge.name} (${judge.modelId}) completed in ${Date.now() - start}ms`);
+    console.log(`[Adaptive Judge] ${judge.name} completed in ${Date.now() - start}ms`);
     return parseJudgeAnalysis(analysisText, judge, agent, opponent, turnNumber, message, opponentMessage, referenceContext);
   } catch (error: any) {
     const elapsed = Date.now() - start;
     if (error?.name === 'AbortError') {
-      console.warn(`[Judge] ${judge.name} (${judge.modelId}) aborted after ${elapsed}ms`);
+      console.warn(`[Adaptive Judge] ${judge.name} aborted after ${elapsed}ms`);
     } else {
-      console.error(`[Judge] ${judge.name} (${judge.modelId}) failed after ${elapsed}ms:`, error);
+      console.error(`[Adaptive Judge] ${judge.name} failed after ${elapsed}ms:`, error);
     }
     return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, referenceContext);
   }
 }
 
-/**
- * Generate judge prompt for turn analysis
- */
 function generateJudgePrompt(
-  judge: LiveJudge,
-  agent: Agent,
-  message: string,
-  opponent: Agent,
-  opponentMessage: string,
-  turnNumber: number,
-  topic: string,
-  referenceContext: string,
-  messageHistory: Message[]
+  judge: LiveJudge, agent: Agent, message: string, opponent: Agent,
+  opponentMessage: string, turnNumber: number, topic: string,
+  referenceContext: string, messageHistory: Message[]
 ): string {
-  const contextBlock = referenceContext
-    ? `\nREFERENCE MATERIAL: ${referenceContext}\n`
-    : '';
+  const contextBlock = referenceContext ? `\nREFERENCE MATERIAL: ${referenceContext}\n` : '';
   const isOpening = !opponentMessage.trim();
   const opponentBlock = isOpening
-    ? `[OPENING TURN — ${agent.name} speaks first. No opponent argument exists yet. Apply the OPENING TURN tactics rule.]`
+    ? `[OPENING TURN — ${agent.name} speaks first. No opponent argument exists yet.]`
     : `OPPONENT (${opponent.name}) just said: "${opponentMessage}"`;
   return `DEBATE TOPIC: ${topic || 'General debate'}
 TURN: ${turnNumber}${contextBlock}
@@ -92,94 +509,46 @@ NOW EVALUATE — ${agent.name}'s response: "${message}"
 Respond with the JSON object only:`;
 }
 
-/**
- * Generate judge system prompt
- */
-
-
-
-
 function generateJudgeSystemPrompt(): string {
-  return `You are a debate scoring system. Your entire response must be a single JSON object — no preamble, no explanation, no markdown, no text before or after the braces.
+  return `You are a debate scoring system. Your entire response must be a single JSON object — no preamble, no explanation, no markdown.
 
 Required output format (integers 1–10 only):
-{"logic_score": 7, "rhetoric_score": 6, "tactics_score": 8, ​"analysis": "Max 2 sentences. If penalizing an unsupported leap or premise, you MUST explicitly name the missing philosophical mechanism or the alternative concept the debater failed to address. NEVER just write 'unsupported premise.' Instead, articulate the gap (e.g., 'Asserted consciousness as the threshold without explaining why information integration is insufficient,' or 'Failed to explain the mechanism by which dependence generates moral obligation rather than just utility.')."}
+{"logic_score": 7, "rhetoric_score": 6, "tactics_score": 8, "analysis": "Max 2 sentences. Name the specific missing mechanism or gap."}
 
-Keep the analysis field under 60 words.
+Keep the analysis field under 50 words.
 
-SCORING PHILOSOPHY: Scores must discriminate. A competent-but-unremarkable argument scores 5–6. Reserve 8–10 for genuinely strong work; use 1–3 for clear failures. Do not anchor to 7.
+SCORING PHILOSOPHY: A competent-but-unremarkable argument scores 5–6. Reserve 8–10 for genuinely strong work; 1–3 for clear failures.
 
 --- LOGIC (1–10) ---
-Start at 8. Apply deductions:
--1  One unsupported assumption, whether empirical OR philosophical. 
--2  Significant unsupported leap. This applies equally to empirical claims (e.g., exact statistics without sources) AND abstract philosophical axioms (e.g., asserting "systems have intrinsic value" or "morality requires intention" as established fact without defending why). 
--3  A clear logical error: category error, circular reasoning, strawman, or an analogy whose mapping breaks down.
--4  Multiple errors or a structurally incoherent argument.
--5  Internally contradictory or entirely fallacious.
-Add back +1 if every major claim is defended with an explicit causal chain or logical proof.
-
-CRITICAL LOGIC EXCEPTIONS: 
-1. Do not penalize thought experiments or illustrative hypotheticals as "unverified facts." If a debater uses a historical event or hypothetical scenario to illustrate a mechanism, judge the mechanism, not the historical precision.
-2. Analogies: Penalize only if the structural mapping is inaccurate. Vivid analogies are as valid as formal proofs.
+Start at 8. -1 unsupported assumption, -2 significant leap, -3 logical error, -4 multiple errors. +1 if every claim has explicit causal chain.
 
 --- RHETORIC (1–10) ---
-- 9–10: Punchy, vivid, memorable — lands with force, no empty jargon.
-- 7–8: Clear and persuasive but not exceptional.
-- 5–6: Competent but flat, over-hedged, or relies on academic jargon to sound profound.
-- 3–4: Dry, dense, or relies on mockery over substance.
-- 1–2: Incomprehensible or incoherent.
+9–10: punchy and memorable. 7–8: clear but not exceptional. 5–6: flat or over-hedged. 3–4: dry or relies on mockery. 1–2: incomprehensible.
 
 --- TACTICS (1–10) ---
-OPENING TURN (opponent message is empty): Score on framing quality, not engagement. A bold opening that stakes a clear defensible position and anticipates the strongest counterargument earns 7–9. A vague or unguarded opening earns 4–6. Do not penalise the opener for failing to rebut a non-existent argument — minimum score is 5.
-ALL OTHER TURNS:
-- 9–10: Directly targets a specific claim or gap in the opponent's argument; applies a named tactic (reframe, concession-pivot, pointed question, exposed contradiction) that creates new pressure.
-- 7–8: Engages the opponent's argument but adds no new strategic leverage.
-- 5–6: Partially addresses the opponent; mostly restates own position.
-- 3–4: Responds to a strawman or largely ignores the opponent's turn.
-- 1–2: Completely ignores the opponent.
+Opening turn: score on framing quality, min 5. Other turns: 9–10 targets a specific gap with a named move; 5–6 mostly restates position; 1–2 ignores opponent.
 
---- ANTI-BIAS & TONE DECOUPLING ---
-WARNING: You are highly susceptible to "Tone Sycophancy." You must actively separate a debater's tone from their logical soundness. 
-- Do NOT reward an argument just because it uses measured, academic, or polite language. Academic phrasing often hides circular reasoning or undefended axioms.
-- Do NOT penalize an argument's logic just because its rhetoric is aggressive, colloquial, or highly vivid. 
-- Apply identical evidentiary standards to both sides. If Debater A must prove their empirical claims, Debater B must prove their abstract theoretical claims.`;
+ANTI-BIAS: Tone ≠ Logic. Academic phrasing ≠ rigorous reasoning.`;
 }
 
-
-/**
- * Parse judge analysis response
- */
 function parseJudgeAnalysis(
-  analysisText: string | null,
-  judge: LiveJudge,
-  agent: Agent,
-  opponent: Agent,
-  turnNumber: number,
-  message: string,
-  opponentMessage: string,
-  context: string
+  analysisText: string | null, judge: LiveJudge, agent: Agent, opponent: Agent,
+  turnNumber: number, message: string, opponentMessage: string, context: string
 ): TurnAnalysis {
   try {
     if (!analysisText?.trim()) {
-      console.warn(`[Judge] ${judge.name} received null/empty response from provider`);
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
 
-    // Strip thinking/reasoning blocks first so their content (which may contain
-    // braces) doesn't interfere with JSON extraction.
     let jsonString = analysisText
       .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
       .replace(/<think>[\s\S]*?<\/think>/gi, '')
       .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
       .trim();
 
-    // Use indexOf (first {) after stripping thinking blocks — safe because the
-    // only remaining { should be the JSON object. lastIndexOf would mis-fire if
-    // the analysis string itself contains { } (e.g. "{specific examples}").
     const firstBrace = jsonString.indexOf('{');
     const lastBrace = jsonString.lastIndexOf('}');
     if (firstBrace === -1 || lastBrace <= firstBrace) {
-      console.warn(`[Judge] ${judge.name} no JSON found in response. Raw (first 300 chars): ${analysisText.trim().slice(0, 300)}`);
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
     jsonString = jsonString.substring(firstBrace, lastBrace + 1);
@@ -188,233 +557,113 @@ function parseJudgeAnalysis(
     try {
       data = JSON.parse(jsonString);
     } catch {
-      // Attempt bracket repair
-      const openBrackets = (jsonString.match(/\[/g) || []).length;
-      const closeBrackets = (jsonString.match(/\]/g) || []).length;
       const openBraces = (jsonString.match(/\{/g) || []).length;
       const closeBraces = (jsonString.match(/\}/g) || []).length;
       let fixed = jsonString;
-      for (let i = 0; i < openBrackets - closeBrackets; i++) fixed += ']';
       for (let i = 0; i < openBraces - closeBraces; i++) fixed += '}';
-      try {
-        data = JSON.parse(fixed);
-      } catch {
-        console.warn(`[Judge] ${judge.name} JSON repair failed`);
+      try { data = JSON.parse(fixed); } catch {
         return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
       }
     }
 
-    // Clamp each dimension to 1-10
     const logicRaw = Math.max(1, Math.min(10, Math.round(Number(data.logic_score)) || 5));
     const rhetoricRaw = Math.max(1, Math.min(10, Math.round(Number(data.rhetoric_score)) || 5));
     const tacticsRaw = Math.max(1, Math.min(10, Math.round(Number(data.tactics_score)) || 5));
 
-    // Backend computes weighted total: logic*4 + rhetoric*3 + tactics*3
-    const logicScore = logicRaw * 4;    // 0-40
-    const rhetoricScore = rhetoricRaw * 3; // 0-30
-    const tacticsScore = tacticsRaw * 3;   // 0-30
-    const totalScore = logicScore + rhetoricScore + tacticsScore; // 0-100
-
+    const logicScore = logicRaw * 4;
+    const rhetoricScore = rhetoricRaw * 3;
+    const tacticsScore = tacticsRaw * 3;
+    const totalScore = logicScore + rhetoricScore + tacticsScore;
     const analysis = typeof data.analysis === 'string' ? data.analysis : 'No analysis provided';
 
-    // Store raw dimension scores (4-40/3-30/3-30) in these fields; UI displays with denominators.
-    // frameControl and credibilityScore carry totalScore as proxies — calibrated in pressure.ts.
     const scores: JudgeScores = {
-      logicalCoherence: logicScore,        // 4–40  (logicRaw × 4)
-      rhetoricalForce: rhetoricScore,      // 3–30  (rhetoricRaw × 3)
-      frameControl: totalScore,            // proxy: totalScore (7–100)
-      credibilityScore: totalScore,        // proxy: totalScore (7–100)
-      tacticalEffectiveness: tacticsScore, // 3–30  (tacticsRaw × 3)
-      overallScore: totalScore             // 7–100
+      logicalCoherence: logicScore,
+      rhetoricalForce: rhetoricScore,
+      frameControl: totalScore,
+      credibilityScore: totalScore,
+      tacticalEffectiveness: tacticsScore,
+      overallScore: totalScore
     };
 
     return {
-      turnNumber,
-      agentId: agent.id,
-      agentName: agent.name,
-      opponentId: opponent.id,
-      opponentName: opponent.name,
-      message,
-      opponentMessage,
-      context,
-      scores,
-      usedTactics: [],
-      effectivenessMap: {},
-      momentumShift: 0,
-      frameControlShift: 0,
-      exposedWeaknesses: [],
-      tacticalInsights: [],
-      judgeId: judge.id,
-      judgeSpecialization: judge.specialization,
-      reasoning: analysis
+      turnNumber, agentId: agent.id, agentName: agent.name,
+      opponentId: opponent.id, opponentName: opponent.name,
+      message, opponentMessage, context, scores,
+      usedTactics: [], effectivenessMap: {},
+      momentumShift: 0, frameControlShift: 0,
+      exposedWeaknesses: [], tacticalInsights: [],
+      judgeId: judge.id, judgeSpecialization: judge.specialization, reasoning: analysis
     };
   } catch (error) {
-    console.error('[Judge] parseJudgeAnalysis threw:', error);
+    console.error('[Adaptive Judge] parseJudgeAnalysis threw:', error);
     return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
   }
 }
 
-/**
- * Create fallback analysis when judge analysis fails
- */
 export function createFallbackAnalysis(
-  judge: LiveJudge,
-  agent: Agent,
-  opponent: Agent,
-  turnNumber: number,
-  message: string,
-  opponentMessage: string,
-  context: string
+  judge: LiveJudge, agent: Agent, opponent: Agent,
+  turnNumber: number, message: string, opponentMessage: string, context: string
 ): TurnAnalysis {
-  // Log more detailed information about the fallback
-  console.info(`Creating fallback analysis for judge ${judge.name} (${judge.modelId}) on turn ${turnNumber}`);
-  
   const defaultScores: JudgeScores = {
-    logicalCoherence: 50,
-    rhetoricalForce: 50,
-    frameControl: 50,
-    credibilityScore: 50,
-    tacticalEffectiveness: 50,
-    overallScore: 50
+    logicalCoherence: 50, rhetoricalForce: 50, frameControl: 50,
+    credibilityScore: 50, tacticalEffectiveness: 50, overallScore: 50
   };
-
   return {
-    turnNumber,
-    agentId: agent.id,
-    agentName: agent.name,
-    opponentId: opponent.id,
-    opponentName: opponent.name,
-    message,
-    opponentMessage,
-    context,
-    scores: defaultScores,
-    usedTactics: [
-      {
-        tactic: "fallback_default",
-        effectiveness: 50,
-        confidence: 30,
-        context: "Default tactic used in fallback analysis"
-      }
-    ],
-    effectivenessMap: {
-      "fallback_default": 50
-    },
-    momentumShift: 0,
-    frameControlShift: 0,
-    exposedWeaknesses: ["Unable to analyze due to system limitations"],
-    tacticalInsights: ["Fallback analysis used due to system error"],
-    judgeId: judge.id,
-    judgeSpecialization: judge.specialization,
-    reasoning: 'Fallback analysis due to judge analysis failure - using default scores'
+    turnNumber, agentId: agent.id, agentName: agent.name,
+    opponentId: opponent.id, opponentName: opponent.name,
+    message, opponentMessage, context, scores: defaultScores,
+    usedTactics: [{ tactic: 'fallback_default', effectiveness: 50, confidence: 30, context: 'Fallback' }],
+    effectivenessMap: { fallback_default: 50 },
+    momentumShift: 0, frameControlShift: 0,
+    exposedWeaknesses: ['Unable to analyze'], tacticalInsights: ['Fallback analysis'],
+    judgeId: judge.id, judgeSpecialization: judge.specialization,
+    reasoning: 'Fallback analysis — using default scores'
   };
 }
 
-/**
- * Aggregate scores across multiple judges
- */
 export function aggregateJudgeScores(judgeAnalyses: TurnAnalysis[]): JudgeScores {
   if (judgeAnalyses.length === 0) {
-    return {
-      logicalCoherence: 0,
-      rhetoricalForce: 0,
-      frameControl: 0,
-      credibilityScore: 0,
-      tacticalEffectiveness: 0,
-      overallScore: 0
-    };
+    return { logicalCoherence: 0, rhetoricalForce: 0, frameControl: 0, credibilityScore: 0, tacticalEffectiveness: 0, overallScore: 0 };
   }
-
-  const aggregated: JudgeScores = {
-    logicalCoherence: 0,
-    rhetoricalForce: 0,
-    frameControl: 0,
-    credibilityScore: 0,
-    tacticalEffectiveness: 0,
-    overallScore: 0
-  };
-
-  // Average all scores
-  judgeAnalyses.forEach(analysis => {
-    aggregated.logicalCoherence += analysis.scores.logicalCoherence;
-    aggregated.rhetoricalForce += analysis.scores.rhetoricalForce;
-    aggregated.frameControl += analysis.scores.frameControl;
-    aggregated.credibilityScore += analysis.scores.credibilityScore;
-    aggregated.tacticalEffectiveness += analysis.scores.tacticalEffectiveness;
-    aggregated.overallScore += analysis.scores.overallScore;
+  const agg: JudgeScores = { logicalCoherence: 0, rhetoricalForce: 0, frameControl: 0, credibilityScore: 0, tacticalEffectiveness: 0, overallScore: 0 };
+  judgeAnalyses.forEach(a => {
+    agg.logicalCoherence += a.scores.logicalCoherence;
+    agg.rhetoricalForce += a.scores.rhetoricalForce;
+    agg.frameControl += a.scores.frameControl;
+    agg.credibilityScore += a.scores.credibilityScore;
+    agg.tacticalEffectiveness += a.scores.tacticalEffectiveness;
+    agg.overallScore += a.scores.overallScore;
   });
-
-  const divisor = judgeAnalyses.length;
-  aggregated.logicalCoherence = Math.round(aggregated.logicalCoherence / divisor);
-  aggregated.rhetoricalForce = Math.round(aggregated.rhetoricalForce / divisor);
-  aggregated.frameControl = Math.round(aggregated.frameControl / divisor);
-  aggregated.credibilityScore = Math.round(aggregated.credibilityScore / divisor);
-  aggregated.tacticalEffectiveness = Math.round(aggregated.tacticalEffectiveness / divisor);
-  aggregated.overallScore = Math.round(aggregated.overallScore / divisor);
-
-  return aggregated;
+  const d = judgeAnalyses.length;
+  return {
+    logicalCoherence: Math.round(agg.logicalCoherence / d),
+    rhetoricalForce: Math.round(agg.rhetoricalForce / d),
+    frameControl: Math.round(agg.frameControl / d),
+    credibilityScore: Math.round(agg.credibilityScore / d),
+    tacticalEffectiveness: Math.round(agg.tacticalEffectiveness / d),
+    overallScore: Math.round(agg.overallScore / d)
+  };
 }
 
-/**
- * Calculate momentum shift based on current scores and historical momentum
- */
-export function calculateMomentumShift(
-  scores: JudgeScores,
-  momentumTracker: MomentumTracker,
-  agentId: string
-): number {
-  // Base momentum from overall score
-  const baseMomentum = (scores.overallScore - 50) * 0.4; // Scale from -20 to +20
-  
-  // Bonus for high tactical effectiveness
+export function calculateMomentumShift(scores: JudgeScores, momentumTracker: MomentumTracker, agentId: string): number {
+  const baseMomentum = (scores.overallScore - 50) * 0.4;
   const tacticalBonus = (scores.tacticalEffectiveness - 50) * 0.3;
-  
-  // Penalty for low credibility
   const credibilityPenalty = (50 - scores.credibilityScore) * 0.2;
-  
-  // Current momentum inertia (tendency to continue current trend)
   const currentMomentum = momentumTracker.currentMomentum[agentId] || 0;
   const inertiaFactor = currentMomentum * 0.1;
-  
-  // Combine factors
-  const momentumShift = baseMomentum + tacticalBonus - credibilityPenalty + inertiaFactor;
-  
-  // Clamp to reasonable bounds
-  return Math.max(-25, Math.min(25, momentumShift));
+  return Math.max(-25, Math.min(25, baseMomentum + tacticalBonus - credibilityPenalty + inertiaFactor));
 }
 
-/**
- * Calculate frame control shift based on argumentative dominance
- */
-export function calculateFrameControlShift(
-  scores: JudgeScores,
-  frameControlTracker: FrameControlTracker,
-  agentId: string
-): number {
-  // Base frame control from logical coherence and rhetorical force
+export function calculateFrameControlShift(scores: JudgeScores, frameControlTracker: FrameControlTracker, agentId: string): number {
   const baseControl = (scores.logicalCoherence + scores.rhetoricalForce) / 2 - 50;
-  
-  // Modifier from tactical effectiveness
   const tacticalModifier = (scores.tacticalEffectiveness - 50) * 0.3;
-  
-  // Current frame control inertia
   const currentControl = frameControlTracker.currentControl[agentId] || 0;
   const inertiaFactor = currentControl * 0.15;
-  
-  // Combine factors
-  const frameShift = (baseControl + tacticalModifier + inertiaFactor) * 0.4;
-  
-  // Clamp to reasonable bounds
-  return Math.max(-20, Math.min(20, frameShift));
+  return Math.max(-20, Math.min(20, (baseControl + tacticalModifier + inertiaFactor) * 0.4));
 }
 
-/**
- * Create judge provider for analysis
- */
 function createJudgeProvider(modelId: string) {
   const modelDef = MODEL_CATALOG[modelId];
-  if (!modelDef) {
-    throw new Error(`Model ${modelId} not found in catalog`);
-  }
+  if (!modelDef) throw new Error(`Model ${modelId} not found in catalog`);
   return modelDef.makeProvider();
 }
-
