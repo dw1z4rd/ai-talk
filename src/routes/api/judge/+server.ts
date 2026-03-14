@@ -1,41 +1,56 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { buildJudgeAgent, generateJudgeVerdict } from '$lib/agents';
+import { getLiveJudgeState, getLiveJudgeSystem } from '$lib/agents';
 
-export const POST: RequestHandler = async ({ request }) => {
-	const { judgeId, agentAName, agentBName, topic, transcript } = (await request.json()) as {
-		judgeId: string;
-		agentAName: string;
-		agentBName: string;
-		topic: string;
-		transcript: string;
-	};
-
-	const judge = buildJudgeAgent(judgeId, agentAName, agentBName);
-
-	const stream = new ReadableStream({
-		async start(controller) {
-			const send = (data: object) => {
-				controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
-			};
-
-			try {
-				await generateJudgeVerdict(judge, topic, transcript, (token) => {
-					send({ type: 'token', text: token });
-				});
-				send({ type: 'done' });
-			} catch (err) {
-				send({ type: 'error', message: String(err) });
-			} finally {
-				controller.close();
+// Get current live judge panel state
+export const GET: RequestHandler = async () => {
+	try {
+		const judgeState = getLiveJudgeState();
+		
+		return new Response(JSON.stringify({
+			success: true,
+			panelState: judgeState
+		}), {
+			headers: {
+				'Content-Type': 'application/json',
+				'Cache-Control': 'no-cache'
 			}
-		}
-	});
+		});
+	} catch (error) {
+		return new Response(JSON.stringify({
+			success: false,
+			error: String(error)
+		}), {
+			status: 500,
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+	}
+};
 
-	return new Response(stream, {
-		headers: {
-			'Content-Type': 'text/event-stream',
-			'Cache-Control': 'no-cache',
-			Connection: 'keep-alive'
-		}
-	});
+// Reset live judge system
+export const DELETE: RequestHandler = async () => {
+	try {
+		const liveJudgeSystem = getLiveJudgeSystem();
+		liveJudgeSystem.reset();
+		
+		return new Response(JSON.stringify({
+			success: true,
+			message: 'Live judge system reset successfully'
+		}), {
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+	} catch (error) {
+		return new Response(JSON.stringify({
+			success: false,
+			error: String(error)
+		}), {
+			status: 500,
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+	}
 };

@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { buildAgents, generateReply } from '$lib/agents';
-import type { Message } from '$lib/agents';
+import { buildAdaptiveAgents, generateAdaptiveReply, resetLiveJudgeDebate } from '$lib/agents';
+import type { Message, LiveJudgeResult } from '$lib/agents';
 
 // Each SSE event is JSON: { type: 'message' | 'done' | 'error', ... }
 
@@ -24,7 +24,10 @@ export const POST: RequestHandler = async ({ request }) => {
 			};
 
 			try {
-				const agents = buildAgents(
+				// Reset live judge system for new debate
+				resetLiveJudgeDebate();
+
+				const agents = buildAdaptiveAgents(
           agentA ?? 'deepseek-v3.1:671b-cloud',
           agentB ?? 'deepseek-v3.2-cloud'
 				);
@@ -44,19 +47,44 @@ export const POST: RequestHandler = async ({ request }) => {
 				
 				for (let turn = aiMessagesCount; turn < totalTurns; turn++) {
 					const agent = agents[turn % agents.length];
-					const text = await generateReply(agent, history, safeTopic, context, (token) => {
-						send({ type: 'token', agentId: agent.id, agentName: agent.name, color: agent.color, text: token });
-					});
+					const opponentAgent = agents[(turn + 1) % agents.length];
+					const turnNumber = turn + 1;
+					
+					const result = await generateAdaptiveReply(
+						agent, 
+						history, 
+						safeTopic, 
+						turnNumber,
+						opponentAgent,
+						context, 
+						(token) => {
+							send({ type: 'token', agentId: agent.id, agentName: agent.name, color: agent.color, text: token });
+						}
+					);
 
-if (!text) {
-// All retries exhausted — silently skip this turn so the debate continues uninterrupted.
-continue;
-}
+					if (!result.reply) {
+						// All retries exhausted — silently skip this turn so the debate continues uninterrupted.
+						continue;
+					}
 
-					const msg: Message = { agentId: agent.id, agentName: agent.name, text };
+					const msg: Message = { agentId: agent.id, agentName: agent.name, text: result.reply };
 					history.push(msg);
 
-					send({ type: 'message', agentId: agent.id, agentName: agent.name, color: agent.color, text });
+					// Send the message
+					send({ type: 'message', agentId: agent.id, agentName: agent.name, color: agent.color, text: result.reply });
+
+					// Send judge results if available
+					if (result.judgeResult) {
+						send({ 
+							type: 'judgeResult', 
+							agentId: agent.id,
+							turnNumber: result.judgeResult.turnNumber,
+							scores: result.judgeResult.scores,
+							momentumShift: result.judgeResult.momentumShift,
+							frameControlShift: result.judgeResult.frameControlShift,
+							tacticalAnalysis: result.judgeResult.tacticalAnalysis
+						});
+					}
 
 					await new Promise((r) => setTimeout(r, 250));
 				}
