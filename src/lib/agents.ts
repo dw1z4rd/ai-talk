@@ -422,7 +422,9 @@ Your argument structure follows ${argumentStyle}. Your linguistic preference is 
 - Forward Momentum Only: Each response must introduce a new claim, implication, or consequence. Do not restate arguments you have already made.
 - Format: Write in natural, unbroken prose. No bullet points, no headers, no labeled sections.
 - Length: Strictly under 350 words per turn.
-- Direct Engagement: Address ${opponentName}'s arguments specifically and directly.
+- Direct Engagement: Address ${opponentName}'s arguments specifically and directly. Always use "you" and "your" when referring to your opponent — never refer to them in third person by name as if writing about them from outside the debate.
+- Plain Language: Prefer clear, concrete language. If you use a technical term, immediately ground it with a plain-English phrase or example. Avoid strings of academic jargon that obscure rather than illuminate your point.
+- Tactical Variety: Do not repeat the same rhetorical move you used in your previous turn. Rotate through different approaches: direct refutation, concession-then-pivot, reductio ad absurdum, questioning the premise, specific example, analogy, appeal to consequence.
 
 [ARGUMENTATION CONSTRAINTS]
 ${bannedTacticsText}
@@ -1058,10 +1060,20 @@ export async function generateAdaptiveReply(
   }
 
   const historyText = formatHistory(history);
+
+  // Pull the last 2 tactics this agent used so the prompt can discourage repetition
+  const recentTactics = agent.adaptiveState?.tacticalMemory?.recentTactics
+    ?.slice(-2)
+    .map((t: any) => t.tactic)
+    .filter(Boolean) ?? [];
+  const tacticWarning = recentTactics.length > 0
+    ? `\n\n[RECENT TACTICS — DO NOT REPEAT]: Your last turns used: ${recentTactics.join(', ')}. Choose a different approach this turn.`
+    : '';
+
   const prompt =
     history.length === 0
       ? `The debate topic is: "${topic}"\n\nYou go first. Open the debate by staking out your position clearly.`
-      : `The debate topic is: "${topic}"\n\nDebate so far:\n${historyText}\n\nNow it's your turn. Respond directly to what was just said — challenge it, refute it, or reinforce your position.`;
+      : `The debate topic is: "${topic}"\n\nDebate so far:\n${historyText}\n\nNow it's your turn. Respond directly to what was just said — challenge it, refute it, or reinforce your position.${tacticWarning}`;
 
   const fullPrompt = context
     ? `${systemPrompt}\n\n[REFERENCE MATERIAL]\nThe following documents have been provided. Draw on them where relevant to support or challenge arguments.\n\n${context}\n\n${prompt}`

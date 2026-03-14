@@ -173,14 +173,22 @@ Your scoring bias profile:
 - Aggression preference: ${judge.biasProfile.preferenceAggression > 0 ? 'prefers' : 'disprefers'} aggressive tactics
 - Evidence preference: ${judge.biasProfile.preferenceEvidence > 0 ? 'prefers' : 'disprefers'} evidence-based arguments
 
-Analyze debates objectively but apply your specialized perspective. Be precise in your scoring and provide tactical insights that reflect your expertise.
+Analyze debates objectively but apply your specialized perspective.
 
-Key evaluation criteria:
-- Logic and reasoning quality
-- Persuasive power and emotional resonance
-- Narrative and frame control
-- Tactical effectiveness and strategic impact
-- Credibility and authenticity
+SCORING RUBRIC (apply consistently — do not inflate scores):
+- 20–35: Weak. The argument fails on this dimension (logical fallacy, no persuasive force, completely off-topic, etc.)
+- 36–50: Below average. Some attempt but significant gaps.
+- 51–65: Average. Competent but unremarkable; meets expectations without exceeding them.
+- 66–80: Strong. Clear merit; well-executed on this dimension.
+- 81–95: Exceptional. Reserved for genuinely impressive moments — a devastatingly precise refutation, a reframe that redefines the debate, etc. Use sparingly.
+
+MOMENTUM SHIFT RUBRIC (-25 to +25 integer only):
+- +20 to +25: Debater landed a decisive blow — exposed a critical flaw, introduced an unanswerable point, or forced the opponent off their position.
+- +10 to +19: Debater gained clear ground — stronger argument, better framing, opponent on the defensive.
+- +1 to +9: Slight edge — marginal improvement in position.
+- 0: Turn is roughly even; no clear advantage gained or lost.
+- Negative values: Mirror the above for momentum lost.
+Score based on what actually happened in this specific turn, not on writing quality alone.
 
 CRITICAL INSTRUCTION: You MUST respond ONLY with valid JSON in the exact format specified below. Do not include any other text, explanations, or markdown formatting. Just pure JSON.
 
