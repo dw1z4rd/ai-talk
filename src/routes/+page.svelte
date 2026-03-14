@@ -1519,11 +1519,9 @@
                 </div>
               </div>
 
-              {#if result.reasoning}
-                <div class="mt-2 pt-2 border-t border-[--color-border-subtle]">
-                  <p class="text-[11px] text-[--color-muted] leading-relaxed italic">{result.reasoning}</p>
-                </div>
-              {/if}
+              <div class="mt-2 pt-2 border-t border-[--color-border]">
+                <p class="text-xs text-[--color-muted-fg] leading-relaxed">{result.reasoning ?? '(no reasoning)'}</p>
+              </div>
 
               {#if result.tacticalAnalysis.usedTactics.length > 0}
                 <div class="mt-2 pt-2 border-t border-[--color-border-subtle]">
