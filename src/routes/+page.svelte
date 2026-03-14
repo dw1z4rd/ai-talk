@@ -622,6 +622,7 @@
               50,
             );
           } else if (data.type === "judgeResult") {
+            console.log('[client] judgeResult keys:', Object.keys(data), 'reasoning:', typeof data.reasoning, data.reasoning?.slice?.(0, 60));
             // Accumulate live judge results
             liveJudgeResults = [...liveJudgeResults, {
               turnNumber: data.turnNumber,
