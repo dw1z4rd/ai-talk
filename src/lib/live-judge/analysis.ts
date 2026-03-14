@@ -140,8 +140,10 @@ function parseJudgeAnalysis(
     }
 
     let jsonString = analysisText.trim();
-    const firstBrace = jsonString.indexOf('{');
     const lastBrace = jsonString.lastIndexOf('}');
+    // Use lastIndexOf('{') so that if the model embeds JSON-like syntax inside
+    // a <thinking> block before the real response, we grab the final object.
+    const firstBrace = lastBrace !== -1 ? jsonString.lastIndexOf('{', lastBrace) : -1;
     if (firstBrace === -1 || lastBrace <= firstBrace) {
       console.warn(`[Judge] ${judge.name} no JSON found in response. Raw (first 300 chars): ${jsonString.slice(0, 300)}`);
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
