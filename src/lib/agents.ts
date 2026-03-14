@@ -58,7 +58,11 @@ export interface LiveJudgeResult {
   pairwiseRound?: import('$lib/live-judge/types').PairwiseRound;
   /** Running scorecard after this round. Undefined on Turn 1. */
   scorecard?: import('$lib/live-judge/types').DebateScorecard;
-  /** Absolute per-turn scores from analyzeTurn(). Populated on every turn. */
+  /**
+   * Absolute per-turn scores from analyzeTurn().
+   * Best-effort only: may be undefined if per-turn analysis is skipped or fails,
+   * so consumers must handle the undefined case (matches $lib/live-judge/types).
+   */
   absoluteScores?: import('$lib/live-judge/types').JudgeScores;
 }
 
