@@ -1199,6 +1199,7 @@ export async function generateAdaptiveReply(
         .join(' | '),
     };
 
+    console.log('[Judge] reasoning value:', JSON.stringify(simplifiedResult.reasoning));
     return { reply, judgeResult: simplifiedResult };
   } catch (error) {
     console.error("Live judging failed:", error);
