@@ -254,10 +254,10 @@
   // ── Helpers ───────────────────────────────────────────────────────────────
   function escapeHtml(s: string): string {
     return s
-      .replace(/&/g, "&")
-      .replace(/</g, "<")
-      .replace(/>/g, ">")
-      .replace(/"/g, """);
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
   function applyInline(text: string): string {
@@ -1388,6 +1388,7 @@
 
       <!-- Current Standings -->
       {#if currentLeader}
+        {@const leaderInfo = getModelInfo(currentLeader.agentId)}
         <div
           class="rounded-2xl border overflow-hidden bg-[--color-panel]"
           style="border-color: #7c6af740"
@@ -1414,7 +1415,6 @@
           </div>
           <div class="px-4 py-3">
             <div class="flex items-center gap-3">
-              {@const leaderInfo = getModelInfo(currentLeader.agentId)}
               <div
                 class="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold"
                 style="background: linear-gradient(135deg, {leaderInfo.color}22, {leaderInfo.color}0a); color: {leaderInfo.color}; border: 1px solid {leaderInfo.color}28"
