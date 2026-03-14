@@ -62,12 +62,6 @@
     content: string;
   }
 
-  interface JudgeResult {
-    model: { id: string; name: string; color: string };
-    text: string;
-    vote: string;
-  }
-
   const MAX_FILE_BYTES = 80_000;
   const ACCEPTED = ".txt,.md,.csv,.json";
 
@@ -101,18 +95,20 @@
   // UI state
   let showFiles = $state(false);
 
-  // ── Judging phase ─────────────────────────────────────────────────────────
+  // ── Live Judge Phase ─────────────────────────────────────────────────────────
   let naturallyEnded = $state(false);
-  let judgingAnnouncing = $state(false);
-  let judgingPhase = $state(false);
-  let judgeModels = $state<{ id: string; name: string; color: string }[]>([]);
-  let judgeResults = $state<JudgeResult[]>([]);
-  let currentJudgeIndex = $state(-1);
-  let judgeStreamingText = $state("");
+  let showLiveJudgePanel = $state(false); // Show live judge panel during/after debate
+  
+  // Live judge system state
+  let liveJudgeResults = $state<any[]>([]); // Accumulated judge results during debate
+  let finalJudgePanel = $state<any>(null); // Final panel state
+  let currentLeader = $state<any>(null); // Current leader based on scores
+  let momentumLeader = $state<any>(null); // Momentum leader
+  let frameControlLeader = $state<any>(null); // Frame control leader
 
   // Winner modal
   let winner = $state<{ id: string; name: string; color: string } | null>(null);
-  let winnerVoteCount = $state(0);
+  let winnerScore = $state(0);
   let showWinnerModal = $state(false);
   let confettiCanvas = $state<HTMLCanvasElement | null>(null);
 
@@ -203,134 +199,65 @@
     requestAnimationFrame(animate);
   }
 
-  // ── Judge logic ───────────────────────────────────────────────────────────
-  async function runJudging() {
-    // 1. Brief announcement modal
-    judgingAnnouncing = true;
-    await new Promise((r) => setTimeout(r, 2800));
-    judgingAnnouncing = false;
+  // ── Live Judge logic ───────────────────────────────────────────────────────
+  async function runLiveJudging() {
+    try {
+      // Fetch final judge panel state
+      const response = await fetch("/api/judge");
+      if (response.ok) {
+        const data = await response.json();
+        finalJudgePanel = data.panelState;
+        
+        // Calculate leader based on accumulated scores
+        if (finalJudgePanel && finalJudgePanel.currentScores) {
+          const scores = Object.entries(finalJudgePanel.currentScores);
+          if (scores.length > 0) {
+            const leader = scores.reduce((a: any, b: any) => 
+              a[1].totalScore > b[1].totalScore ? a : b
+            );
+            currentLeader = {
+              agentId: leader[0],
+              agentName: leader[1].agentName,
+              score: leader[1].totalScore
+            };
 
-    // 2. Pick 3 judges (exclude agentA and agentB, shuffle for variety)
-    const allModels = MODEL_OPTIONS.flatMap((g) => g.options);
-    const eligible = allModels.filter(
-      (m) => m.id !== agentA && m.id !== agentB,
-    );
-    const shuffled = [...eligible].sort(() => Math.random() - 0.5);
-    judgeModels = shuffled.slice(0, 3);
+            // Set momentum and frame control leaders
+            momentumLeader = finalJudgePanel.momentumTracker && 
+              Object.entries(finalJudgePanel.momentumTracker.currentMomentum).length > 0
+              ? Object.entries(finalJudgePanel.momentumTracker.currentMomentum).reduce((a: any, b: any) => 
+                  a[1] > b[1] ? a : b
+                ).map((id: string, momentum: number) => ({ agentId: id, momentum }))
+              : null;
 
-    judgingPhase = true;
-    judgeResults = [];
+            frameControlLeader = finalJudgePanel.frameControlTracker && 
+              finalJudgePanel.frameControlTracker.dominantFrame
+              ? { agentId: finalJudgePanel.frameControlTracker.dominantFrame }
+              : null;
 
-    const agentAInfo = getModelInfo(agentA);
-    const agentBInfo = getModelInfo(agentB);
-
-    // Build transcript (skip moderator messages)
-    const transcript = messages
-      .filter((m) => m.agentId !== "moderator")
-      .map((m) => `[${m.agentName}]: ${m.text}`)
-      .join("\n\n---\n\n");
-
-    // 3. Stream each judge's verdict sequentially
-    for (let i = 0; i < judgeModels.length; i++) {
-      const judge = judgeModels[i];
-      currentJudgeIndex = i;
-      judgeStreamingText = "";
-
-      // Scroll to judges panel
-      await tick();
-      const judgesEl = document.getElementById("judges-panel");
-      judgesEl?.scrollIntoView({ behavior: "smooth", block: "start" });
-
-      let fullText = "";
-      try {
-        const response = await fetch("/api/judge", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            judgeId: judge.id,
-            agentAName: agentAInfo.name,
-            agentBName: agentBInfo.name,
-            topic,
-            transcript,
-          }),
-        });
-
-        if (response.ok && response.body) {
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-
-          while (true) {
-            const { done: streamDone, value } = await reader.read();
-            if (streamDone) break;
-            buffer += decoder.decode(value, { stream: true });
-            const parts = buffer.split("\n\n");
-            buffer = parts.pop() ?? "";
-            for (const part of parts) {
-              const line = part.trim();
-              if (!line.startsWith("data: ")) continue;
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.type === "token") {
-                  fullText += data.text;
-                  judgeStreamingText = fullText;
-                }
-              } catch {
-                // ignore malformed chunks
-              }
-            }
+            // Set winner and show modal
+            winner = getModelInfo(currentLeader.agentId);
+            winnerScore = currentLeader.score;
+            
+            // Show winner modal after a brief delay
+            await new Promise((r) => setTimeout(r, 800));
+            showWinnerModal = true;
+            await tick();
+            launchConfetti();
           }
         }
-      } catch {
-        // If judge call fails, skip gracefully
       }
-
-      // Parse vote from the final text
-      const voteMatch = fullText.match(/^\*{0,2}VOTE:\s*(.+?)[\s*]*$/im);
-      const voteName = voteMatch?.[1]?.trim() ?? "";
-      const vote =
-        voteName.toLowerCase().includes(agentAInfo.name.toLowerCase())
-          ? agentA
-          : agentBInfo.name.toLowerCase().includes(voteName.toLowerCase()) ||
-              voteName.toLowerCase().includes(agentBInfo.name.toLowerCase())
-            ? agentB
-            : agentA; // fallback to A if unparseable
-
-      judgeResults = [
-        ...judgeResults,
-        { model: judge, text: fullText, vote },
-      ];
-      currentJudgeIndex = -1;
-      judgeStreamingText = "";
-
-      // Small pause between judges
-      if (i < judgeModels.length - 1) {
-        await new Promise((r) => setTimeout(r, 600));
-      }
+    } catch (error) {
+      console.error('Failed to fetch live judge results:', error);
     }
-
-    // 4. Tally votes
-    const votesForA = judgeResults.filter((r) => r.vote === agentA).length;
-    const votesForB = judgeResults.filter((r) => r.vote === agentB).length;
-    const winnerInfo =
-      votesForA > votesForB ? getModelInfo(agentA) : getModelInfo(agentB);
-    winner = winnerInfo;
-    winnerVoteCount = Math.max(votesForA, votesForB);
-
-    // 5. Show winner modal then fire confetti
-    await new Promise((r) => setTimeout(r, 800));
-    showWinnerModal = true;
-    await tick();
-    launchConfetti();
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function escapeHtml(s: string): string {
     return s
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      .replace(/&/g, "&")
+      .replace(/</g, "<")
+      .replace(/>/g, ">")
+      .replace(/"/g, """);
   }
 
   function applyInline(text: string): string {
@@ -387,14 +314,14 @@
     done = false;
     errorMsg = "";
     naturallyEnded = false;
-    judgingPhase = false;
-    judgingAnnouncing = false;
-    judgeModels = [];
-    judgeResults = [];
-    currentJudgeIndex = -1;
-    judgeStreamingText = "";
+    showLiveJudgePanel = false;
+    liveJudgeResults = [];
+    finalJudgePanel = null;
+    currentLeader = null;
+    momentumLeader = null;
+    frameControlLeader = null;
     winner = null;
-    winnerVoteCount = 0;
+    winnerScore = 0;
     showWinnerModal = false;
   }
 
@@ -454,22 +381,21 @@
         .map((m) => `### ${m.agentName}\n\n${m.text}`)
         .join("\n\n---\n\n");
 
-      if (judgeResults.length > 0) {
-        content += "\n\n---\n\n## Judges' Deliberation\n\n";
-        content += judgeResults
-          .map((r, i) => {
-            const votedFor = getModelInfo(r.vote);
-            const deliberation = r.text.replace(/\n?\*{0,2}VOTE:\s*.+$/im, "").trim();
-            return `### 🧑‍⚖️ Judge ${i + 1} · ${r.model.name}\n\n> **Voted:** ${votedFor.name}\n\n${deliberation}`;
+      if (liveJudgeResults.length > 0) {
+        content += "\n\n---\n\n## Live Judge Analysis\n\n";
+        content += liveJudgeResults
+          .map((result, i) => {
+            return `### Turn ${result.turnNumber} · ${result.agentId === agentA ? agentAInfo.name : agentBInfo.name}\n\n` +
+                   `**Overall Score:** ${result.scores.overallScore.toFixed(1)}/100\n\n` +
+                   `**Momentum Shift:** ${result.momentumShift > 0 ? '+' : ''}${result.momentumShift.toFixed(1)}\n` +
+                   `**Frame Control Shift:** ${result.frameControlShift > 0 ? '+' : ''}${result.frameControlShift.toFixed(1)}\n\n` +
+                   `**Tactical Analysis:**\n${result.tacticalAnalysis.usedTactics.map((tactic: string) => `- ${tactic}`).join('\n')}\n`;
           })
           .join("\n\n---\n\n");
 
-        const votesA = judgeResults.filter((r) => r.vote === agentA).length;
-        const votesB = judgeResults.filter((r) => r.vote === agentB).length;
-        content += "\n\n---\n\n## Final Verdict\n\n";
-        content += `| Model | Votes |\n|---|---|\n| ${agentAInfo.name} | ${votesA} |\n| ${agentBInfo.name} | ${votesB} |\n\n`;
-        if (winner) {
-          content += `🏆 **Winner: ${winner.name}** (${winnerVoteCount} of ${judgeModels.length} judges)\n`;
+        if (currentLeader) {
+          content += "\n\n---\n\n## Final Verdict\n\n";
+          content += `🏆 **Winner: ${currentLeader.agentName}** (Score: ${currentLeader.score.toFixed(1)})\n`;
         }
       }
 
@@ -481,21 +407,17 @@
         .map((m) => `[${m.agentName}]\n${m.text}`)
         .join("\n\n");
 
-      if (judgeResults.length > 0) {
-        content += `\n\n${"═".repeat(40)}\nJUDGES' DELIBERATION\n\n`;
-        content += judgeResults
-          .map((r, i) => {
-            const votedFor = getModelInfo(r.vote);
-            const deliberation = r.text.replace(/\n?\*{0,2}VOTE:\s*.+$/im, "").trim();
-            return `[Judge ${i + 1} — ${r.model.name}]\nVoted: ${votedFor.name}\n\n${deliberation}`;
+      if (liveJudgeResults.length > 0) {
+        content += `\n\n${"═".repeat(40)}\nLIVE JUDGE ANALYSIS\n\n`;
+        content += liveJudgeResults
+          .map((result, i) => {
+            const agentName = result.agentId === agentA ? agentAInfo.name : agentBInfo.name;
+            return `[Turn ${result.turnNumber} — ${agentName}]\nOverall: ${result.scores.overallScore.toFixed(1)}/100\nMomentum: ${result.momentumShift > 0 ? '+' : ''}${result.momentumShift.toFixed(1)}\nFrame Control: ${result.frameControlShift > 0 ? '+' : ''}${result.frameControlShift.toFixed(1)}\n`;
           })
           .join(`\n\n${"─".repeat(40)}\n\n`);
 
-        const votesA = judgeResults.filter((r) => r.vote === agentA).length;
-        const votesB = judgeResults.filter((r) => r.vote === agentB).length;
-        content += `\n\n${"═".repeat(40)}\nFINAL VERDICT\n${agentAInfo.name}: ${votesA} vote${votesA !== 1 ? "s" : ""}\n${agentBInfo.name}: ${votesB} vote${votesB !== 1 ? "s" : ""}`;
-        if (winner) {
-          content += `\nWinner: ${winner.name}`;
+        if (currentLeader) {
+          content += `\n\n${"═".repeat(40)}\nFINAL VERDICT\nWinner: ${currentLeader.agentName} (${currentLeader.score.toFixed(1)})\n`;
         }
         content += "\n";
       }
@@ -576,16 +498,16 @@
     if (!resume) {
       messages = [];
       leftAgentId = agentA;
-      // Reset judging state for fresh debate
+      // Reset live judge state for fresh debate
       naturallyEnded = false;
-      judgingPhase = false;
-      judgingAnnouncing = false;
-      judgeModels = [];
-      judgeResults = [];
-      currentJudgeIndex = -1;
-      judgeStreamingText = "";
+      showLiveJudgePanel = false;
+      liveJudgeResults = [];
+      finalJudgePanel = null;
+      currentLeader = null;
+      momentumLeader = null;
+      frameControlLeader = null;
       winner = null;
-      winnerVoteCount = 0;
+      winnerScore = 0;
       showWinnerModal = false;
     }
     done = false;
@@ -596,6 +518,7 @@
     typingAgentColor = "";
     streamingMessage = null;
     abortController = new AbortController();
+    showLiveJudgePanel = true;
 
     try {
       const response = await fetch("/api/chat", {
@@ -692,13 +615,23 @@
                 }),
               50,
             );
+          } else if (data.type === "judgeResult") {
+            // Accumulate live judge results
+            liveJudgeResults = [...liveJudgeResults, {
+              turnNumber: data.turnNumber,
+              agentId: data.agentId,
+              scores: data.scores,
+              momentumShift: data.momentumShift,
+              frameControlShift: data.frameControlShift,
+              tacticalAnalysis: data.tacticalAnalysis
+            }];
           } else if (data.type === "done") {
             done = true;
             running = false;
             naturallyEnded = true;
             typingAgentName = "";
-            // Kick off the judging panel automatically
-            runJudging();
+            // Kick off the final live judge analysis
+            runLiveJudging();
           } else if (data.type === "error") {
             errorMsg = data.message || "An AI failed to respond.";
             running = false;
@@ -719,45 +652,6 @@
     }
   }
 </script>
-
-<!-- Judging announcement modal -->
-{#if judgingAnnouncing}
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md"
-    transition:fade={{ duration: 500 }}
-  >
-    <div
-      class="flex flex-col items-center gap-5 text-center px-8"
-      in:scale={{ start: 0.82, duration: 700 }}
-    >
-      <div class="text-7xl" style="filter: drop-shadow(0 0 24px #7c6af7aa)">
-        ⚖️
-      </div>
-      <p
-        class="text-2xl font-black uppercase tracking-[0.25em] text-[--color-muted]"
-      >
-        The Judges Are
-      </p>
-      <p
-        class="text-4xl font-black uppercase tracking-[0.3em]"
-        style="color: #c084fc; text-shadow: 0 0 40px #7c6af799"
-      >
-        Deliberating…
-      </p>
-      <div class="flex gap-2 mt-2">
-        <span
-          class="w-2 h-2 rounded-full bg-[#7c6af7] animate-bounce [animation-delay:0ms]"
-        ></span>
-        <span
-          class="w-2 h-2 rounded-full bg-[#7c6af7] animate-bounce [animation-delay:180ms]"
-        ></span>
-        <span
-          class="w-2 h-2 rounded-full bg-[#7c6af7] animate-bounce [animation-delay:360ms]"
-        ></span>
-      </div>
-    </div>
-  </div>
-{/if}
 
 <!-- Winner modal -->
 {#if showWinnerModal}
@@ -799,9 +693,9 @@
         </p>
       </div>
 
-      <!-- Vote tally -->
+      <!-- Score -->
       <p class="text-sm uppercase tracking-widest text-[--color-muted]">
-        {winnerVoteCount} of {judgeModels.length} judges voted in favour
+        Final Score: {winnerScore?.toFixed(1)} points
       </p>
 
       <!-- Close -->
@@ -1474,10 +1368,10 @@
     </div>
   </div>
 
-  <!-- ── Judges Panel ─────────────────────────────────────────────────────── -->
-  {#if judgingPhase}
+  <!-- ── Live Judge Panel ─────────────────────────────────────────────────────── -->
+  {#if showLiveJudgePanel}
     <div
-      id="judges-panel"
+      id="live-judge-panel"
       class="flex flex-col gap-4"
       in:fade={{ duration: 400 }}
     >
@@ -1487,143 +1381,181 @@
         <span
           class="text-[11px] font-bold uppercase tracking-[0.2em] px-3 py-1 rounded-full border"
           style="color: #c084fc; border-color: #7c6af740; background: #7c6af708"
-          >🎤 The Judges</span
+          >⚖️ Live Judge Analysis</span
         >
         <div class="flex-1 h-px bg-[--color-border]"></div>
       </div>
 
-      <!-- Judge cards -->
-      {#each judgeModels as judge, i}
-        {@const result = judgeResults[i]}
-        {@const isStreaming = currentJudgeIndex === i}
-        {@const isPending = !result && !isStreaming}
-
+      <!-- Current Standings -->
+      {#if currentLeader}
         <div
-          class="rounded-2xl border overflow-hidden bg-[--color-panel] transition-all duration-300"
-          style="border-color: {result || isStreaming
-            ? judge.color + '40'
-            : 'var(--color-border)'}"
-          in:fade={{ duration: 300, delay: i * 80 }}
+          class="rounded-2xl border overflow-hidden bg-[--color-panel]"
+          style="border-color: #7c6af740"
+          in:fade={{ duration: 300 }}
         >
-          <!-- Judge header -->
           <div
-            class="flex items-center gap-3 px-3 py-3 sm:px-5 border-b"
-            style="border-color: {result || isStreaming
-              ? judge.color + '25'
-              : 'var(--color-border-subtle)'}; background: {result ||
-            isStreaming
-              ? judge.color + '08'
-              : 'transparent'}"
+            class="flex items-center gap-3 px-4 py-3 border-b"
+            style="border-color: #7c6af725; background: #7c6af708"
           >
-            <!-- Avatar -->
             <div
-              class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all"
-              class:ring-2={isStreaming}
-              style="background: {judge.color}18; color: {judge.color}; border: 1px solid {judge.color}30; {isStreaming
-                ? 'box-shadow: 0 0 0 2px ' + judge.color + '60'
-                : ''}"
+              class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0"
+              style="background: #7c6af718; color: #c084fc; border: 1px solid #7c6af730"
             >
-              {judge.name[0]}
+              🏆
             </div>
             <div class="flex flex-col min-w-0">
-              <span class="text-sm font-semibold" style="color: {judge.color}"
-                >{judge.name}</span
+              <span class="text-sm font-semibold" style="color: #c084fc"
+                >Current Leader</span
               >
               <span class="text-[10px] text-[--color-muted]"
-                >Judge #{i + 1}</span
+                >Based on accumulated scores</span
               >
             </div>
-
-            <div class="ml-auto flex items-center gap-2">
-              {#if isStreaming}
-                <span
-                  class="text-[10px] font-bold uppercase tracking-wider text-[--color-muted] flex items-center gap-1.5"
-                >
-                  <span
-                    class="w-1.5 h-1.5 rounded-full animate-pulse"
-                    style="background: {judge.color}"
-                  ></span>
-                  Deliberating
-                </span>
-              {:else if result}
-                <!-- Vote badge -->
-                {@const votedFor = getModelInfo(result.vote)}
-                <span
-                  class="text-[11px] font-bold px-3 py-1 rounded-full"
-                  style="background: {votedFor.color}20; color: {votedFor.color}; border: 1px solid {votedFor.color}35"
-                >
-                  Voted: {votedFor.name}
-                </span>
-              {:else if isPending}
-                <span
-                  class="text-[10px] text-[--color-muted] uppercase tracking-wider"
-                  >Waiting…</span
-                >
-              {/if}
+          </div>
+          <div class="px-4 py-3">
+            <div class="flex items-center gap-3">
+              {@const leaderInfo = getModelInfo(currentLeader.agentId)}
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold"
+                style="background: linear-gradient(135deg, {leaderInfo.color}22, {leaderInfo.color}0a); color: {leaderInfo.color}; border: 1px solid {leaderInfo.color}28"
+              >
+                {leaderInfo.name[0]}
+              </div>
+              <div class="flex-1">
+                <div class="font-semibold" style="color: {leaderInfo.color}">
+                  {leaderInfo.name}
+                </div>
+                <div class="text-sm text-[--color-muted]">
+                  Score: {currentLeader.score.toFixed(1)} points
+                </div>
+              </div>
+              <div class="text-right">
+                {#if momentumLeader && momentumLeader.agentId === currentLeader.agentId}
+                  <div class="text-xs text-green-400 font-medium">↑ Momentum</div>
+                {/if}
+                {#if frameControlLeader && frameControlLeader.agentId === currentLeader.agentId}
+                  <div class="text-xs text-blue-400 font-medium">⬡ Frame Control</div>
+                {/if}
+              </div>
             </div>
           </div>
-
-          <!-- Judge body -->
-          <div class="px-3 py-3 sm:px-5 sm:py-4 text-[14px] sm:text-[15px] leading-relaxed sm:leading-[1.72] text-[#d4d4e8]">
-            {#if result}
-              <!-- Strip the VOTE line from display -->
-              <div class="message-content">
-                {@html formatMessage(
-                  result.text.replace(/\n?\*{0,2}VOTE:\s*.+$/im, "").trim(),
-                )}
-              </div>
-            {:else if isStreaming}
-              <div class="message-content">
-                {@html formatMessage(judgeStreamingText.replace(/\n?\*{0,2}VOTE:\s*.+$/im, "").trim())}<span
-                  class="inline-block w-[2px] h-[0.9em] ml-[2px] align-text-bottom rounded-sm animate-pulse"
-                  style="background: {judge.color}"
-                ></span>
-              </div>
-            {:else}
-              <!-- Pending placeholder -->
-              <div class="flex items-center gap-2 text-[--color-muted]">
-                <span
-                  class="w-1.5 h-1.5 rounded-full bg-[--color-border] animate-pulse"
-                ></span>
-                <span class="text-sm">Waiting to deliberate…</span>
-              </div>
-            {/if}
-          </div>
         </div>
-      {/each}
+      {/if}
 
-      <!-- Vote tally (shown once all judges done) -->
-      {#if judgeResults.length === judgeModels.length && judgeModels.length > 0}
-        {@const votesA = judgeResults.filter((r) => r.vote === agentA).length}
-        {@const votesB = judgeResults.filter((r) => r.vote === agentB).length}
-        {@const infoA = getModelInfo(agentA)}
-        {@const infoB = getModelInfo(agentB)}
-        <div
-          class="flex items-center justify-center gap-6 py-4 rounded-2xl border bg-[--color-panel]"
-          style="border-color: var(--color-border)"
-          in:fade={{ duration: 400 }}
-        >
-          <div class="flex flex-col items-center gap-1">
-            <span
-              class="text-3xl font-black tabular-nums"
-              style="color: {infoA.color}">{votesA}</span
+      <!-- Recent Judge Results -->
+      {#if liveJudgeResults.length > 0}
+        <div class="flex flex-col gap-3">
+          <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
+            Recent Analysis
+          </h3>
+          {#each liveJudgeResults.slice(-3).reverse() as result (result.turnNumber)}
+            {@const agentInfo = getModelInfo(result.agentId)}
+            <div
+              class="rounded-xl border bg-[--color-panel] p-3"
+              style="border-color: {agentInfo.color}20"
+              in:fade={{ duration: 200 }}
             >
-            <span
-              class="text-[11px] font-semibold uppercase tracking-widest"
-              style="color: {infoA.color}99">{infoA.name}</span
+              <div class="flex items-center gap-2 mb-2">
+                <div
+                  class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold"
+                  style="background: {agentInfo.color}15; color: {agentInfo.color}"
+                >
+                  {agentInfo.name[0]}
+                </div>
+                <span class="text-xs font-medium" style="color: {agentInfo.color}">
+                  Turn {result.turnNumber}
+                </span>
+                <span class="text-xs text-[--color-muted] ml-auto">
+                  Overall: {result.scores.overallScore.toFixed(1)}/100
+                </span>
+              </div>
+              
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="flex items-center gap-1">
+                  <span class="text-[--color-muted]">Logic:</span>
+                  <span style="color: {result.scores.logicalCoherence > 70 ? '#34d399' : result.scores.logicalCoherence > 50 ? '#fbbf24' : '#f87171'}">
+                    {result.scores.logicalCoherence.toFixed(0)}
+                  </span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <span class="text-[--color-muted]">Rhetoric:</span>
+                  <span style="color: {result.scores.rhetoricalForce > 70 ? '#34d399' : result.scores.rhetoricalForce > 50 ? '#fbbf24' : '#f87171'}">
+                    {result.scores.rhetoricalForce.toFixed(0)}
+                  </span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <span class="text-[--color-muted]">Tactics:</span>
+                  <span style="color: {result.scores.tacticalEffectiveness > 70 ? '#34d399' : result.scores.tacticalEffectiveness > 50 ? '#fbbf24' : '#f87171'}">
+                    {result.scores.tacticalEffectiveness.toFixed(0)}
+                  </span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <span class="text-[--color-muted]">Frame:</span>
+                  <span style="color: {result.frameControlShift > 0 ? '#60a5fa' : '#f87171'}">
+                    {result.frameControlShift > 0 ? '+' : ''}{result.frameControlShift.toFixed(0)}
+                  </span>
+                </div>
+              </div>
+
+              {#if result.tacticalAnalysis.usedTactics.length > 0}
+                <div class="mt-2 pt-2 border-t border-[--color-border-subtle]">
+                  <div class="flex flex-wrap gap-1">
+                    {#each result.tacticalAnalysis.usedTactics.slice(0, 3) as tactic}
+                      <span
+                        class="text-[10px] px-2 py-0.5 rounded-full"
+                        style="background: {agentInfo.color}15; color: {agentInfo.color}99"
+                      >
+                        {tactic.replace('_', ' ')}
+                      </span>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      <!-- Momentum & Frame Control Leaders -->
+      {#if (momentumLeader || frameControlLeader) && !currentLeader}
+        <div class="grid grid-cols-2 gap-3">
+          {#if momentumLeader}
+            {@const momentumInfo = getModelInfo(momentumLeader.agentId)}
+            <div
+              class="rounded-xl border bg-[--color-panel] p-3 text-center"
+              style="border-color: #10b98140"
             >
-          </div>
-          <span class="text-[--color-border] text-2xl font-light">—</span>
-          <div class="flex flex-col items-center gap-1">
-            <span
-              class="text-3xl font-black tabular-nums"
-              style="color: {infoB.color}">{votesB}</span
+              <div class="text-[10px] text-[--color-muted] mb-1">Momentum Leader</div>
+              <div
+                class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold mx-auto mb-1"
+                style="background: {momentumInfo.color}15; color: {momentumInfo.color}"
+              >
+                {momentumInfo.name[0]}
+              </div>
+              <div class="text-xs font-medium" style="color: {momentumInfo.color}">
+                {momentumInfo.name}
+              </div>
+            </div>
+          {/if}
+          
+          {#if frameControlLeader}
+            {@const frameInfo = getModelInfo(frameControlLeader.agentId)}
+            <div
+              class="rounded-xl border bg-[--color-panel] p-3 text-center"
+              style="border-color: #3b82f640"
             >
-            <span
-              class="text-[11px] font-semibold uppercase tracking-widest"
-              style="color: {infoB.color}99">{infoB.name}</span
-            >
-          </div>
+              <div class="text-[10px] text-[--color-muted] mb-1">Frame Control</div>
+              <div
+                class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold mx-auto mb-1"
+                style="background: {frameInfo.color}15; color: {frameInfo.color}"
+              >
+                {frameInfo.name[0]}
+              </div>
+              <div class="text-xs font-medium" style="color: {frameInfo.color}">
+                {frameInfo.name}
+              </div>
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
