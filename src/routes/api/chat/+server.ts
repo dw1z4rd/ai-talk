@@ -78,6 +78,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 					// Send judge results if available (message already sent via onReply callback)
 					if (result.judgeResult) {
+						console.log('[chat] sending judgeResult, reasoning length:', result.judgeResult.reasoning?.length, 'value:', JSON.stringify(result.judgeResult.reasoning)?.slice(0, 80));
 						send({
 							type: 'judgeResult',
 							agentId: agent.id,
