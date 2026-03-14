@@ -250,6 +250,72 @@ function calculateDuration(analysis: TurnAnalysis): number {
   return Math.max(2, Math.min(5, duration));
 }
 
+// Directive pools by weakness category
+const LOGIC_DIRECTIVES = [
+  "CRITICAL: Your previous arguments lacked empirical grounding. You MUST cite a concrete historical or scientific example in this turn.",
+  "MANDATORY: Build your argument around a specific, verifiable fact or documented case — no abstract assertions allowed.",
+  "REQUIRED: Present a tightly reasoned causal chain this turn. Show exactly how A leads to B leads to C with no logical leaps.",
+  "OVERRIDE: Ground every claim you make this turn in a concrete example or proof. No bare assertions.",
+];
+
+const LOGIC_SEVERE_DIRECTIVES = [
+  "CRITICAL PRIORITY: Do not make a single claim you cannot immediately support with a specific example or documented evidence. One tight argument beats three vague ones.",
+  "OVERRIDE: Your argument structure this turn must move from a concrete premise to an airtight conclusion. Eliminate all speculative language.",
+];
+
+const RHETORIC_DIRECTIVES = [
+  "MANDATORY: Open with a vivid, concrete image or analogy before making your point — your delivery needs to land harder.",
+  "REQUIRED: Connect the stakes of this debate to something real and human. Make the audience feel what is actually at risk.",
+  "CRITICAL: State your position with unambiguous conviction this turn. Cut every hedge, every qualification, every 'perhaps'.",
+  "MANDATORY: Your last turn was too flat. This turn, find the one sharpest thing you could say and lead with it.",
+];
+
+const TACTICS_DIRECTIVES = [
+  "REQUIRED: Stop defending your position and go on offense. Identify a specific weakness in your opponent's last argument and attack it directly.",
+  "CRITICAL: Change your approach entirely this turn. Use a reframe, a pointed question, or a concession that pivots to a stronger attack.",
+  "MANDATORY: Your opponent left a contradiction in their last argument. Expose it before making your own point.",
+  "REQUIRED: Do not reiterate any claim you have already made. Introduce a completely new line of attack.",
+];
+
+const OVERALL_DIRECTIVES = [
+  "PRIORITY OVERRIDE: You are losing this exchange. Do not repeat anything you have said before — pivot to a completely new angle of attack.",
+  "CRITICAL: Your last turn failed to move the debate in your favor. This turn, open with your strongest possible point and build from there.",
+];
+
+function pickDirective(pool: string[], turnNumber: number): string {
+  return pool[turnNumber % pool.length];
+}
+
+/**
+ * Generate a hidden behavioral directive based on aggregated judge scores.
+ * Returns a one-turn imperative injected silently into the debater's system prompt.
+ * Thresholds mirror pressure.ts calibration: logicalCoherence 0-40, rhetoricalForce 0-30,
+ * tacticalEffectiveness 0-30, overallScore 0-100.
+ */
+export function generateHiddenDirective(scores: JudgeScores, turnNumber: number): string | undefined {
+  // Severe logic weakness — highest priority
+  if (scores.logicalCoherence < 12) {
+    return pickDirective(LOGIC_SEVERE_DIRECTIVES, turnNumber);
+  }
+  // Logic weakness
+  if (scores.logicalCoherence < 16) {
+    return pickDirective(LOGIC_DIRECTIVES, turnNumber);
+  }
+  // Rhetoric weakness
+  if (scores.rhetoricalForce < 12) {
+    return pickDirective(RHETORIC_DIRECTIVES, turnNumber);
+  }
+  // Tactics weakness
+  if (scores.tacticalEffectiveness < 12) {
+    return pickDirective(TACTICS_DIRECTIVES, turnNumber);
+  }
+  // General weak turn
+  if (scores.overallScore < 40) {
+    return pickDirective(OVERALL_DIRECTIVES, turnNumber);
+  }
+  return undefined;
+}
+
 /**
  * Apply multiple adaptive pressures to an agent (accumulation)
  */

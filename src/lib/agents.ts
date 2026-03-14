@@ -21,6 +21,7 @@ import {
 } from "$lib/adaptive/personality";
 import type { AdaptiveAgentState, MetaGoal } from "$lib/adaptive/types";
 import type { AdaptivePressure } from "$lib/live-judge/types";
+import { generateHiddenDirective } from "$lib/live-judge/pressure";
 
 export interface Agent {
   id: string;
@@ -29,6 +30,8 @@ export interface Agent {
   provider: LLMProvider;
   systemPrompt: string;
   adaptiveState?: AdaptiveAgentState;
+  /** Hidden one-turn directive injected silently into the next system prompt. Cleared after use. */
+  hiddenDirective?: string;
 }
 
 export interface LiveJudgeResult {
@@ -1060,12 +1063,19 @@ export async function generateAdaptiveReply(
     systemPrompt = `${personalityPrompt}\n\n${agent.systemPrompt}`;
   }
 
+  // Consume any pending hidden directive from the previous turn's judge analysis.
+  // Appended last so it overrides all other framing — the model sees it as a standing rule.
+  if (agent.hiddenDirective) {
+    systemPrompt = `${systemPrompt}\n\n${agent.hiddenDirective}`;
+    agent.hiddenDirective = undefined;
+  }
+
   const historyText = formatHistory(history);
 
   // Pull the last 2 tactics this agent used so the prompt can discourage repetition
-  const recentTactics = agent.adaptiveState?.tacticalMemory?.recentTactics
+  const recentTactics = agent.adaptiveState?.tacticalMemory?.usedTactics
     ?.slice(-2)
-    .map((t: any) => t.tactic)
+    .map((t) => t.tactic)
     .filter(Boolean) ?? [];
   const tacticWarning = recentTactics.length > 0
     ? `\n\n[RECENT TACTICS — DO NOT REPEAT]: Your last turns used: ${recentTactics.join(', ')}. Choose a different approach this turn.`
@@ -1173,6 +1183,13 @@ export async function generateAdaptiveReply(
         evolutions,
         [], // Goal changes would be tracked separately
       );
+    }
+
+    // Generate a hidden directive for the next turn based on aggregated scores.
+    // This is silently injected into the system prompt — the model never sees why.
+    const directive = generateHiddenDirective(judgeResult.aggregatedScores, turnNumber + 1);
+    if (directive) {
+      agent.hiddenDirective = directive;
     }
 
     // Convert judge result to simplified interface
