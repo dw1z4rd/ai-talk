@@ -100,9 +100,12 @@
   let showLiveJudgePanel = $state(false); // Show live judge panel during/after debate
   
   // Live judge system state
-  let liveJudgeResults = $state<any[]>([]); // Accumulated judge results during debate
+  let liveJudgeResults = $state<any[]>([]); // Accumulated per-turn judge results (for adaptive pressure display)
+  let pairwiseRounds = $state<any[]>([]); // Pairwise comparison rounds
+  let finalScorecard = $state<any>(null); // Final pairwise scorecard
+  let narrativeVerdict = $state<any>(null); // Full-debate narrative verdict
   let finalJudgePanel = $state<any>(null); // Final panel state
-  let currentLeader = $state<any>(null); // Current leader based on scores
+  let currentLeader = $state<any>(null); // Current leader based on win tallies
   let momentumLeader = $state<any>(null); // Momentum leader
   let frameControlLeader = $state<any>(null); // Frame control leader
 
@@ -202,56 +205,52 @@
   // ── Live Judge logic ───────────────────────────────────────────────────────
   async function runLiveJudging() {
     try {
-      // Fetch final judge panel state
-      const response = await fetch("/api/judge");
-      if (response.ok) {
-        const data = await response.json();
-        finalJudgePanel = data.panelState;
-        
-        // Calculate leader based on accumulated scores
-        if (finalJudgePanel && finalJudgePanel.currentScores) {
-          const scores = Object.entries(finalJudgePanel.currentScores);
-          if (scores.length > 0) {
-            const leader: [string, any] = scores.reduce((a: [string, any], b: [string, any]) => 
-              a[1].totalScore > b[1].totalScore ? a : b
-            );
-            currentLeader = {
-              agentId: leader[0],
-              agentName: leader[1].agentName,
-              score: leader[1].totalScore
-            };
+      // Winner is already set via SSE events (finalScorecard / judgeResult).
+      // Use finalScorecard if available, otherwise fall back to current leader from streaming.
+      const scorecardData = finalScorecard ?? null;
+      let winnerId: string | null = null;
 
-            // Set momentum and frame control leaders
-            momentumLeader = finalJudgePanel.momentumTracker && 
-              Object.entries(finalJudgePanel.momentumTracker.currentMomentum).length > 0
-              ? (() => {
-                  const momentumEntries: [string, number][] = Object.entries(finalJudgePanel.momentumTracker.currentMomentum);
-                  const leaderEntry = momentumEntries.reduce((a, b) => 
-                    a[1] > b[1] ? a : b
-                  );
-                  return { agentId: leaderEntry[0], momentum: leaderEntry[1] };
-                })()
-              : null;
+      if (scorecardData?.overallWinner) {
+        winnerId = scorecardData.overallWinner;
+      } else if (currentLeader?.agentId) {
+        winnerId = currentLeader.agentId;
+      }
 
-            frameControlLeader = finalJudgePanel.frameControlTracker && 
-              finalJudgePanel.frameControlTracker.dominantFrame
-              ? { agentId: finalJudgePanel.frameControlTracker.dominantFrame }
-              : null;
+      // Also try to fetch judge panel for momentum/frame control
+      try {
+        const response = await fetch("/api/judge");
+        if (response.ok) {
+          const data = await response.json();
+          finalJudgePanel = data.panelState;
 
-            // Set winner and show modal
-            winner = getModelInfo(currentLeader.agentId);
-            winnerScore = currentLeader.score;
-            
-            // Show winner modal after a brief delay
-            await new Promise((r) => setTimeout(r, 800));
-            showWinnerModal = true;
-            await tick();
-            launchConfetti();
+          if (finalJudgePanel?.momentumTracker) {
+            const momentumEntries: [string, number][] = Object.entries(finalJudgePanel.momentumTracker.currentMomentum || {});
+            if (momentumEntries.length > 0) {
+              const leaderEntry = momentumEntries.reduce((a, b) => a[1] > b[1] ? a : b);
+              momentumLeader = { agentId: leaderEntry[0], momentum: leaderEntry[1] };
+            }
           }
+          frameControlLeader = finalJudgePanel?.frameControlTracker?.dominantFrame
+            ? { agentId: finalJudgePanel.frameControlTracker.dominantFrame }
+            : null;
         }
+      } catch {
+        // Panel fetch failed — winner still determined from SSE events
+      }
+
+      if (winnerId) {
+        winner = getModelInfo(winnerId);
+        // Show win tally as score if available, otherwise total from currentLeader
+        const tally = scorecardData?.winTallies?.[winnerId];
+        winnerScore = tally ? tally.total : (currentLeader?.score ?? 0);
+
+        await new Promise((r) => setTimeout(r, 800));
+        showWinnerModal = true;
+        await tick();
+        launchConfetti();
       }
     } catch (error) {
-      console.error('Failed to fetch live judge results:', error);
+      console.error('Failed to run live judging:', error);
     }
   }
 
@@ -320,6 +319,9 @@
     naturallyEnded = false;
     showLiveJudgePanel = false;
     liveJudgeResults = [];
+    pairwiseRounds = [];
+    finalScorecard = null;
+    narrativeVerdict = null;
     finalJudgePanel = null;
     currentLeader = null;
     momentumLeader = null;
@@ -385,29 +387,39 @@
         .map((m) => `### ${m.agentName}\n\n${m.text}`)
         .join("\n\n---\n\n");
 
-      if (liveJudgeResults.length > 0) {
+      if (pairwiseRounds.length > 0) {
         content += "\n\n---\n\n## Live Judge Analysis\n\n";
-        content += liveJudgeResults
-          .map((result) => {
-            const agentName = result.agentId === agentA ? agentAInfo.name : agentBInfo.name;
-            const tactics = result.tacticalAnalysis?.usedTactics?.length
-              ? `**Tactics:** ${result.tacticalAnalysis.usedTactics.join(', ')}\n\n`
-              : '';
-            const reasoning = result.reasoning
-              ? `**Judge Analysis:**\n\n> ${result.reasoning.replace(/\s*\|\s*/g, '\n>\n> ')}\n\n`
-              : '';
-            return `### Turn ${result.turnNumber} · ${agentName}\n\n` +
-                   `**Total:** ${result.scores.overallScore ?? 0}/100 · ` +
-                   `**Logic:** ${result.scores.logicalCoherence ?? 0}/40 · ` +
-                   `**Rhetoric:** ${result.scores.rhetoricalForce ?? 0}/30 · ` +
-                   `**Tactics:** ${result.scores.tacticalEffectiveness ?? 0}/30\n\n` +
-                   reasoning;
+        content += pairwiseRounds
+          .map((round) => {
+            const logicWinnerName = getModelInfo(round.logicWinner).name;
+            const tacticsWinnerName = getModelInfo(round.tacticsWinner).name;
+            const rhetoricWinnerName = getModelInfo(round.rhetoricWinner).name;
+            return `### Round ${round.roundNumber} · T${round.prevTurn.turnNumber} (${round.prevTurn.agentName}) vs T${round.curTurn.turnNumber} (${round.curTurn.agentName})\n\n` +
+                   `**Logic:** ${logicWinnerName} · **Tactics:** ${tacticsWinnerName} · **Rhetoric:** ${rhetoricWinnerName}\n\n` +
+                   `**Logic Analysis:**\n\n> ${round.logicDelta}\n\n` +
+                   (round.languageWarning ? `> ⚠ ${round.languageWarning}\n\n` : '');
           })
           .join("---\n\n");
+      }
 
+      if (finalScorecard?.winTallies) {
+        content += "\n\n---\n\n## Scorecard\n\n";
+        content += Object.entries(finalScorecard.winTallies)
+          .map(([id, t]: [string, any]) => `**${t.agentName}**: Logic ${t.logic} · Tactics ${t.tactics} · Rhetoric ${t.rhetoric} · Total ${t.total}`)
+          .join('\n\n');
         if (currentLeader) {
-          content += "\n\n---\n\n## Final Verdict\n\n";
-          content += `🏆 **Winner: ${currentLeader.agentName}** (Score: ${currentLeader.score.toFixed(1)})\n`;
+          content += `\n\n🏆 **Winner: ${currentLeader.agentName}** (${currentLeader.score} round wins)\n`;
+        }
+      }
+
+      if (narrativeVerdict?.text) {
+        content += "\n\n---\n\n## Narrative Verdict\n\n";
+        content += narrativeVerdict.text + "\n";
+        if (narrativeVerdict.favouredAgentId) {
+          content += `\n**Verdict: ${getModelInfo(narrativeVerdict.favouredAgentId).name}**\n`;
+        }
+        if (!narrativeVerdict.agreesWithScorecard) {
+          content += `\n> ⚡ Narrative verdict disagrees with the round-by-round scorecard.\n`;
         }
       }
 
@@ -419,17 +431,31 @@
         .map((m) => `[${m.agentName}]\n${m.text}`)
         .join("\n\n");
 
-      if (liveJudgeResults.length > 0) {
-        content += `\n\n${"═".repeat(40)}\nLIVE JUDGE ANALYSIS\n\n`;
-        content += liveJudgeResults
-          .map((result, i) => {
-            const agentName = result.agentId === agentA ? agentAInfo.name : agentBInfo.name;
-            return `[Turn ${result.turnNumber} — ${agentName}]\nTotal: ${result.scores.overallScore}/100  Logic: ${result.scores.logicalCoherence}/40  Rhetoric: ${result.scores.rhetoricalForce}/30  Tactics: ${result.scores.tacticalEffectiveness}/30\n${result.reasoning ? result.reasoning + '\n' : ''}`;
+      if (pairwiseRounds.length > 0) {
+        content += `\n\n${"═".repeat(40)}\nPAIRWISE SCORECARD\n\n`;
+        content += pairwiseRounds
+          .map((round) => {
+            return `[Round ${round.roundNumber}  T${round.prevTurn.turnNumber}:${round.prevTurn.agentName} vs T${round.curTurn.turnNumber}:${round.curTurn.agentName}]\n` +
+                   `Logic: ${getModelInfo(round.logicWinner).name}  Tactics: ${getModelInfo(round.tacticsWinner).name}  Rhetoric: ${getModelInfo(round.rhetoricWinner).name}\n${round.logicDelta}`;
           })
           .join(`\n\n${"─".repeat(40)}\n\n`);
 
+        if (finalScorecard?.winTallies) {
+          content += `\n\n${"═".repeat(40)}\nFINAL TALLY\n`;
+          Object.entries(finalScorecard.winTallies).forEach(([id, t]: [string, any]) => {
+            content += `${t.agentName}: Logic ${t.logic}  Tactics ${t.tactics}  Rhetoric ${t.rhetoric}  Total ${t.total}\n`;
+          });
+        }
         if (currentLeader) {
-          content += `\n\n${"═".repeat(40)}\nFINAL VERDICT\nWinner: ${currentLeader.agentName} (${currentLeader.score.toFixed(1)})\n`;
+          content += `Winner: ${currentLeader.agentName} (${currentLeader.score} wins)\n`;
+        }
+        content += "\n";
+      }
+
+      if (narrativeVerdict?.text) {
+        content += `${"═".repeat(40)}\nNARRATIVE VERDICT\n\n${narrativeVerdict.text}\n`;
+        if (narrativeVerdict.favouredAgentId) {
+          content += `\nVerdict: ${getModelInfo(narrativeVerdict.favouredAgentId).name}\n`;
         }
         content += "\n";
       }
@@ -514,6 +540,9 @@
       naturallyEnded = false;
       showLiveJudgePanel = false;
       liveJudgeResults = [];
+      pairwiseRounds = [];
+      finalScorecard = null;
+      narrativeVerdict = null;
       finalJudgePanel = null;
       currentLeader = null;
       momentumLeader = null;
@@ -630,7 +659,7 @@
               50,
             );
           } else if (data.type === "judgeResult") {
-            // Accumulate live judge results
+            // Accumulate live judge results (kept for display/export)
             liveJudgeResults = [...liveJudgeResults, {
               turnNumber: data.turnNumber,
               agentId: data.agentId,
@@ -641,20 +670,68 @@
               reasoning: data.reasoning
             }];
 
-            // Update live leader stats from accumulated results
-            const scoreTotals: Record<string, number> = {};
+            // Accumulate pairwise rounds for display
+            if (data.pairwiseRound) {
+              pairwiseRounds = [...pairwiseRounds, data.pairwiseRound];
+            }
+
+            // Update live leader from pairwise scorecard win tallies (preferred)
+            // or fall back to score totals if no scorecard yet
+            if (data.scorecard && Object.keys(data.scorecard.winTallies || {}).length > 0) {
+              const tallies: [string, any][] = Object.entries(data.scorecard.winTallies);
+              const topTally = tallies.sort((a: [string, any], b: [string, any]) => b[1].total - a[1].total)[0];
+              if (topTally && topTally[1].total > 0) {
+                const info = getModelInfo(topTally[0]);
+                currentLeader = {
+                  agentId: topTally[0],
+                  agentName: topTally[1].agentName || info.name,
+                  score: topTally[1].total,
+                  winTallies: data.scorecard.winTallies
+                };
+              }
+            } else {
+              // Fallback: use score totals before first pairwise round
+              const scoreTotals: Record<string, number> = {};
+              for (const r of liveJudgeResults) {
+                scoreTotals[r.agentId] = (scoreTotals[r.agentId] || 0) + (r.scores?.overallScore ?? 50);
+              }
+              const topScorer = Object.entries(scoreTotals).sort((a, b) => b[1] - a[1])[0];
+              if (topScorer) {
+                const info = getModelInfo(topScorer[0]);
+                currentLeader = { agentId: topScorer[0], agentName: info.name, score: topScorer[1] };
+              }
+            }
+
             const momentumTotals: Record<string, number> = {};
             for (const r of liveJudgeResults) {
-              scoreTotals[r.agentId] = (scoreTotals[r.agentId] || 0) + (r.scores?.overallScore ?? 50);
               momentumTotals[r.agentId] = (momentumTotals[r.agentId] || 0) + (r.momentumShift ?? 0);
-            }
-            const topScorer = Object.entries(scoreTotals).sort((a, b) => b[1] - a[1])[0];
-            if (topScorer) {
-              const info = getModelInfo(topScorer[0]);
-              currentLeader = { agentId: topScorer[0], agentName: info.name, score: topScorer[1] };
             }
             const topMomentum = Object.entries(momentumTotals).sort((a, b) => b[1] - a[1])[0];
             momentumLeader = topMomentum ? { agentId: topMomentum[0], momentum: topMomentum[1] } : null;
+
+          } else if (data.type === "narrativeVerdict") {
+            narrativeVerdict = {
+              text: data.text,
+              favouredAgentId: data.favouredAgentId,
+              agreesWithScorecard: data.agreesWithScorecard
+            };
+
+          } else if (data.type === "finalScorecard") {
+            finalScorecard = data.scorecard;
+            // Update leader from final scorecard
+            if (data.scorecard?.winTallies) {
+              const tallies: [string, any][] = Object.entries(data.scorecard.winTallies);
+              const topTally = tallies.sort((a: [string, any], b: [string, any]) => b[1].total - a[1].total)[0];
+              if (topTally) {
+                const info = getModelInfo(topTally[0]);
+                currentLeader = {
+                  agentId: topTally[0],
+                  agentName: topTally[1].agentName || info.name,
+                  score: topTally[1].total,
+                  winTallies: data.scorecard.winTallies
+                };
+              }
+            }
           } else if (data.type === "done") {
             done = true;
             running = false;
@@ -725,7 +802,7 @@
 
       <!-- Score -->
       <p class="text-sm uppercase tracking-widest text-[--color-muted]">
-        Final Score: {winnerScore?.toFixed(1)} points
+        {finalScorecard ? `${winnerScore} round wins` : `Score: ${winnerScore?.toFixed(1)}`}
       </p>
 
       <!-- Close -->
@@ -1416,9 +1493,9 @@
         <div class="flex-1 h-px bg-[--color-border]"></div>
       </div>
 
-      <!-- Current Standings -->
-      {#if currentLeader}
-        {@const leaderInfo = getModelInfo(currentLeader.agentId)}
+      <!-- Scorecard — win tallies -->
+      {#if currentLeader?.winTallies}
+        {@const tallies = currentLeader.winTallies}
         <div
           class="rounded-2xl border overflow-hidden bg-[--color-panel]"
           style="border-color: #7c6af740"
@@ -1428,111 +1505,145 @@
             class="flex items-center gap-3 px-4 py-3 border-b"
             style="border-color: #7c6af725; background: #7c6af708"
           >
+            <span class="text-sm font-bold" style="color: #c084fc">Scorecard</span>
+            <span class="text-[10px] text-[--color-muted] ml-1">round wins — boxing scorecard</span>
+          </div>
+          <div class="px-4 py-3 flex flex-col gap-2">
+            {#each Object.entries(tallies) as [agentId, tally]}
+              {@const info = getModelInfo(agentId)}
+              {@const isLeader = agentId === currentLeader.agentId}
+              <div class="flex items-center gap-3">
+                <div
+                  class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                  style="background: {info.color}18; color: {info.color}; border: 1px solid {info.color}28"
+                >
+                  {info.name[0]}
+                </div>
+                <span class="text-sm font-medium flex-1 {isLeader ? '' : 'text-[--color-muted-fg]'}" style="{isLeader ? `color: ${info.color}` : ''}">
+                  {tally.agentName}
+                </span>
+                <div class="flex items-center gap-3 text-xs">
+                  <span title="Logic wins" class="flex flex-col items-center">
+                    <span class="text-[--color-muted] text-[10px]">Logic</span>
+                    <span style="color: {tally.logic > 0 ? '#34d399' : '#6b7280'}">{tally.logic}</span>
+                  </span>
+                  <span title="Tactics wins" class="flex flex-col items-center">
+                    <span class="text-[--color-muted] text-[10px]">Tactics</span>
+                    <span style="color: {tally.tactics > 0 ? '#60a5fa' : '#6b7280'}">{tally.tactics}</span>
+                  </span>
+                  <span title="Rhetoric wins" class="flex flex-col items-center">
+                    <span class="text-[--color-muted] text-[10px]">Rhetoric</span>
+                    <span style="color: {tally.rhetoric > 0 ? '#f472b6' : '#6b7280'}">{tally.rhetoric}</span>
+                  </span>
+                  <span title="Total wins" class="flex flex-col items-center border-l border-[--color-border] pl-3">
+                    <span class="text-[--color-muted] text-[10px]">Total</span>
+                    <span class="font-bold" style="color: {info.color}">{tally.total}</span>
+                  </span>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {:else if currentLeader}
+        <!-- Fallback leader display before first pairwise round -->
+        {@const leaderInfo = getModelInfo(currentLeader.agentId)}
+        <div
+          class="rounded-2xl border overflow-hidden bg-[--color-panel]"
+          style="border-color: #7c6af740"
+          in:fade={{ duration: 300 }}
+        >
+          <div class="px-4 py-3 flex items-center gap-3">
             <div
               class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0"
-              style="background: #7c6af718; color: #c084fc; border: 1px solid #7c6af730"
-            >
-              🏆
-            </div>
-            <div class="flex flex-col min-w-0">
-              <span class="text-sm font-semibold" style="color: #c084fc"
-                >Current Leader</span
-              >
-              <span class="text-[10px] text-[--color-muted]"
-                >Based on accumulated scores</span
-              >
-            </div>
-          </div>
-          <div class="px-4 py-3">
-            <div class="flex items-center gap-3">
-              <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold"
-                style="background: linear-gradient(135deg, {leaderInfo.color}22, {leaderInfo.color}0a); color: {leaderInfo.color}; border: 1px solid {leaderInfo.color}28"
-              >
-                {leaderInfo.name[0]}
-              </div>
-              <div class="flex-1">
-                <div class="font-semibold" style="color: {leaderInfo.color}">
-                  {leaderInfo.name}
-                </div>
-                <div class="text-sm text-[--color-muted]">
-                  Score: {currentLeader.score.toFixed(1)} points
-                </div>
-              </div>
-              <div class="text-right">
-                {#if momentumLeader && momentumLeader.agentId === currentLeader.agentId}
-                  <div class="text-xs text-green-400 font-medium">↑ Momentum</div>
-                {/if}
-                {#if frameControlLeader && frameControlLeader.agentId === currentLeader.agentId}
-                  <div class="text-xs text-blue-400 font-medium">⬡ Frame Control</div>
-                {/if}
-              </div>
+              style="background: {leaderInfo.color}15; color: {leaderInfo.color}"
+            >{leaderInfo.name[0]}</div>
+            <div>
+              <div class="text-sm font-semibold" style="color: {leaderInfo.color}">{leaderInfo.name}</div>
+              <div class="text-[10px] text-[--color-muted]">Early leader — pairwise scoring starts Turn 2</div>
             </div>
           </div>
         </div>
       {/if}
 
-      <!-- Recent Judge Results -->
-      {#if liveJudgeResults.length > 0}
+      <!-- Language warning -->
+      {#if pairwiseRounds.some(r => r.languageWarning)}
+        <div class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400" in:fade>
+          {pairwiseRounds.find(r => r.languageWarning)?.languageWarning}
+        </div>
+      {/if}
+
+      <!-- Recent pairwise rounds -->
+      {#if pairwiseRounds.length > 0}
         <div class="flex flex-col gap-3">
           <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
-            Recent Analysis
+            Recent Rounds
           </h3>
-          {#each liveJudgeResults.slice(-3).reverse() as result (result.turnNumber)}
-            {@const agentInfo = getModelInfo(result.agentId)}
+          {#each pairwiseRounds.slice(-3).reverse() as round (round.roundNumber)}
+            {@const logicWinnerInfo = getModelInfo(round.logicWinner)}
+            {@const tacticsWinnerInfo = getModelInfo(round.tacticsWinner)}
+            {@const rhetoricWinnerInfo = getModelInfo(round.rhetoricWinner)}
             <div
               class="rounded-xl border bg-[--color-panel] p-3"
-              style="border-color: {agentInfo.color}20"
+              style="border-color: #7c6af720"
               in:fade={{ duration: 200 }}
             >
-              <div class="flex items-center gap-2 mb-2">
-                <div
-                  class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold"
-                  style="background: {agentInfo.color}15; color: {agentInfo.color}"
-                >
-                  {agentInfo.name[0]}
-                </div>
-                <span class="text-xs font-medium" style="color: {agentInfo.color}">
-                  Turn {result.turnNumber}
-                </span>
-                <span class="text-xs text-[--color-muted] ml-auto">
-                  {(result.scores.overallScore ?? 0).toFixed(0)}/100
-                </span>
+              <!-- Round header -->
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-[10px] font-bold uppercase tracking-widest text-[--color-muted]">Round {round.roundNumber}</span>
+                <span class="text-[10px] text-[--color-muted]">·</span>
+                <span class="text-[10px] text-[--color-muted]">T{round.prevTurn.turnNumber} ({round.prevTurn.agentName}) vs T{round.curTurn.turnNumber} ({round.curTurn.agentName})</span>
+                {#if round.isFallback}
+                  <span class="ml-auto text-[10px] text-yellow-500">fallback</span>
+                {/if}
               </div>
 
-              <div class="grid grid-cols-2 gap-2 text-xs">
-                <div class="flex items-center gap-1">
-                  <span class="text-[--color-muted]">Logic:</span>
-                  <span style="color: {(result.scores.logicalCoherence ?? 0) > 28 ? '#34d399' : (result.scores.logicalCoherence ?? 0) > 20 ? '#fbbf24' : '#f87171'}">
-                    {(result.scores.logicalCoherence ?? 0)}/40
-                  </span>
+              <!-- Winner chips -->
+              <div class="grid grid-cols-3 gap-2 mb-3">
+                <div class="flex flex-col gap-1">
+                  <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Logic</span>
+                  <span class="text-xs font-semibold truncate" style="color: {logicWinnerInfo.color}">{logicWinnerInfo.name}</span>
                 </div>
-                <div class="flex items-center gap-1">
-                  <span class="text-[--color-muted]">Rhetoric:</span>
-                  <span style="color: {(result.scores.rhetoricalForce ?? 0) > 21 ? '#34d399' : (result.scores.rhetoricalForce ?? 0) > 15 ? '#fbbf24' : '#f87171'}">
-                    {(result.scores.rhetoricalForce ?? 0)}/30
-                  </span>
+                <div class="flex flex-col gap-1">
+                  <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Tactics</span>
+                  <span class="text-xs font-semibold truncate" style="color: {tacticsWinnerInfo.color}">{tacticsWinnerInfo.name}</span>
                 </div>
-                <div class="flex items-center gap-1">
-                  <span class="text-[--color-muted]">Tactics:</span>
-                  <span style="color: {(result.scores.tacticalEffectiveness ?? 0) > 21 ? '#34d399' : (result.scores.tacticalEffectiveness ?? 0) > 15 ? '#fbbf24' : '#f87171'}">
-                    {(result.scores.tacticalEffectiveness ?? 0)}/30
-                  </span>
-                </div>
-                <div class="flex items-center gap-1">
-                  <span class="text-[--color-muted]">Total:</span>
-                  <span style="color: {(result.scores.overallScore ?? 0) > 70 ? '#34d399' : (result.scores.overallScore ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
-                    {(result.scores.overallScore ?? 0)}/100
-                  </span>
+                <div class="flex flex-col gap-1">
+                  <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Rhetoric</span>
+                  <span class="text-xs font-semibold truncate" style="color: {rhetoricWinnerInfo.color}">{rhetoricWinnerInfo.name}</span>
                 </div>
               </div>
 
-              <div class="mt-2 pt-2 border-t border-[--color-border]">
-                <p class="text-xs text-[--color-muted-fg] leading-relaxed">{result.reasoning ?? '(no reasoning)'}</p>
+              <!-- Logic delta (2-3 sentences) -->
+              <div class="pt-2 border-t border-[--color-border]">
+                <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.logicDelta}</p>
               </div>
-
             </div>
           {/each}
+        </div>
+      {/if}
+
+      <!-- Narrative verdict (shown after debate completes) -->
+      {#if narrativeVerdict}
+        <div
+          class="rounded-2xl border overflow-hidden bg-[--color-panel]"
+          style="border-color: {narrativeVerdict.agreesWithScorecard ? '#7c6af740' : '#f59e0b40'}"
+          in:fade={{ duration: 500 }}
+        >
+          <div
+            class="flex items-center gap-3 px-4 py-3 border-b"
+            style="border-color: {narrativeVerdict.agreesWithScorecard ? '#7c6af725' : '#f59e0b25'}; background: {narrativeVerdict.agreesWithScorecard ? '#7c6af708' : '#f59e0b08'}"
+          >
+            <span class="text-sm font-bold" style="color: {narrativeVerdict.agreesWithScorecard ? '#c084fc' : '#fbbf24'}">
+              {narrativeVerdict.agreesWithScorecard ? 'Narrative Verdict' : '⚡ Narrative Disagrees with Scorecard'}
+            </span>
+            {#if narrativeVerdict.favouredAgentId}
+              {@const favouredInfo = getModelInfo(narrativeVerdict.favouredAgentId)}
+              <span class="ml-auto text-xs font-semibold" style="color: {favouredInfo.color}">→ {favouredInfo.name}</span>
+            {/if}
+          </div>
+          <div class="px-4 py-4">
+            <p class="text-sm text-[--color-muted-fg] leading-relaxed whitespace-pre-line">{narrativeVerdict.text}</p>
+          </div>
         </div>
       {/if}
 

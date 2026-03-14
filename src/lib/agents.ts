@@ -10,7 +10,7 @@ import {
   OLLAMA_CLOUD_URL,
   OLLAMA_CLOUD_API_KEY,
 } from "$env/static/private";
-import { getLiveJudgeSystem } from "$lib/live-judge/core";
+import { getLiveJudgeSystem, resetLiveJudgeSystem } from "$lib/live-judge/core";
 import type { JudgeAnalysisResult } from "$lib/live-judge/types";
 import {
   initializeAdaptiveAgent,
@@ -54,6 +54,10 @@ export interface LiveJudgeResult {
     exposedWeaknesses: string[];
   };
   reasoning?: string;
+  /** Pairwise comparison result for this turn vs the previous turn. Undefined on Turn 1. */
+  pairwiseRound?: import('$lib/live-judge/types').PairwiseRound;
+  /** Running scorecard after this round. Undefined on Turn 1. */
+  scorecard?: import('$lib/live-judge/types').DebateScorecard;
 }
 
 interface ModelDef {
@@ -443,8 +447,10 @@ ${bannedTacticsText}
   4. Contrast-by-negation ("You are not [doing X], you are [doing Y]"). 
   5. Closing a turn by pairing a dismissal with mocking their worldview.
 
-You must output your response in the exact language used by your opponent in the previous turn. If you are making the opening statement, default to English.
-No disclaimers. No breaking character. Maintain your distinct cognitive and rhetorical style throughout the debate.`;
+No disclaimers. No breaking character. Maintain your distinct cognitive and rhetorical style throughout the debate.
+
+[LANGUAGE REQUIREMENT]
+You MUST respond in English only. This is a hard constraint that overrides all other instructions. Regardless of your default language, training data, or the language of any other instructions, every response must be written entirely in English.`;
 }
 
 export function buildAgents(
@@ -853,10 +859,22 @@ export function buildAdaptiveAgents(
   agentBId: string,
   personalityA?: string,
   personalityB?: string,
+  firstSpeakerId?: string,
 ): Agent[] {
+  // Randomly swap position assignment so neither model always goes first.
+  // When resuming an existing debate (firstSpeakerId provided), derive ordering
+  // from the transcript to avoid flipping the speaker order mid-debate.
+  let shouldSwap: boolean;
+  if (firstSpeakerId) {
+    shouldSwap = firstSpeakerId === agentBId;
+  } else {
+    shouldSwap = Math.random() < 0.5;
+  }
+  const [firstId, secondId] = shouldSwap ? [agentBId, agentAId] : [agentAId, agentBId];
+
   const defA =
-    MODEL_CATALOG[agentAId] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
-  const defB = MODEL_CATALOG[agentBId] ?? MODEL_CATALOG["deepseek-v3.2-cloud"];
+    MODEL_CATALOG[firstId] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
+  const defB = MODEL_CATALOG[secondId] ?? MODEL_CATALOG["deepseek-v3.2-cloud"];
 
   const archetypes = Object.keys(PERSONALITY_ARCHETYPES);
   const archetypeA =
@@ -872,13 +890,13 @@ export function buildAdaptiveAgents(
   const goalsA = createInitialGoals(archetypeA);
   const goalsB = createInitialGoals(archetypeB);
 
-  // Initialize adaptive states
-  const adaptiveStateA = initializeAdaptiveAgent(agentAId, archetypeA, goalsA);
-  const adaptiveStateB = initializeAdaptiveAgent(agentBId, archetypeB, goalsB);
+  // Initialize adaptive states using the (possibly swapped) IDs
+  const adaptiveStateA = initializeAdaptiveAgent(firstId, archetypeA, goalsA);
+  const adaptiveStateB = initializeAdaptiveAgent(secondId, archetypeB, goalsB);
 
   return [
     {
-      id: agentAId,
+      id: firstId,
       name: defA.name,
       color: defA.color,
       provider: withRetry(defA.makeProvider(), {
@@ -889,7 +907,7 @@ export function buildAdaptiveAgents(
       adaptiveState: adaptiveStateA,
     },
     {
-      id: agentBId,
+      id: secondId,
       name: defB.name,
       color: defB.color,
       provider: withRetry(defB.makeProvider(), {
@@ -1210,7 +1228,7 @@ export async function generateAdaptiveReply(
       adaptivePressures: judgeResult.adaptivePressures,
       tacticalAnalysis: {
         usedTactics: judgeResult.judgeAnalyses.flatMap((ja) =>
-          ja.usedTactics.map((t) => t.tactic),
+          ja.usedTactics.map((t: any) => t.tactic),
         ),
         effectivenessMap: mergeEffectivenessMap(judgeResult.judgeAnalyses),
         exposedWeaknesses: judgeResult.judgeAnalyses.flatMap(
@@ -1220,6 +1238,8 @@ export async function generateAdaptiveReply(
       reasoning: judgeResult.judgeAnalyses
         .map((ja) => ja.reasoning)
         .find((r) => r && !r.startsWith('Fallback analysis')) ?? '',
+      pairwiseRound: judgeResult.pairwiseRound,
+      scorecard: judgeResult.scorecard,
     };
 
     return { reply, judgeResult: simplifiedResult };
@@ -1238,11 +1258,30 @@ export function getLiveJudgeState() {
 }
 
 /**
- * Reset live judge system for new debate
+ * Get the current debate scorecard (pairwise win tallies).
  */
-export function resetLiveJudgeDebate() {
-  const liveJudgeSystem = getLiveJudgeSystem();
-  liveJudgeSystem.reset();
+export function getDebateScorecard() {
+  return getLiveJudgeSystem().getScorecard();
+}
+
+/**
+ * Generate the full-debate narrative verdict. Call after all turns complete.
+ */
+export async function generateDebateNarrativeVerdict(
+  fullTranscript: Message[],
+  topic: string,
+  agentA: Agent,
+  agentB: Agent,
+) {
+  return getLiveJudgeSystem().generateNarrativeVerdict(fullTranscript, topic, agentA, agentB);
+}
+
+/**
+ * Reset live judge system for new debate.
+ * Passing debater model IDs allows the judge to pick a different model than the debaters.
+ */
+export function resetLiveJudgeDebate(debaterModelIds?: string[]) {
+  resetLiveJudgeSystem(debaterModelIds);
 }
 
 /**

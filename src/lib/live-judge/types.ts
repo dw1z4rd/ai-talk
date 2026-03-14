@@ -2,7 +2,7 @@
 
 export interface ScoringWeights {
   logicalCoherence: number;      // 0.2 - 0.5
-  rhetoricalForce: number;       // 0.2 - 0.5  
+  rhetoricalForce: number;       // 0.2 - 0.5
   frameControl: number;          // 0.1 - 0.3
   credibilityScore: number;      // 0.1 - 0.3
   tacticalEffectiveness: number; // 0.2 - 0.4
@@ -33,25 +33,76 @@ export interface TurnAnalysis {
   message: string;
   opponentMessage: string;
   context: string;
-  
+
   // Scoring breakdown
   scores: JudgeScores;
-  
+
   // Tactical insights
   usedTactics: TacticAnalysis[];
   effectivenessMap: { [tactic: string]: number };
-  
+
   // Strategic impact
   momentumShift: number;         // -100 to +100
   frameControlShift: number;     // -100 to +100
   exposedWeaknesses: string[];
   tacticalInsights: string[];
-  
+
   // Judge-specific data
   judgeId: string;
   judgeSpecialization: JudgeSpecialization;
   reasoning: string;
 }
+
+// ── Pairwise comparison types ─────────────────────────────────────────────────
+
+export interface PairwiseTurnRef {
+  turnNumber: number;
+  agentId: string;
+  agentName: string;
+  message: string;
+}
+
+/** Result of comparing two consecutive debate turns head-to-head. */
+export interface PairwiseRound {
+  roundNumber: number;
+  prevTurn: PairwiseTurnRef;
+  curTurn: PairwiseTurnRef;
+  /** agentId of the winner on each dimension */
+  logicWinner: string;
+  tacticsWinner: string;
+  rhetoricWinner: string;
+  /** 2-3 sentence justifications */
+  logicDelta: string;
+  tacticsDelta: string;
+  rhetoricDelta: string;
+  languageWarning?: string;
+  isFallback: boolean;
+}
+
+/** Running win tally for one agent across all pairwise rounds. */
+export interface AgentWinTally {
+  agentName: string;
+  logic: number;
+  tactics: number;
+  rhetoric: number;
+  total: number;
+}
+
+/** Accumulated scorecard for the full debate. */
+export interface DebateScorecard {
+  rounds: PairwiseRound[];
+  winTallies: { [agentId: string]: AgentWinTally };
+  overallWinner: string | null;  // agentId, or null if draw
+}
+
+/** Full-debate narrative verdict written after all pairwise rounds. */
+export interface NarrativeVerdict {
+  text: string;
+  favouredAgentId: string | null;
+  agreesWithScorecard: boolean;
+}
+
+// ── Existing types kept for adaptive pressure system ─────────────────────────
 
 export interface JudgeBias {
   preferenceComplexity: number;    // -1 to 1 (prefers simple to complex)
@@ -82,6 +133,10 @@ export interface AgentScores {
   frameControlScore: number;
   tacticalEffectiveness: number;
   lastTurnAnalysis: TurnAnalysis | null;
+  // Pairwise win tallies
+  logicWins: number;
+  tacticsWins: number;
+  rhetoricWins: number;
 }
 
 export interface MomentumTracker {
@@ -101,13 +156,13 @@ export interface FrameControlTracker {
 export interface AdaptivePressure {
   sourceJudge: string;
   sourceTurn: number;
-  
+
   // Pressure types
   cognitivePressure: number;     // 0-100 (affects analytical traits)
   emotionalPressure: number;     // 0-100 (affects emotional traits)
   strategicPressure: number;     // 0-100 (affects risk/aggression traits)
   credibilityPressure: number;   // 0-100 (affects evidence/personal traits)
-  
+
   // Specific trait adjustments (-5 to +5)
   traitAdjustments: {
     analyticalDepth: number;
@@ -123,7 +178,7 @@ export interface AdaptivePressure {
     engagementTactics: number;
     metaphorUsage: number;
   };
-  
+
   // Duration and decay
   intensity: number;             // Overall pressure strength 0-100
   decayRate: number;             // How quickly pressure fades 0-1
@@ -137,6 +192,9 @@ export interface LiveJudgePanel {
   frameControlTracker: FrameControlTracker;
   turnCount: number;
   isActive: boolean;
+  scorecard: DebateScorecard;
+  /** The most recently completed turn, stored so the next processTurn can run pairwise. */
+  previousTurn: PairwiseTurnRef | null;
 }
 
 export interface JudgeAnalysisResult {
@@ -150,6 +208,10 @@ export interface JudgeAnalysisResult {
   judgeAnalyses: TurnAnalysis[];
   newMomentumState: MomentumTracker;
   newFrameControlState: FrameControlTracker;
+  /** Pairwise round result if this was not the opening turn. */
+  pairwiseRound?: PairwiseRound;
+  /** Running scorecard after this turn pair. */
+  scorecard?: DebateScorecard;
 }
 
 // Judge specialization configurations
