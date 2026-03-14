@@ -1041,6 +1041,7 @@ export async function generateAdaptiveReply(
   opponentAgent: Agent,
   context?: string,
   onToken?: (token: string) => void,
+  onReply?: (reply: string) => void,
 ): Promise<{ reply: string | null; judgeResult?: LiveJudgeResult }> {
   // Generate the reply
   let systemPrompt = agent.systemPrompt;
@@ -1076,21 +1077,34 @@ export async function generateAdaptiveReply(
     return { reply };
   }
 
+  // Capture opponent's last message before onReply mutates history
+  const opponentMessage = history.length > 0 ? history[history.length - 1].text : "";
+
+  // Notify caller that the reply is ready — before judge analysis blocks
+  onReply?.(reply);
+
   // Process with live judge system even if no adaptive state
   try {
     const liveJudgeSystem = getLiveJudgeSystem();
-    const opponentMessage =
-      history.length > 0 ? history[history.length - 1].text : "";
 
-    const judgeResult = await liveJudgeSystem.processTurn(
-      agent,
-      reply,
-      opponentAgent,
-      opponentMessage,
-      turnNumber,
-      context || "",
-      history,
-    );
+    const JUDGE_TIMEOUT_MS = 20_000;
+    const judgeResult = await Promise.race([
+      liveJudgeSystem.processTurn(
+        agent,
+        reply,
+        opponentAgent,
+        opponentMessage,
+        turnNumber,
+        context || "",
+        history,
+      ),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Judge analysis timed out after ${JUDGE_TIMEOUT_MS}ms`)),
+          JUDGE_TIMEOUT_MS,
+        ),
+      ),
+    ]);
 
     // Only apply adaptive pressure if adaptive state exists
     if (agent.adaptiveState) {

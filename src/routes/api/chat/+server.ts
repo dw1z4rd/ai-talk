@@ -52,14 +52,21 @@ export const POST: RequestHandler = async ({ request }) => {
 					const turnNumber = turn + 1;
 					
 					const result = await generateAdaptiveReply(
-						agent, 
-						history, 
-						safeTopic, 
+						agent,
+						history,
+						safeTopic,
 						turnNumber,
 						opponentAgent,
-						context, 
+						context,
 						(token) => {
 							send({ type: 'token', agentId: agent.id, agentName: agent.name, color: agent.color, text: token });
+						},
+						(reply) => {
+							// Fires as soon as the reply text is ready, before judge analysis runs.
+							// Committing the message here ensures the debate moves forward even
+							// if judge LLM calls are slow or unresponsive.
+							history.push({ agentId: agent.id, agentName: agent.name, text: reply });
+							send({ type: 'message', agentId: agent.id, agentName: agent.name, color: agent.color, text: reply });
 						}
 					);
 
@@ -69,13 +76,7 @@ export const POST: RequestHandler = async ({ request }) => {
 						continue;
 					}
 
-					const msg: Message = { agentId: agent.id, agentName: agent.name, text: result.reply };
-					history.push(msg);
-
-					// Send the message
-					send({ type: 'message', agentId: agent.id, agentName: agent.name, color: agent.color, text: result.reply });
-
-					// Send judge results if available
+					// Send judge results if available (message already sent via onReply callback)
 					if (result.judgeResult) {
 						send({ 
 							type: 'judgeResult', 
