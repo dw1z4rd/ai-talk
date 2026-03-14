@@ -10,7 +10,7 @@ import {
   JUDGE_SPECIALIZATION_CONFIGS
 } from './types';
 import type { Agent, Message } from '$lib/agents';
-import { createOllamaProvider, withRetry } from '$lib/llm-agent';
+import { createOllamaProvider } from '$lib/llm-agent';
 import { MODEL_CATALOG } from '$lib/agents';
 
 /**
