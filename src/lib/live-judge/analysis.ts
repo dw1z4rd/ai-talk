@@ -47,7 +47,7 @@ export async function analyzeTurn(
     const analysisText = await judgeProvider.generateText(judgePrompt, {
       systemPrompt: generateJudgeSystemPrompt(judge),
       temperature: 0.7,
-      maxTokens: 600,
+      maxTokens: 1000,
       signal
     });
 
@@ -272,30 +272,29 @@ function parseJudgeAnalysis(
     try {
       analysisData = JSON.parse(jsonString);
     } catch (parseError: unknown) {
-      console.warn('JSON parsing failed, attempting fixes:', (parseError as Error).message);
-      // If parsing fails, try to fix common issues
+      console.warn(`[Judge] ${judge.name} JSON parse failed (${(parseError as Error).message}), attempting fix. Raw response tail: ...${jsonString.slice(-200)}`);
       try {
-        // Try to fix truncated JSON by adding missing braces
+        // Close any truncated string literal first
         let fixedJson = jsonString;
-        
-        // Count opening and closing brackets
+        const lastQuote = fixedJson.lastIndexOf('"');
+        const afterLastQuote = fixedJson.slice(lastQuote + 1).replace(/\s/g, '');
+        // If there's an unclosed string (odd number of unescaped quotes), close it
+        if (afterLastQuote.length > 0 && !afterLastQuote.startsWith(',') && !afterLastQuote.startsWith('}') && !afterLastQuote.startsWith(']')) {
+          fixedJson = fixedJson.slice(0, lastQuote + 1);
+        }
+
+        // Close brackets in the correct order: ] before }
         const openBraces = (fixedJson.match(/\{/g) || []).length;
         const closeBraces = (fixedJson.match(/\}/g) || []).length;
         const openBrackets = (fixedJson.match(/\[/g) || []).length;
         const closeBrackets = (fixedJson.match(/\]/g) || []).length;
-        
-        // Add missing closing braces/brackets
-        for (let i = 0; i < openBraces - closeBraces; i++) {
-          fixedJson += '}';
-        }
-        for (let i = 0; i < openBrackets - closeBrackets; i++) {
-          fixedJson += ']';
-        }
-        
-        // Try to parse again
+
+        for (let i = 0; i < openBrackets - closeBrackets; i++) fixedJson += ']';
+        for (let i = 0; i < openBraces - closeBraces; i++) fixedJson += '}';
+
         analysisData = JSON.parse(fixedJson);
       } catch (secondParseError: unknown) {
-        console.warn('JSON parsing failed completely, using fallback:', (secondParseError as Error).message);
+        console.warn(`[Judge] ${judge.name} JSON fix failed (${(secondParseError as Error).message}), using fallback`);
         return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
       }
     }
