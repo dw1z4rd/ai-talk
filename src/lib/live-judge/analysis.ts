@@ -45,7 +45,7 @@ export async function analyzeTurn(
     const analysisText = await judgeProvider.generateText(judgePrompt, {
       systemPrompt: generateJudgeSystemPrompt(),
       temperature: 0.3,
-      maxTokens: 400,
+      maxTokens: 800,
       signal
     });
 
