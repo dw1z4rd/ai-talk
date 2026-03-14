@@ -6,9 +6,9 @@ import {
   generateDebateNarrativeVerdict,
   getDebateScorecard,
 } from '$lib/agents';
-import type { Message, LiveJudgeResult } from '$lib/agents';
+import type { Message } from '$lib/agents';
 
-// Each SSE event is JSON: { type: 'message' | 'pairwiseResult' | 'narrativeVerdict' | 'finalScorecard' | 'done' | 'error', ... }
+// Each SSE event is JSON: { type: 'token' | 'message' | 'judgeResult' | 'narrativeVerdict' | 'finalScorecard' | 'done' | 'error', ... }
 
 export const POST: RequestHandler = async ({ request }) => {
 	const { topic, turns, context, agentA, agentB, messages } = (await request.json()) as {
@@ -37,9 +37,6 @@ export const POST: RequestHandler = async ({ request }) => {
 				// model can be selected to differ from the debaters.
 				resetLiveJudgeDebate([agentAId, agentBId]);
 
-				// buildAdaptiveAgents randomly swaps position assignment
-				const agents = buildAdaptiveAgents(agentAId, agentBId);
-
 				const history: Message[] = (messages || []).map((m: any) => {
 					if (m.agentId === 'moderator') {
 						return {
@@ -50,6 +47,11 @@ export const POST: RequestHandler = async ({ request }) => {
 					}
 					return m;
 				});
+
+				// When resuming, derive agent ordering from the first speaker so
+				// turn parity is preserved; on a fresh debate, randomize.
+				const firstSpeakerId = history.find(m => m.agentId !== 'moderator')?.agentId;
+				const agents = buildAdaptiveAgents(agentAId, agentBId, undefined, undefined, firstSpeakerId);
 
 				const aiMessagesCount = history.filter(m => m.agentId !== 'moderator').length;
 

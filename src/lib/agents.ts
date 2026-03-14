@@ -859,10 +859,17 @@ export function buildAdaptiveAgents(
   agentBId: string,
   personalityA?: string,
   personalityB?: string,
+  firstSpeakerId?: string,
 ): Agent[] {
   // Randomly swap position assignment so neither model always goes first.
-  // This prevents systematic bias from always having the same model open the debate.
-  const shouldSwap = Math.random() < 0.5;
+  // When resuming an existing debate (firstSpeakerId provided), derive ordering
+  // from the transcript to avoid flipping the speaker order mid-debate.
+  let shouldSwap: boolean;
+  if (firstSpeakerId) {
+    shouldSwap = firstSpeakerId === agentBId;
+  } else {
+    shouldSwap = Math.random() < 0.5;
+  }
   const [firstId, secondId] = shouldSwap ? [agentBId, agentAId] : [agentAId, agentBId];
 
   const defA =
