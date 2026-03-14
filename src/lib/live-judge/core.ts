@@ -17,7 +17,7 @@ import { MODEL_CATALOG } from '$lib/agents';
 export class LiveJudgeSystem {
   private panel: LiveJudgePanel;
 
-  constructor(judgeModelIds: string[] = ['gpt-oss:120b-cloud', 'deepseek-v3.1:671b-cloud', 'deepseek-v3.2-cloud']) {
+  constructor(judgeModelIds: string[] = ['glm-4.6:cloud', 'devstral-small-2:24b-cloud', 'glm-4.6:cloud']) {
     this.panel = this.initializeJudgePanel(judgeModelIds);
   }
 

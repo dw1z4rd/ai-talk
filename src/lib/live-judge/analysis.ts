@@ -44,7 +44,7 @@ export async function analyzeTurn(
     const analysisText = await judgeProvider.generateText(judgePrompt, {
       systemPrompt: generateJudgeSystemPrompt(judge),
       temperature: 0.7,
-      maxTokens: 1500
+      maxTokens: 600
     });
 
     return parseJudgeAnalysis(analysisText, judge, agent, opponent, turnNumber, message, opponentMessage, context);
@@ -523,11 +523,7 @@ function createJudgeProvider(modelId: string) {
     throw new Error(`Model ${modelId} not found in catalog`);
   }
   
-  const provider = modelDef.makeProvider();
-  return withRetry(provider, {
-    maxRetries: 2,
-    initialDelayMs: 600
-  });
+  return modelDef.makeProvider();
 }
 
 /**
