@@ -10,8 +10,8 @@ import {
   JUDGE_SPECIALIZATION_CONFIGS
 } from './types';
 import type { Agent, Message } from '$lib/agents';
-import { createOllamaProvider } from '$lib/llm-agent';
-import { MODEL_CATALOG } from '$lib/agents';
+import { createAnthropicProvider } from '$lib/llm-agent';
+import { ANTHROPIC_API_KEY } from '$env/static/private';
 
 /**
  * Analyze a single turn with a specific judge
@@ -517,13 +517,11 @@ export function calculateFrameControlShift(
 /**
  * Create judge provider for analysis
  */
-function createJudgeProvider(modelId: string) {
-  const modelDef = MODEL_CATALOG[modelId];
-  if (!modelDef) {
-    throw new Error(`Model ${modelId} not found in catalog`);
-  }
-  
-  return modelDef.makeProvider();
+function createJudgeProvider(_modelId: string) {
+  return createAnthropicProvider({
+    apiKey: ANTHROPIC_API_KEY,
+    model: 'claude-haiku-4-5-20251001'
+  });
 }
 
 /**

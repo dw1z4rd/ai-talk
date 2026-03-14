@@ -12,12 +12,11 @@ import {
 import type { Agent, Message } from '$lib/agents';
 import { analyzeTurn, aggregateJudgeScores, calculateMomentumShift, calculateFrameControlShift, createFallbackAnalysis } from './analysis';
 import { generateAdaptivePressure } from './pressure';
-import { MODEL_CATALOG } from '$lib/agents';
 
 export class LiveJudgeSystem {
   private panel: LiveJudgePanel;
 
-  constructor(judgeModelIds: string[] = ['glm-4.6:cloud', 'devstral-small-2:24b-cloud', 'glm-4.6:cloud']) {
+  constructor(judgeModelIds: string[] = ['claude-haiku', 'claude-haiku', 'claude-haiku']) {
     this.panel = this.initializeJudgePanel(judgeModelIds);
   }
 
@@ -26,8 +25,6 @@ export class LiveJudgeSystem {
     const judges: LiveJudge[] = judgeModelIds.slice(0, 3).map((modelId, index) => {
       const specialization = specializations[index];
       const config = JUDGE_SPECIALIZATION_CONFIGS[specialization];
-      const modelDef = MODEL_CATALOG[modelId];
-      
       return {
         id: `judge-${specialization}-${index}`,
         name: config.name,
