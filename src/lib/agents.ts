@@ -11,12 +11,12 @@ import {
   OLLAMA_CLOUD_API_KEY,
 } from "$env/static/private";
 import { getLiveJudgeSystem } from "$lib/live-judge/core";
-import { 
-  initializeAdaptiveAgent, 
-  applyAdaptivePressure, 
+import {
+  initializeAdaptiveAgent,
+  applyAdaptivePressure,
   getCurrentPersonalityPrompt,
   recordTacticUsage,
-  updateAdaptationMetrics
+  updateAdaptationMetrics,
 } from "$lib/adaptive/personality";
 import type { AdaptiveAgentState, MetaGoal } from "$lib/adaptive/types";
 import type { AdaptivePressure } from "$lib/live-judge/types";
@@ -517,7 +517,7 @@ export async function generateReply(
   return agent.provider.generateText(prompt, {
     systemPrompt,
     temperature: 0.9,
-    maxTokens: 1000,
+    maxTokens: 10000,
     ...(onToken ? { onToken } : {}),
   });
 }
@@ -721,7 +721,7 @@ export async function generateEscapeRoomResponse(
   return agent.provider.generateText(prompt, {
     systemPrompt: agent.systemPrompt,
     temperature: 0.8,
-    maxTokens: 1000,
+    maxTokens: 10000,
   });
 }
 
@@ -845,16 +845,19 @@ export function buildAdaptiveAgents(
   personalityA?: string,
   personalityB?: string,
 ): Agent[] {
-  const defA = MODEL_CATALOG[agentAId] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
+  const defA =
+    MODEL_CATALOG[agentAId] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
   const defB = MODEL_CATALOG[agentBId] ?? MODEL_CATALOG["deepseek-v3.2-cloud"];
 
   const archetypes = Object.keys(PERSONALITY_ARCHETYPES);
-  const archetypeA = personalityA && PERSONALITY_ARCHETYPES[personalityA]
-    ? personalityA
-    : archetypes[Math.floor(Math.random() * archetypes.length)];
-  const archetypeB = personalityB && PERSONALITY_ARCHETYPES[personalityB]
-    ? personalityB
-    : archetypes[Math.floor(Math.random() * archetypes.length)];
+  const archetypeA =
+    personalityA && PERSONALITY_ARCHETYPES[personalityA]
+      ? personalityA
+      : archetypes[Math.floor(Math.random() * archetypes.length)];
+  const archetypeB =
+    personalityB && PERSONALITY_ARCHETYPES[personalityB]
+      ? personalityB
+      : archetypes[Math.floor(Math.random() * archetypes.length)];
 
   // Create initial goals for each agent
   const goalsA = createInitialGoals(archetypeA);
@@ -896,81 +899,126 @@ export function buildAdaptiveAgents(
 function createInitialGoals(archetype: string): MetaGoal[] {
   const baseGoals: MetaGoal[] = [
     {
-      id: 'frame_control',
-      type: 'frame_control',
+      id: "frame_control",
+      type: "frame_control",
       priority: 0.5,
-      successMetric: 'frame_control_score',
+      successMetric: "frame_control_score",
       tacticalPreferences: [
-        { tactic: 'frame_redefinition', weight: 0.8, triggerConditions: [], effectivenessScore: 0 },
-        { tactic: 'questioning', weight: 0.6, triggerConditions: [], effectivenessScore: 0 }
+        {
+          tactic: "frame_redefinition",
+          weight: 0.8,
+          triggerConditions: [],
+          effectivenessScore: 0,
+        },
+        {
+          tactic: "questioning",
+          weight: 0.6,
+          triggerConditions: [],
+          effectivenessScore: 0,
+        },
       ],
       isActive: true,
       activationTurn: 0,
     },
     {
-      id: 'dominance',
-      type: 'dominance',
+      id: "dominance",
+      type: "dominance",
       priority: 0.4,
-      successMetric: 'overall_score',
+      successMetric: "overall_score",
       tacticalPreferences: [
-        { tactic: 'contradiction', weight: 0.7, triggerConditions: [], effectivenessScore: 0 },
-        { tactic: 'escalation', weight: 0.6, triggerConditions: [], effectivenessScore: 0 }
+        {
+          tactic: "contradiction",
+          weight: 0.7,
+          triggerConditions: [],
+          effectivenessScore: 0,
+        },
+        {
+          tactic: "escalation",
+          weight: 0.6,
+          triggerConditions: [],
+          effectivenessScore: 0,
+        },
       ],
       isActive: true,
       activationTurn: 0,
-    }
+    },
   ];
 
   // Adjust goals based on archetype
   switch (archetype) {
-    case 'engineer':
+    case "engineer":
       baseGoals.push({
-        id: 'evidence_focus',
-        type: 'defensive',
+        id: "evidence_focus",
+        type: "defensive",
         priority: 0.7,
-        successMetric: 'logicalCoherence',
+        successMetric: "logicalCoherence",
         tacticalPreferences: [
-          { tactic: 'evidence_citation', weight: 0.9, triggerConditions: [], effectivenessScore: 0 }
+          {
+            tactic: "evidence_citation",
+            weight: 0.9,
+            triggerConditions: [],
+            effectivenessScore: 0,
+          },
         ],
         isActive: true,
         activationTurn: 0,
       });
       break;
-    case 'philosopher':
+    case "philosopher":
       baseGoals.push({
-        id: 'contradiction_mining',
-        type: 'contradiction_mining',
+        id: "contradiction_mining",
+        type: "contradiction_mining",
         priority: 0.6,
-        successMetric: 'logicalCoherence',
+        successMetric: "logicalCoherence",
         tacticalPreferences: [
-          { tactic: 'questioning', weight: 0.8, triggerConditions: [], effectivenessScore: 0 }
+          {
+            tactic: "questioning",
+            weight: 0.8,
+            triggerConditions: [],
+            effectivenessScore: 0,
+          },
         ],
         isActive: true,
         activationTurn: 0,
       });
       break;
-    case 'strategist':
+    case "strategist":
       baseGoals.push({
-        id: 'strategic_control',
-        type: 'frame_control',
+        id: "strategic_control",
+        type: "frame_control",
         priority: 0.8,
-        successMetric: 'tacticalEffectiveness',
+        successMetric: "tacticalEffectiveness",
         tacticalPreferences: [
-          { tactic: 'redirection', weight: 0.7, triggerConditions: [], effectivenessScore: 0 }
+          {
+            tactic: "redirection",
+            weight: 0.7,
+            triggerConditions: [],
+            effectivenessScore: 0,
+          },
         ],
         isActive: true,
         activationTurn: 0,
       });
       break;
-    case 'provocateur':
+    case "provocateur":
       baseGoals.push({
-        id: 'ethos_undermining',
-        type: 'ethos_undermining',
+        id: "ethos_undermining",
+        type: "ethos_undermining",
         priority: 0.7,
-        successMetric: 'rhetoricalForce',
+        successMetric: "rhetoricalForce",
         tacticalPreferences: [
-          { tactic: 'ridicule', weight: 0.8, triggerConditions: [], effectivenessScore: 0 },
-          { tactic: 'personal_attack', weight: 0.6, triggerConditions: [], effectivenessScore: 0 }
+          {
+            tactic: "ridicule",
+            weight: 0.8,
+            triggerConditions: [],
+            effectivenessScore: 0,
+          },
+          {
+            tactic: "personal_attack",
+            weight: 0.6,
+            triggerConditions: [],
+            effectivenessScore: 0,
+          },
         ],
         isActive: true,
         activationTurn: 0,
@@ -993,24 +1041,24 @@ export async function generateAdaptiveReply(
   context?: string,
   onToken?: (token: string) => void,
 ): Promise<{ reply: string | null; judgeResult?: LiveJudgeResult }> {
-  
   // Generate the reply
   let systemPrompt = agent.systemPrompt;
-  
+
   // Use dynamic personality prompt if adaptive state exists
   if (agent.adaptiveState) {
     const personalityPrompt = getCurrentPersonalityPrompt(
       agent.adaptiveState.personality,
       opponentAgent.name,
-      topic
+      topic,
     );
     systemPrompt = `${personalityPrompt}\n\n${agent.systemPrompt}`;
   }
 
   const historyText = formatHistory(history);
-  const prompt = history.length === 0
-    ? `The debate topic is: "${topic}"\n\nYou go first. Open the debate by staking out your position clearly.`
-    : `The debate topic is: "${topic}"\n\nDebate so far:\n${historyText}\n\nNow it's your turn. Respond directly to what was just said — challenge it, refute it, or reinforce your position.`;
+  const prompt =
+    history.length === 0
+      ? `The debate topic is: "${topic}"\n\nYou go first. Open the debate by staking out your position clearly.`
+      : `The debate topic is: "${topic}"\n\nDebate so far:\n${historyText}\n\nNow it's your turn. Respond directly to what was just said — challenge it, refute it, or reinforce your position.`;
 
   const fullPrompt = context
     ? `${systemPrompt}\n\n[REFERENCE MATERIAL]\nThe following documents have been provided. Draw on them where relevant to support or challenge arguments.\n\n${context}\n\n${prompt}`
@@ -1019,7 +1067,7 @@ export async function generateAdaptiveReply(
   const reply = await agent.provider.generateText(fullPrompt, {
     systemPrompt,
     temperature: 0.9,
-    maxTokens: 1000,
+    maxTokens: 10000,
     ...(onToken ? { onToken } : {}),
   });
 
@@ -1030,46 +1078,56 @@ export async function generateAdaptiveReply(
   // Process with live judge system
   try {
     const liveJudgeSystem = getLiveJudgeSystem();
-    const opponentMessage = history.length > 0 
-      ? history[history.length - 1].text 
-      : '';
-    
+    const opponentMessage =
+      history.length > 0 ? history[history.length - 1].text : "";
+
     const judgeResult = await liveJudgeSystem.processTurn(
       agent,
       reply,
       opponentAgent,
       opponentMessage,
       turnNumber,
-      context || '',
-      history
+      context || "",
+      history,
     );
 
     // Apply adaptive pressure to personality
     const evolutions = applyAdaptivePressure(
       agent.adaptiveState.personality,
       judgeResult.adaptivePressures,
-      turnNumber
+      turnNumber,
     );
 
     // Record tactic usage
     if (judgeResult.judgeAnalyses && judgeResult.judgeAnalyses.length > 0) {
-      const allTactics = judgeResult.judgeAnalyses.flatMap(ja => ja.usedTactics.map(t => t.tactic));
-      const effectivenessMap = judgeResult.judgeAnalyses.flatMap(ja => 
-        Object.entries(ja.effectivenessMap).map(([tactic, effectiveness]) => ({ tactic, effectiveness }))
-      ).reduce((acc, { tactic, effectiveness }) => {
-        acc[tactic] = (acc[tactic] || 0 + effectiveness) / judgeResult.judgeAnalyses.length;
-        return acc;
-      }, {} as { [tactic: string]: number });
-      
-      allTactics.forEach(tactic => {
+      const allTactics = judgeResult.judgeAnalyses.flatMap((ja) =>
+        ja.usedTactics.map((t) => t.tactic),
+      );
+      const effectivenessMap = judgeResult.judgeAnalyses
+        .flatMap((ja) =>
+          Object.entries(ja.effectivenessMap).map(
+            ([tactic, effectiveness]) => ({ tactic, effectiveness }),
+          ),
+        )
+        .reduce(
+          (acc, { tactic, effectiveness }) => {
+            acc[tactic] =
+              (acc[tactic] || 0 + effectiveness) /
+              judgeResult.judgeAnalyses.length;
+            return acc;
+          },
+          {} as { [tactic: string]: number },
+        );
+
+      allTactics.forEach((tactic) => {
         recordTacticUsage(
           agent.adaptiveState.tacticalMemory,
           tactic,
           effectivenessMap[tactic] || 50,
           `turn_${turnNumber}`,
-          allTactics[0] || 'default',
+          allTactics[0] || "default",
           opponentMessage,
-          turnNumber
+          turnNumber,
         );
       });
     }
@@ -1078,7 +1136,7 @@ export async function generateAdaptiveReply(
     updateAdaptationMetrics(
       agent.adaptiveState,
       evolutions,
-      [] // Goal changes would be tracked separately
+      [], // Goal changes would be tracked separately
     );
 
     // Convert judge result to simplified interface
@@ -1090,20 +1148,33 @@ export async function generateAdaptiveReply(
       frameControlShift: judgeResult.frameControlShift,
       adaptivePressures: judgeResult.adaptivePressures,
       tacticalAnalysis: {
-        usedTactics: judgeResult.judgeAnalyses.flatMap(ja => ja.usedTactics.map(t => t.tactic)),
-        effectivenessMap: judgeResult.judgeAnalyses.flatMap(ja => 
-          Object.entries(ja.effectivenessMap).map(([tactic, effectiveness]) => ({ tactic, effectiveness }))
-        ).reduce((acc, { tactic, effectiveness }) => {
-          acc[tactic] = (acc[tactic] || 0 + effectiveness) / judgeResult.judgeAnalyses.length;
-          return acc;
-        }, {} as { [tactic: string]: number }),
-        exposedWeaknesses: judgeResult.judgeAnalyses.flatMap(ja => ja.exposedWeaknesses)
-      }
+        usedTactics: judgeResult.judgeAnalyses.flatMap((ja) =>
+          ja.usedTactics.map((t) => t.tactic),
+        ),
+        effectivenessMap: judgeResult.judgeAnalyses
+          .flatMap((ja) =>
+            Object.entries(ja.effectivenessMap).map(
+              ([tactic, effectiveness]) => ({ tactic, effectiveness }),
+            ),
+          )
+          .reduce(
+            (acc, { tactic, effectiveness }) => {
+              acc[tactic] =
+                (acc[tactic] || 0 + effectiveness) /
+                judgeResult.judgeAnalyses.length;
+              return acc;
+            },
+            {} as { [tactic: string]: number },
+          ),
+        exposedWeaknesses: judgeResult.judgeAnalyses.flatMap(
+          (ja) => ja.exposedWeaknesses,
+        ),
+      },
     };
 
     return { reply, judgeResult: simplifiedResult };
   } catch (error) {
-    console.error('Live judging failed:', error);
+    console.error("Live judging failed:", error);
     return { reply };
   }
 }

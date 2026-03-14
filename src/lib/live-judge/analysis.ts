@@ -173,7 +173,35 @@ Key evaluation criteria:
 - Tactical effectiveness and strategic impact
 - Credibility and authenticity
 
-Always provide specific, evidence-based analysis in the requested JSON format.`;
+CRITICAL INSTRUCTION: You MUST respond ONLY with valid JSON in the exact format specified below. Do not include any other text, explanations, or markdown formatting. Just pure JSON.
+
+Example response format:
+{
+  "scores": {
+    "logicalCoherence": 85,
+    "rhetoricalForce": 75,
+    "frameControl": 80,
+    "credibility": 90,
+    "tacticalEffectiveness": 70
+  },
+  "usedTactics": [
+    {
+      "tactic": "evidence_citation",
+      "effectiveness": 85,
+      "confidence": 90,
+      "context": "cited specific study to support claim"
+    }
+  ],
+  "strategicImpact": {
+    "momentumShift": 5,
+    "frameControlShift": 10,
+    "exposedWeaknesses": ["inconsistent logic in previous argument"],
+    "tacticalInsights": ["effective use of authoritative sources"]
+  },
+  "reasoning": "The agent demonstrated strong logical coherence by citing specific studies..."
+}
+
+If you cannot provide a complete analysis, fill in reasonable default values rather than omitting fields.`;
 }
 
 /**
