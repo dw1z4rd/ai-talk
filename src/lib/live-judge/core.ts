@@ -10,7 +10,7 @@ import {
   JUDGE_SPECIALIZATION_CONFIGS 
 } from './types';
 import type { Agent, Message } from '$lib/agents';
-import { analyzeTurn, aggregateJudgeScores, calculateMomentumShift, calculateFrameControlShift } from './analysis';
+import { analyzeTurn, aggregateJudgeScores, calculateMomentumShift, calculateFrameControlShift, createFallbackAnalysis } from './analysis';
 import { generateAdaptivePressure } from './pressure';
 import { MODEL_CATALOG } from '$lib/agents';
 
@@ -75,10 +75,20 @@ export class LiveJudgeSystem {
     
     this.panel.turnCount = turnNumber;
 
-    // Run all judge analyses in parallel
+    const PER_JUDGE_TIMEOUT_MS = 15_000;
+
+    // Run all judge analyses in parallel, each with an individual timeout fallback
     const judgeAnalyses = await Promise.all(
-      this.panel.judges.map(judge => 
-        this.analyzeWithJudge(judge, agent, message, opponent, opponentMessage, turnNumber, context, messageHistory)
+      this.panel.judges.map(judge =>
+        Promise.race([
+          this.analyzeWithJudge(judge, agent, message, opponent, opponentMessage, turnNumber, context, messageHistory),
+          new Promise<any>((resolve) =>
+            setTimeout(() => {
+              console.warn(`Judge ${judge.name} (${judge.modelId}) timed out after ${PER_JUDGE_TIMEOUT_MS}ms — using fallback`);
+              resolve(createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context));
+            }, PER_JUDGE_TIMEOUT_MS)
+          )
+        ])
       )
     );
 

@@ -364,7 +364,7 @@ function calculateWeightedScore(scores: any, weights: any): number {
 /**
  * Create fallback analysis when judge analysis fails
  */
-function createFallbackAnalysis(
+export function createFallbackAnalysis(
   judge: LiveJudge,
   agent: Agent,
   opponent: Agent,
