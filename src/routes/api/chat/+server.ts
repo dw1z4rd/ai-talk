@@ -78,14 +78,15 @@ export const POST: RequestHandler = async ({ request }) => {
 
 					// Send judge results if available (message already sent via onReply callback)
 					if (result.judgeResult) {
-						send({ 
-							type: 'judgeResult', 
+						send({
+							type: 'judgeResult',
 							agentId: agent.id,
 							turnNumber: result.judgeResult.turnNumber,
 							scores: result.judgeResult.scores,
 							momentumShift: result.judgeResult.momentumShift,
 							frameControlShift: result.judgeResult.frameControlShift,
-							tacticalAnalysis: result.judgeResult.tacticalAnalysis
+							tacticalAnalysis: result.judgeResult.tacticalAnalysis,
+							reasoning: result.judgeResult.reasoning
 						});
 					}
 
