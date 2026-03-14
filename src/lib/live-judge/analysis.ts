@@ -367,7 +367,7 @@ function calculateWeightedScore(scores: any, weights: any): number {
     scores.logicalCoherence * weights.logicalCoherence +
     scores.rhetoricalForce * weights.rhetoricalForce +
     scores.frameControl * weights.frameControl +
-    scores.credibility * weights.credibility +
+    scores.credibilityScore * weights.credibilityScore +
     scores.tacticalEffectiveness * weights.tacticalEffectiveness
   );
 }
