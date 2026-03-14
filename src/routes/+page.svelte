@@ -397,13 +397,10 @@
               ? `**Judge Analysis:**\n\n> ${result.reasoning.replace(/\s*\|\s*/g, '\n>\n> ')}\n\n`
               : '';
             return `### Turn ${result.turnNumber} · ${agentName}\n\n` +
-                   `**Overall:** ${(result.scores.overallScore ?? 0).toFixed(1)}/100 · ` +
-                   `**Logic:** ${(result.scores.logicalCoherence ?? 0).toFixed(0)} · ` +
-                   `**Rhetoric:** ${(result.scores.rhetoricalForce ?? 0).toFixed(0)} · ` +
-                   `**Tactics:** ${(result.scores.tacticalEffectiveness ?? 0).toFixed(0)}\n\n` +
-                   `**Momentum:** ${result.momentumShift > 0 ? '+' : ''}${(result.momentumShift ?? 0).toFixed(0)} · ` +
-                   `**Frame Control:** ${result.frameControlShift > 0 ? '+' : ''}${(result.frameControlShift ?? 0).toFixed(0)}\n\n` +
-                   tactics +
+                   `**Total:** ${result.scores.overallScore ?? 0}/100 · ` +
+                   `**Logic:** ${result.scores.logicalCoherence ?? 0}/40 · ` +
+                   `**Rhetoric:** ${result.scores.rhetoricalForce ?? 0}/30 · ` +
+                   `**Tactics:** ${result.scores.tacticalEffectiveness ?? 0}/30\n\n` +
                    reasoning;
           })
           .join("---\n\n");
@@ -427,7 +424,7 @@
         content += liveJudgeResults
           .map((result, i) => {
             const agentName = result.agentId === agentA ? agentAInfo.name : agentBInfo.name;
-            return `[Turn ${result.turnNumber} — ${agentName}]\nOverall: ${result.scores.overallScore.toFixed(1)}/100\nMomentum: ${result.momentumShift > 0 ? '+' : ''}${result.momentumShift.toFixed(1)}\nFrame Control: ${result.frameControlShift > 0 ? '+' : ''}${result.frameControlShift.toFixed(1)}\n`;
+            return `[Turn ${result.turnNumber} — ${agentName}]\nTotal: ${result.scores.overallScore}/100  Logic: ${result.scores.logicalCoherence}/40  Rhetoric: ${result.scores.rhetoricalForce}/30  Tactics: ${result.scores.tacticalEffectiveness}/30\n${result.reasoning ? result.reasoning + '\n' : ''}`;
           })
           .join(`\n\n${"─".repeat(40)}\n\n`);
 
@@ -1506,26 +1503,26 @@
               <div class="grid grid-cols-2 gap-2 text-xs">
                 <div class="flex items-center gap-1">
                   <span class="text-[--color-muted]">Logic:</span>
-                  <span style="color: {(result.scores.logicalCoherence ?? 0) > 70 ? '#34d399' : (result.scores.logicalCoherence ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
-                    {Math.round((result.scores.logicalCoherence ?? 0) / 100 * 40)}/40
+                  <span style="color: {(result.scores.logicalCoherence ?? 0) > 28 ? '#34d399' : (result.scores.logicalCoherence ?? 0) > 20 ? '#fbbf24' : '#f87171'}">
+                    {(result.scores.logicalCoherence ?? 0)}/40
                   </span>
                 </div>
                 <div class="flex items-center gap-1">
                   <span class="text-[--color-muted]">Rhetoric:</span>
-                  <span style="color: {(result.scores.rhetoricalForce ?? 0) > 70 ? '#34d399' : (result.scores.rhetoricalForce ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
-                    {Math.round((result.scores.rhetoricalForce ?? 0) / 100 * 30)}/30
+                  <span style="color: {(result.scores.rhetoricalForce ?? 0) > 21 ? '#34d399' : (result.scores.rhetoricalForce ?? 0) > 15 ? '#fbbf24' : '#f87171'}">
+                    {(result.scores.rhetoricalForce ?? 0)}/30
                   </span>
                 </div>
                 <div class="flex items-center gap-1">
                   <span class="text-[--color-muted]">Tactics:</span>
-                  <span style="color: {(result.scores.tacticalEffectiveness ?? 0) > 70 ? '#34d399' : (result.scores.tacticalEffectiveness ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
-                    {Math.round((result.scores.tacticalEffectiveness ?? 0) / 100 * 30)}/30
+                  <span style="color: {(result.scores.tacticalEffectiveness ?? 0) > 21 ? '#34d399' : (result.scores.tacticalEffectiveness ?? 0) > 15 ? '#fbbf24' : '#f87171'}">
+                    {(result.scores.tacticalEffectiveness ?? 0)}/30
                   </span>
                 </div>
                 <div class="flex items-center gap-1">
                   <span class="text-[--color-muted]">Total:</span>
                   <span style="color: {(result.scores.overallScore ?? 0) > 70 ? '#34d399' : (result.scores.overallScore ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
-                    {(result.scores.overallScore ?? 0).toFixed(0)}/100
+                    {(result.scores.overallScore ?? 0)}/100
                   </span>
                 </div>
               </div>
@@ -1539,48 +1536,6 @@
         </div>
       {/if}
 
-      <!-- Momentum & Frame Control Leaders -->
-      {#if (momentumLeader || frameControlLeader) && !currentLeader}
-        <div class="grid grid-cols-2 gap-3">
-          {#if momentumLeader}
-            {@const momentumInfo = getModelInfo(momentumLeader.agentId)}
-            <div
-              class="rounded-xl border bg-[--color-panel] p-3 text-center"
-              style="border-color: #10b98140"
-            >
-              <div class="text-[10px] text-[--color-muted] mb-1">Momentum Leader</div>
-              <div
-                class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold mx-auto mb-1"
-                style="background: {momentumInfo.color}15; color: {momentumInfo.color}"
-              >
-                {momentumInfo.name[0]}
-              </div>
-              <div class="text-xs font-medium" style="color: {momentumInfo.color}">
-                {momentumInfo.name}
-              </div>
-            </div>
-          {/if}
-          
-          {#if frameControlLeader}
-            {@const frameInfo = getModelInfo(frameControlLeader.agentId)}
-            <div
-              class="rounded-xl border bg-[--color-panel] p-3 text-center"
-              style="border-color: #3b82f640"
-            >
-              <div class="text-[10px] text-[--color-muted] mb-1">Frame Control</div>
-              <div
-                class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold mx-auto mb-1"
-                style="background: {frameInfo.color}15; color: {frameInfo.color}"
-              >
-                {frameInfo.name[0]}
-              </div>
-              <div class="text-xs font-medium" style="color: {frameInfo.color}">
-                {frameInfo.name}
-              </div>
-            </div>
-          {/if}
-        </div>
-      {/if}
     </div>
   {/if}
 

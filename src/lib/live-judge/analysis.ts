@@ -105,10 +105,12 @@ Tactics Score (0-30 Points):
 - 15: Successfully refutes the opponent but introduces no new tactical pressure.
 - 0: Ignores the opponent's previous turn entirely.
 
-You must evaluate the most recent turn and output your evaluation STRICTLY as a valid JSON object. Do not write introductory text, meta-commentary, or markdown blocks. Calculate total_score as the exact sum of the three scores. Keep analysis strictly to 2-3 sentences citing specific point deductions.
+Score each category from 1 to 10. Do not use any other scale.
+
+You must output your evaluation STRICTLY as a valid JSON object. Do not write introductory text, meta-commentary, or markdown blocks. Keep analysis strictly to 2-3 sentences citing specific point deductions.
 
 Output format:
-{"logic_score": <integer 0-40>, "rhetoric_score": <integer 0-30>, "tactics_score": <integer 0-30>, "total_score": <integer 0-100>, "analysis": "<2-3 sentences>"}`;
+{"logic_score": <integer 1-10>, "rhetoric_score": <integer 1-10>, "tactics_score": <integer 1-10>, "analysis": "<2-3 sentences>"}`;
 }
 
 /**
@@ -158,20 +160,27 @@ function parseJudgeAnalysis(
       }
     }
 
-    const logicScore = Math.max(0, Math.min(40, Number(data.logic_score) || 0));
-    const rhetoricScore = Math.max(0, Math.min(30, Number(data.rhetoric_score) || 0));
-    const tacticsScore = Math.max(0, Math.min(30, Number(data.tactics_score) || 0));
-    const totalScore = Math.max(0, Math.min(100, Number(data.total_score) || (logicScore + rhetoricScore + tacticsScore)));
+    // Clamp each dimension to 1-10
+    const logicRaw = Math.max(1, Math.min(10, Math.round(Number(data.logic_score)) || 5));
+    const rhetoricRaw = Math.max(1, Math.min(10, Math.round(Number(data.rhetoric_score)) || 5));
+    const tacticsRaw = Math.max(1, Math.min(10, Math.round(Number(data.tactics_score)) || 5));
+
+    // Backend computes weighted total: logic*4 + rhetoric*3 + tactics*3
+    const logicScore = logicRaw * 4;    // 0-40
+    const rhetoricScore = rhetoricRaw * 3; // 0-30
+    const tacticsScore = tacticsRaw * 3;   // 0-30
+    const totalScore = logicScore + rhetoricScore + tacticsScore; // 0-100
+
     const analysis = typeof data.analysis === 'string' ? data.analysis : 'No analysis provided';
 
-    // Normalize sub-scores to 0-100 for internal consistency; UI denormalizes for display
+    // Store raw dimension scores (0-40/0-30/0-30) in these fields; UI displays with denominators
     const scores: JudgeScores = {
-      logicalCoherence: Math.round(logicScore / 40 * 100),
-      rhetoricalForce: Math.round(rhetoricScore / 30 * 100),
+      logicalCoherence: logicScore,    // 0-40
+      rhetoricalForce: rhetoricScore,  // 0-30
       frameControl: totalScore,
       credibilityScore: totalScore,
-      tacticalEffectiveness: Math.round(tacticsScore / 30 * 100),
-      overallScore: totalScore
+      tacticalEffectiveness: tacticsScore, // 0-30
+      overallScore: totalScore         // 0-100
     };
 
     return {
