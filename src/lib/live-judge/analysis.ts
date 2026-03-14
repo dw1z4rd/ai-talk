@@ -305,8 +305,15 @@ function parseJudgeAnalysis(
       return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
     }
 
-    // Calculate overall score using judge's weights
-    const overallScore = calculateWeightedScore(analysisData.scores, judge.scoringWeights);
+    // Map scores using consistent field names before calculating weighted score
+    const mappedScores = {
+      logicalCoherence: analysisData.scores.logicalCoherence || 70,
+      rhetoricalForce: analysisData.scores.rhetoricalForce || 70,
+      frameControl: analysisData.scores.frameControl || 70,
+      credibilityScore: analysisData.scores.credibility || analysisData.scores.credibilityScore || 70,
+      tacticalEffectiveness: analysisData.scores.tacticalEffectiveness || 70,
+    };
+    const overallScore = calculateWeightedScore(mappedScores, judge.scoringWeights);
 
     // Create effectiveness map
     const effectivenessMap: { [tactic: string]: number } = {};
@@ -328,11 +335,7 @@ function parseJudgeAnalysis(
       opponentMessage,
       context,
       scores: {
-        logicalCoherence: analysisData.scores.logicalCoherence || 70,
-        rhetoricalForce: analysisData.scores.rhetoricalForce || 70,
-        frameControl: analysisData.scores.frameControl || 70,
-        credibilityScore: analysisData.scores.credibility || analysisData.scores.credibilityScore || 70,
-        tacticalEffectiveness: analysisData.scores.tacticalEffectiveness || 70,
+        ...mappedScores,
         overallScore
       },
       usedTactics: Array.isArray(analysisData.usedTactics) ? analysisData.usedTactics : [],

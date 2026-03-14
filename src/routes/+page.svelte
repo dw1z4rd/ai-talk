@@ -622,7 +622,6 @@
               50,
             );
           } else if (data.type === "judgeResult") {
-            console.log('[client] judgeResult keys:', Object.keys(data), 'reasoning:', typeof data.reasoning, data.reasoning?.slice?.(0, 60));
             // Accumulate live judge results
             liveJudgeResults = [...liveJudgeResults, {
               turnNumber: data.turnNumber,
@@ -1489,33 +1488,33 @@
                   Turn {result.turnNumber}
                 </span>
                 <span class="text-xs text-[--color-muted] ml-auto">
-                  Overall: {result.scores.overallScore.toFixed(1)}/100
+                  Overall: {(result.scores.overallScore ?? 0).toFixed(1)}/100
                 </span>
               </div>
-              
+
               <div class="grid grid-cols-2 gap-2 text-xs">
                 <div class="flex items-center gap-1">
                   <span class="text-[--color-muted]">Logic:</span>
-                  <span style="color: {result.scores.logicalCoherence > 70 ? '#34d399' : result.scores.logicalCoherence > 50 ? '#fbbf24' : '#f87171'}">
-                    {result.scores.logicalCoherence.toFixed(0)}
+                  <span style="color: {(result.scores.logicalCoherence ?? 0) > 70 ? '#34d399' : (result.scores.logicalCoherence ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
+                    {(result.scores.logicalCoherence ?? 0).toFixed(0)}
                   </span>
                 </div>
                 <div class="flex items-center gap-1">
                   <span class="text-[--color-muted]">Rhetoric:</span>
-                  <span style="color: {result.scores.rhetoricalForce > 70 ? '#34d399' : result.scores.rhetoricalForce > 50 ? '#fbbf24' : '#f87171'}">
-                    {result.scores.rhetoricalForce.toFixed(0)}
+                  <span style="color: {(result.scores.rhetoricalForce ?? 0) > 70 ? '#34d399' : (result.scores.rhetoricalForce ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
+                    {(result.scores.rhetoricalForce ?? 0).toFixed(0)}
                   </span>
                 </div>
                 <div class="flex items-center gap-1">
                   <span class="text-[--color-muted]">Tactics:</span>
-                  <span style="color: {result.scores.tacticalEffectiveness > 70 ? '#34d399' : result.scores.tacticalEffectiveness > 50 ? '#fbbf24' : '#f87171'}">
-                    {result.scores.tacticalEffectiveness.toFixed(0)}
+                  <span style="color: {(result.scores.tacticalEffectiveness ?? 0) > 70 ? '#34d399' : (result.scores.tacticalEffectiveness ?? 0) > 50 ? '#fbbf24' : '#f87171'}">
+                    {(result.scores.tacticalEffectiveness ?? 0).toFixed(0)}
                   </span>
                 </div>
                 <div class="flex items-center gap-1">
                   <span class="text-[--color-muted]">Frame:</span>
-                  <span style="color: {result.frameControlShift > 0 ? '#60a5fa' : '#f87171'}">
-                    {result.frameControlShift > 0 ? '+' : ''}{result.frameControlShift.toFixed(0)}
+                  <span style="color: {(result.frameControlShift ?? 0) > 0 ? '#60a5fa' : '#f87171'}">
+                    {(result.frameControlShift ?? 0) > 0 ? '+' : ''}{(result.frameControlShift ?? 0).toFixed(0)}
                   </span>
                 </div>
               </div>
