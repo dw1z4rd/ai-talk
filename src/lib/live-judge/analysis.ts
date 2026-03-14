@@ -10,8 +10,9 @@ import {
   JUDGE_SPECIALIZATION_CONFIGS
 } from './types';
 import type { Agent, Message } from '$lib/agents';
-import { createAnthropicProvider } from '$lib/llm-agent';
-import { ANTHROPIC_API_KEY } from '$env/static/private';
+import { createOllamaProvider } from '$lib/llm-agent';
+import { OLLAMA_CLOUD_URL, OLLAMA_CLOUD_API_KEY } from '$env/static/private';
+import { MODEL_CATALOG } from '$lib/agents';
 
 /**
  * Analyze a single turn with a specific judge
@@ -24,7 +25,8 @@ export async function analyzeTurn(
   opponentMessage: string,
   turnNumber: number,
   context: string,
-  messageHistory: Message[]
+  messageHistory: Message[],
+  signal?: AbortSignal
 ): Promise<TurnAnalysis> {
 
   const judgePrompt = generateJudgePrompt(
@@ -39,18 +41,25 @@ export async function analyzeTurn(
   );
 
   const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
-  
+
+  const start = Date.now();
   try {
     const analysisText = await judgeProvider.generateText(judgePrompt, {
       systemPrompt: generateJudgeSystemPrompt(judge),
       temperature: 0.7,
-      maxTokens: 600
+      maxTokens: 600,
+      signal
     });
 
+    console.log(`[Judge] ${judge.name} (${judge.modelId}) completed in ${Date.now() - start}ms`);
     return parseJudgeAnalysis(analysisText, judge, agent, opponent, turnNumber, message, opponentMessage, context);
-  } catch (error) {
-    console.error(`Judge analysis failed for ${judge.name}:`, error);
-    // Return fallback analysis
+  } catch (error: any) {
+    const elapsed = Date.now() - start;
+    if (error?.name === 'AbortError') {
+      console.warn(`[Judge] ${judge.name} (${judge.modelId}) aborted after ${elapsed}ms`);
+    } else {
+      console.error(`[Judge] ${judge.name} (${judge.modelId}) failed after ${elapsed}ms:`, error);
+    }
     return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
   }
 }
@@ -517,11 +526,12 @@ export function calculateFrameControlShift(
 /**
  * Create judge provider for analysis
  */
-function createJudgeProvider(_modelId: string) {
-  return createAnthropicProvider({
-    apiKey: ANTHROPIC_API_KEY,
-    model: 'claude-haiku-4-5-20251001'
-  });
+function createJudgeProvider(modelId: string) {
+  const modelDef = MODEL_CATALOG[modelId];
+  if (!modelDef) {
+    throw new Error(`Model ${modelId} not found in catalog`);
+  }
+  return modelDef.makeProvider();
 }
 
 /**

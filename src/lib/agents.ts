@@ -1087,7 +1087,7 @@ export async function generateAdaptiveReply(
   try {
     const liveJudgeSystem = getLiveJudgeSystem();
 
-    const JUDGE_TIMEOUT_MS = 18_000;
+    const JUDGE_TIMEOUT_MS = 50_000;
     const judgeResult = await Promise.race([
       liveJudgeSystem.processTurn(
         agent,

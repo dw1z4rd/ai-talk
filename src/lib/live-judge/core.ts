@@ -12,11 +12,12 @@ import {
 import type { Agent, Message } from '$lib/agents';
 import { analyzeTurn, aggregateJudgeScores, calculateMomentumShift, calculateFrameControlShift, createFallbackAnalysis } from './analysis';
 import { generateAdaptivePressure } from './pressure';
+import { MODEL_CATALOG } from '$lib/agents';
 
 export class LiveJudgeSystem {
   private panel: LiveJudgePanel;
 
-  constructor(judgeModelIds: string[] = ['claude-haiku', 'claude-haiku', 'claude-haiku']) {
+  constructor(judgeModelIds: string[] = ['gpt-oss:120b-cloud', 'deepseek-v3.1:671b-cloud', 'deepseek-v3.2-cloud']) {
     this.panel = this.initializeJudgePanel(judgeModelIds);
   }
 
@@ -25,6 +26,7 @@ export class LiveJudgeSystem {
     const judges: LiveJudge[] = judgeModelIds.slice(0, 3).map((modelId, index) => {
       const specialization = specializations[index];
       const config = JUDGE_SPECIALIZATION_CONFIGS[specialization];
+      const modelDef = MODEL_CATALOG[modelId];
       return {
         id: `judge-${specialization}-${index}`,
         name: config.name,
@@ -72,21 +74,21 @@ export class LiveJudgeSystem {
     
     this.panel.turnCount = turnNumber;
 
-    const PER_JUDGE_TIMEOUT_MS = 15_000;
+    const PER_JUDGE_TIMEOUT_MS = 45_000;
 
-    // Run all judge analyses in parallel, each with an individual timeout fallback
+    // Run all judge analyses in parallel, each with an AbortController so the
+    // underlying fetch is actually cancelled (not just abandoned) on timeout.
     const judgeAnalyses = await Promise.all(
-      this.panel.judges.map(judge =>
-        Promise.race([
-          this.analyzeWithJudge(judge, agent, message, opponent, opponentMessage, turnNumber, context, messageHistory),
-          new Promise<any>((resolve) =>
-            setTimeout(() => {
-              console.warn(`Judge ${judge.name} (${judge.modelId}) timed out after ${PER_JUDGE_TIMEOUT_MS}ms — using fallback`);
-              resolve(createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context));
-            }, PER_JUDGE_TIMEOUT_MS)
-          )
-        ])
-      )
+      this.panel.judges.map(judge => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => {
+          console.warn(`[Judge] ${judge.name} (${judge.modelId}) timed out after ${PER_JUDGE_TIMEOUT_MS}ms — aborting request`);
+          controller.abort();
+        }, PER_JUDGE_TIMEOUT_MS);
+
+        return this.analyzeWithJudge(judge, agent, message, opponent, opponentMessage, turnNumber, context, messageHistory, controller.signal)
+          .finally(() => clearTimeout(timer));
+      })
     );
 
     // Aggregate scores across all judges
@@ -129,7 +131,8 @@ export class LiveJudgeSystem {
     opponentMessage: string,
     turnNumber: number,
     context: string,
-    messageHistory: Message[]
+    messageHistory: Message[],
+    signal?: AbortSignal
   ): Promise<any> {
     const analysis = await analyzeTurn(
       judge,
@@ -139,7 +142,8 @@ export class LiveJudgeSystem {
       opponentMessage,
       turnNumber,
       context,
-      messageHistory
+      messageHistory,
+      signal
     );
 
     // Update judge state
