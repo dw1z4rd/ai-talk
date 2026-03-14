@@ -45,7 +45,8 @@ export const POST: RequestHandler = async ({ request }) => {
 
 				const aiMessagesCount = history.filter(m => m.agentId !== 'moderator').length;
 				
-				for (let turn = aiMessagesCount; turn < totalTurns; turn++) {
+				let turn = aiMessagesCount;
+				while (turn < totalTurns) {
 					const agent = agents[turn % agents.length];
 					const opponentAgent = agents[(turn + 1) % agents.length];
 					const turnNumber = turn + 1;
@@ -64,6 +65,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 					if (!result.reply) {
 						// All retries exhausted — silently skip this turn so the debate continues uninterrupted.
+						turn++;
 						continue;
 					}
 
@@ -86,6 +88,7 @@ export const POST: RequestHandler = async ({ request }) => {
 						});
 					}
 
+					turn++; // Increment turn counter
 					await new Promise((r) => setTimeout(r, 250));
 				}
 

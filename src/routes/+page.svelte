@@ -212,7 +212,7 @@
         if (finalJudgePanel && finalJudgePanel.currentScores) {
           const scores = Object.entries(finalJudgePanel.currentScores);
           if (scores.length > 0) {
-            const leader = scores.reduce((a: any, b: any) => 
+            const leader: [string, any] = scores.reduce((a: [string, any], b: [string, any]) => 
               a[1].totalScore > b[1].totalScore ? a : b
             );
             currentLeader = {
@@ -224,9 +224,9 @@
             // Set momentum and frame control leaders
             momentumLeader = finalJudgePanel.momentumTracker && 
               Object.entries(finalJudgePanel.momentumTracker.currentMomentum).length > 0
-              ? Object.entries(finalJudgePanel.momentumTracker.currentMomentum).reduce((a: any, b: any) => 
+              ? Object.entries(finalJudgePanel.momentumTracker.currentMomentum).reduce((a: [string, number], b: [string, number]) => 
                   a[1] > b[1] ? a : b
-                ).map((id: string, momentum: number) => ({ agentId: id, momentum }))
+                ).map((entry: [string, number]) => ({ agentId: entry[0], momentum: entry[1] }))
               : null;
 
             frameControlLeader = finalJudgePanel.frameControlTracker && 
@@ -577,6 +577,7 @@
                 text: streamingMessage.text + data.text,
               };
             }
+            await tick(); // Ensure DOM updates after state change
             setTimeout(
               () =>
                 chatEl?.scrollTo({
@@ -598,6 +599,7 @@
                 text: data.text,
               },
             ];
+            await tick(); // Ensure DOM updates after state change
             const aiCount = messages.filter(
               (m) => m.agentId !== "moderator",
             ).length;
