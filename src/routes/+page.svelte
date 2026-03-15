@@ -966,6 +966,10 @@
     <Nav />
   </header>
 
+  <!-- ── Two-column desktop layout ─────────────────────────────────────────────── -->
+  <div class="main-two-col">
+    <!-- LEFT COLUMN: judge analysis panel (inner 3-col grid via judge-main-grid) -->
+    <div class="left-col">
   <!-- ── Live Judge Panel ─────────────────────────────────────────────────────── -->
   {#if showLiveJudgePanel}
     <div
@@ -1158,10 +1162,10 @@
         {/if}
       </div>
     {/if}
-    <!-- Responsive main grid: left = scorecard, right = rounds + scores -->
+    <!-- 3-col analysis grid: most items span full row, round cards take 1 col each -->
     <div class="judge-main-grid">
-      <!-- Left column: Scorecard or Fallback + Language warning -->
-      <div class="flex flex-col gap-3 relative">
+      <!-- Scorecard + language warning (full row) -->
+      <div class="col-span-3 flex flex-col gap-3 relative">
         <!-- Scorecard — win tallies -->
         {#if currentLeader?.winTallies}
           {@const tallies = currentLeader.winTallies}
@@ -1302,19 +1306,12 @@
         {/if}
       </div>
 
-      <!-- Right column: Recent Rounds + Turn Scores -->
-      {#if pairwiseRounds.length > 0 || liveJudgeResults.some((r) => r.absoluteScores)}
-        <div class="flex flex-col gap-4">
-          <!-- Recent pairwise rounds -->
-          {#if pairwiseRounds.length > 0}
-            <div class="flex flex-col gap-3 relative">
-              <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
-                Recent Rounds
-              </h3>
-              <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
-                {#each pairwiseRounds
-                  .slice(-3)
-                  .reverse() as round, i (round.roundNumber)}
+      <!-- Recent Rounds: header spans full row, each card takes 1 col -->
+      {#if pairwiseRounds.length > 0}
+        <h3 class="col-span-3 text-sm font-semibold text-[--color-muted-fg] px-1">Recent Rounds</h3>
+        {#each pairwiseRounds
+          .slice(-3)
+          .reverse() as round, i (round.roundNumber)}
                   {@const logicWinnerInfo = getWinnerInfo(round.logicWinner)}
                   {@const tacticsWinnerInfo = getWinnerInfo(round.tacticsWinner)}
                   {@const rhetoricWinnerInfo = getWinnerInfo(
@@ -1397,19 +1394,15 @@
                     </div>
                   </div>
                 {/each}
-              </div>
-            </div>
-          {/if}
-        </div>
       {/if}
     </div>
   {/if}
-
-  <!-- Main content row: setup (left) + chat (right) -->
-  <div class="flex flex-col md:flex-row gap-4">
+    </div>
+    <!-- RIGHT COLUMN: debate setup + live chat -->
+    <div class="right-col">
     <!-- Setup card -->
     <div
-      class="w-full md:w-[35%] md:flex-none flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
+      class="flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
     >
       <!-- Topic -->
       <div class="flex flex-col gap-1.5">
@@ -2034,6 +2027,7 @@
         {/if}
       </div>
     </div>
+    </div>
   </div>
 </div>
 
@@ -2136,11 +2130,42 @@
     animation-delay: 250ms;
   }
 
-  /* Responsive 2-col grid: stacks on mobile, side-by-side on 860px+ */
-  .judge-main-grid {
+  /* Two-column desktop layout: judge panel left, setup+chat right */
+  .main-two-col {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  @media (min-width: 1024px) {
+    .main-two-col {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+    }
+  }
+
+  /* Judge analysis panel stacks items vertically in the left column */
+  .left-col {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-width: 0;
+  }
+
+  /* Setup card + chat stack vertically in the right column */
+  .right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  /* 3-col grid inside the judge panel: full-row items use col-span-3, round cards take 1 col */
+  .judge-main-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    align-content: start;
   }
 
   .message-content :global(p) {
