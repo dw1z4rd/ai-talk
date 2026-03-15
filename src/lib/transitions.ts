@@ -56,7 +56,54 @@ export function flyOutToBottom(
     `,
   };
 }
+export function flyInFromLeft(
+  node: Element,
+  { duration = 400, delay = 0, easing = expoOut } = {},
+) {
+  const style = getComputedStyle(node);
+  const parsedOpacity = parseFloat(style.opacity);
+  const targetOpacity = parsedOpacity === 0 ? 1 : parsedOpacity;
+  const transform = style.transform === "none" ? "" : style.transform;
 
+  const nodeRect = node.getBoundingClientRect();
+  // Pushes the element left by exactly enough pixels to hide its rightmost edge
+  const startX = -nodeRect.right;
+
+  return {
+    delay,
+    duration,
+    easing,
+    css: (t: number, u: number) => `
+      transform: ${transform} translateX(${u * startX}px);
+      opacity: ${targetOpacity * t};
+    `,
+  };
+}
+export function flyOutToRight(
+  node: Element,
+  { duration = 400, delay = 0, easing = expoOut } = {},
+) {
+  const style = getComputedStyle(node);
+  const parsedOpacity = parseFloat(style.opacity);
+  const targetOpacity = parsedOpacity === 0 ? 1 : parsedOpacity;
+  const transform = style.transform === "none" ? "" : style.transform;
+
+  const nodeRect = node.getBoundingClientRect();
+  // Calculates exactly how many pixels to move right before the left edge clears the viewport
+  const distanceToRight = window.innerWidth - nodeRect.left;
+
+  return {
+    delay,
+    duration,
+    easing,
+    css: (t: number, u: number) => `
+      position: absolute;
+      width: ${nodeRect.width}px;
+      transform: ${transform} translateX(${u * distanceToRight}px);
+      opacity: ${targetOpacity * t};
+    `,
+  };
+}
 export function spinFly(
   node: Element,
   { duration = 1500, delay = 0, easing = expoOut, y = "100vh", spins = 1 } = {},

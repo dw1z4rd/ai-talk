@@ -1,7 +1,7 @@
 <script lang="ts">
   import Nav from "$lib/Nav.svelte";
   import { flip } from 'svelte/animate';
-  import { flyInFromTop, flyOutToBottom } from "$lib/transitions";
+  import { flyInFromLeft, flyOutToRight } from "$lib/transitions";
   import { tick } from "svelte";
 
   const MODEL_OPTIONS = [
@@ -843,8 +843,8 @@
 {#if showWinnerModal}
   <div
     class="fixed inset-0 z-50 flex items-center justify-center"
-    in:flyInFromTop
-    out:flyOutToBottom
+    in:flyInFromLeft
+    out:flyOutToRight
   >
     <!-- Confetti canvas (sits behind modal content) -->
     <canvas
@@ -858,8 +858,8 @@
     <!-- Content -->
     <div
       class="relative z-10 flex flex-col items-center gap-6 text-center px-8"
-      in:flyInFromTop
-      out:flyOutToBottom
+      in:flyInFromLeft
+      out:flyOutToRight
     >
       <!-- Glow + name -->
       <div class="relative">
@@ -1563,8 +1563,8 @@
     <div
       id="live-judge-panel"
       class="flex flex-col gap-4 judge-panel"
-      in:flyInFromTop
-      out:flyOutToBottom
+      in:flyInFromLeft
+      out:flyOutToRight
     >
       <!-- Section header -->
       <div class="flex items-center gap-3 mt-2 judge-header">
@@ -1946,8 +1946,8 @@
                   class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
                   style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i *
                     100}ms"
-                  in:flyInFromTop
-      out:flyOutToBottom
+                  in:flyInFromLeft
+      out:flyOutToRight
                 >
                   <span class="text-[--color-muted] text-[11px]"
                     >T{r.turnNumber}</span
