@@ -546,31 +546,6 @@ export class LiveJudgeSystem {
         } catch {
           // Adjudication failed — non-critical
         }
-      } else if (
-        !scorecardInternallyConsistent &&
-        winCountLeader !== null &&
-        pointsLeaderName !== null
-      ) {
-        // Narrative agrees with the round-count leader, but cumulative absolute points
-        // favour a different agent — the "won exchanges vs. won arc" diagnostic split.
-        // Surface a dedicated note so this discrepancy is never silently dropped.
-        try {
-          const adjController = new AbortController();
-          const adjTimer = setTimeout(() => adjController.abort(), 20_000);
-          const splitNoteText = await generateScorecardSplitNote(
-            judge,
-            winCountLeader,
-            pointsLeaderName,
-            scorecardSummary,
-            adjController.signal,
-          ).finally(() => clearTimeout(adjTimer));
-          const trimmedSplitNote = splitNoteText.trim();
-          if (trimmedSplitNote.length > 0) {
-            verdict.conflictResolution = trimmedSplitNote;
-          }
-        } catch {
-          // Split note failed — non-critical
-        }
       }
 
       // Meta-judge harmonization — reconcile per-round scores with arc-level coherence.
