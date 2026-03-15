@@ -1,27 +1,27 @@
 // Core Live Judge System Types
 
 export interface ScoringWeights {
-  logicalCoherence: number;      // 0.2 - 0.5
-  rhetoricalForce: number;       // 0.2 - 0.5
-  frameControl: number;          // 0.1 - 0.3
-  credibilityScore: number;      // 0.1 - 0.3
+  logicalCoherence: number; // 0.2 - 0.5
+  rhetoricalForce: number; // 0.2 - 0.5
+  frameControl: number; // 0.1 - 0.3
+  credibilityScore: number; // 0.1 - 0.3
   tacticalEffectiveness: number; // 0.2 - 0.4
 }
 
 export interface JudgeScores {
-  logicalCoherence: number;    // 0-100
-  rhetoricalForce: number;     // 0-100
-  frameControl: number;        // 0-100
-  credibilityScore: number;    // 0-100
+  logicalCoherence: number; // 0-100
+  rhetoricalForce: number; // 0-100
+  frameControl: number; // 0-100
+  credibilityScore: number; // 0-100
   tacticalEffectiveness: number; // 0-100
-  overallScore: number;        // Weighted composite
+  overallScore: number; // Weighted composite
 }
 
 export interface TacticAnalysis {
   tactic: string;
-  effectiveness: number;       // 0-100
-  confidence: number;          // 0-100
-  context: string;             // When/why this was used
+  effectiveness: number; // 0-100
+  confidence: number; // 0-100
+  context: string; // When/why this was used
 }
 
 export interface TurnAnalysis {
@@ -42,8 +42,8 @@ export interface TurnAnalysis {
   effectivenessMap: { [tactic: string]: number };
 
   // Strategic impact
-  momentumShift: number;         // -100 to +100
-  frameControlShift: number;     // -100 to +100
+  momentumShift: number; // -100 to +100
+  frameControlShift: number; // -100 to +100
   exposedWeaknesses: string[];
   tacticalInsights: string[];
 
@@ -75,6 +75,12 @@ export interface PairwiseRound {
   logicDelta: string;
   tacticsDelta: string;
   rhetoricDelta: string;
+  /** 1-2 sentences on mechanism quality covering both turns — cause→process→measurable consequence. */
+  mechanismDelta?: string;
+  /** agentNames that had a mechanism failure in this round (missing one or more chain elements). */
+  mechanismFailures?: string[];
+  /** Set when a turn contains a qualifying counterfactual ("no-X world" with full causal chain). */
+  counterfactualDetected?: { agentId: string; summary: string };
   languageWarning?: string;
   isFallback: boolean;
 }
@@ -92,7 +98,25 @@ export interface AgentWinTally {
 export interface DebateScorecard {
   rounds: PairwiseRound[];
   winTallies: { [agentId: string]: AgentWinTally };
-  overallWinner: string | null;  // agentId, or null if draw
+  overallWinner: string | null; // agentId, or null if draw
+  /** Tracks which agents have submitted at least one qualifying counterfactual. */
+  counterfactualTrack: { [agentId: string]: boolean };
+}
+
+/**
+ * Flagged when a per-round pairwise winner assignment diverges significantly from
+ * the absolute per-turn scores for the same dimension. Computed synchronously — no LLM call.
+ */
+export interface HarmonizationFlag {
+  roundNumber: number;
+  dimension: "logic" | "tactics" | "rhetoric" | "overall";
+  /** agentId that won the dimension according to pairwise comparison. */
+  pairwiseWinner: string;
+  /** agentId that had the higher absolute score on that dimension. */
+  absoluteScoreLeader: string;
+  /** Raw score gap on the dimension's native scale (logic: 0-40, tactics/rhetoric: 0-30, overall: 0-100). */
+  divergenceMagnitude: number;
+  note: string;
 }
 
 /** Full-debate narrative verdict written after all pairwise rounds. */
@@ -109,10 +133,10 @@ export interface NarrativeVerdict {
 // ── Existing types kept for adaptive pressure system ─────────────────────────
 
 export interface JudgeBias {
-  preferenceComplexity: number;    // -1 to 1 (prefers simple to complex)
-  preferenceEmotion: number;        // -1 to 1 (prefers detached to passionate)
-  preferenceAggression: number;     // -1 to 1 (prefers cautious to aggressive)
-  preferenceEvidence: number;       // -1 to 1 (prefers intuitive to data-driven)
+  preferenceComplexity: number; // -1 to 1 (prefers simple to complex)
+  preferenceEmotion: number; // -1 to 1 (prefers detached to passionate)
+  preferenceAggression: number; // -1 to 1 (prefers cautious to aggressive)
+  preferenceEvidence: number; // -1 to 1 (prefers intuitive to data-driven)
 }
 
 export interface LiveJudge {
@@ -126,7 +150,7 @@ export interface LiveJudge {
   analysisCount: number;
 }
 
-export type JudgeSpecialization = 'logic' | 'rhetoric' | 'strategy' | 'balance';
+export type JudgeSpecialization = "logic" | "rhetoric" | "strategy" | "balance";
 
 export interface AgentScores {
   agentId: string;
@@ -147,7 +171,7 @@ export interface MomentumTracker {
   currentMomentum: { [agentId: string]: number };
   momentumHistory: { [turnNumber: number]: { [agentId: string]: number } };
   lastMomentumShift: { [agentId: string]: number };
-  momentumTrend: { [agentId: string]: 'rising' | 'falling' | 'stable' };
+  momentumTrend: { [agentId: string]: "rising" | "falling" | "stable" };
 }
 
 export interface FrameControlTracker {
@@ -162,10 +186,10 @@ export interface AdaptivePressure {
   sourceTurn: number;
 
   // Pressure types
-  cognitivePressure: number;     // 0-100 (affects analytical traits)
-  emotionalPressure: number;     // 0-100 (affects emotional traits)
-  strategicPressure: number;     // 0-100 (affects risk/aggression traits)
-  credibilityPressure: number;   // 0-100 (affects evidence/personal traits)
+  cognitivePressure: number; // 0-100 (affects analytical traits)
+  emotionalPressure: number; // 0-100 (affects emotional traits)
+  strategicPressure: number; // 0-100 (affects risk/aggression traits)
+  credibilityPressure: number; // 0-100 (affects evidence/personal traits)
 
   // Specific trait adjustments (-5 to +5)
   traitAdjustments: {
@@ -184,9 +208,9 @@ export interface AdaptivePressure {
   };
 
   // Duration and decay
-  intensity: number;             // Overall pressure strength 0-100
-  decayRate: number;             // How quickly pressure fades 0-1
-  duration: number;             // How long pressure lasts (turns)
+  intensity: number; // Overall pressure strength 0-100
+  decayRate: number; // How quickly pressure fades 0-1
+  duration: number; // How long pressure lasts (turns)
 }
 
 export interface LiveJudgePanel {
@@ -199,6 +223,8 @@ export interface LiveJudgePanel {
   scorecard: DebateScorecard;
   /** The most recently completed turn, stored so the next processTurn can run pairwise. */
   previousTurn: PairwiseTurnRef | null;
+  /** Most recent per-turn absolute scores per agent, used for harmonization checks. */
+  lastAbsoluteScores: { [agentId: string]: JudgeScores };
 }
 
 export interface JudgeAnalysisResult {
@@ -225,102 +251,107 @@ export interface JudgeAnalysisResult {
    *  overallScore is the corresponding weighted composite of these absolute per-turn scores.
    *  Does not drive the adaptive pressure pipeline — use aggregatedScores for that. */
   absoluteScores?: JudgeScores;
+  /** Rounds where pairwise winner assignment diverged significantly from absolute per-turn scores. */
+  harmonizationFlags?: HarmonizationFlag[];
 }
 
 // Judge specialization configurations
-export const JUDGE_SPECIALIZATION_CONFIGS: Record<JudgeSpecialization, {
-  name: string;
-  scoringWeights: ScoringWeights;
-  typicalBias: JudgeBias;
-  description: string;
-}> = {
+export const JUDGE_SPECIALIZATION_CONFIGS: Record<
+  JudgeSpecialization,
+  {
+    name: string;
+    scoringWeights: ScoringWeights;
+    typicalBias: JudgeBias;
+    description: string;
+  }
+> = {
   logic: {
-    name: 'Logic Judge',
+    name: "Logic Judge",
     scoringWeights: {
       logicalCoherence: 0.4,
       rhetoricalForce: 0.2,
       frameControl: 0.15,
       credibilityScore: 0.1,
-      tacticalEffectiveness: 0.15
+      tacticalEffectiveness: 0.15,
     },
     typicalBias: {
       preferenceComplexity: 0.3,
       preferenceEmotion: -0.2,
       preferenceAggression: -0.1,
-      preferenceEvidence: 0.4
+      preferenceEvidence: 0.4,
     },
-    description: 'Values rigorous reasoning and logical consistency above all'
+    description: "Values rigorous reasoning and logical consistency above all",
   },
   rhetoric: {
-    name: 'Rhetoric Judge',
+    name: "Rhetoric Judge",
     scoringWeights: {
       logicalCoherence: 0.15,
       rhetoricalForce: 0.4,
       frameControl: 0.25,
       credibilityScore: 0.15,
-      tacticalEffectiveness: 0.05
+      tacticalEffectiveness: 0.05,
     },
     typicalBias: {
       preferenceComplexity: -0.2,
       preferenceEmotion: 0.4,
       preferenceAggression: 0.2,
-      preferenceEvidence: -0.1
+      preferenceEvidence: -0.1,
     },
-    description: 'Focuses on persuasive power and emotional resonance'
+    description: "Focuses on persuasive power and emotional resonance",
   },
   strategy: {
-    name: 'Strategy Judge',
+    name: "Strategy Judge",
     scoringWeights: {
       logicalCoherence: 0.2,
       rhetoricalForce: 0.15,
       frameControl: 0.2,
       credibilityScore: 0.1,
-      tacticalEffectiveness: 0.35
+      tacticalEffectiveness: 0.35,
     },
     typicalBias: {
       preferenceComplexity: 0.1,
       preferenceEmotion: 0.0,
       preferenceAggression: 0.3,
-      preferenceEvidence: 0.2
+      preferenceEvidence: 0.2,
     },
-    description: 'Evaluates tactical brilliance and strategic effectiveness'
+    description: "Evaluates tactical brilliance and strategic effectiveness",
   },
   balance: {
-    name: 'Balance Judge',
+    name: "Balance Judge",
     scoringWeights: {
       logicalCoherence: 0.2,
       rhetoricalForce: 0.2,
       frameControl: 0.2,
       credibilityScore: 0.2,
-      tacticalEffectiveness: 0.2
+      tacticalEffectiveness: 0.2,
     },
     typicalBias: {
       preferenceComplexity: 0.0,
       preferenceEmotion: 0.0,
       preferenceAggression: 0.0,
-      preferenceEvidence: 0.0
+      preferenceEvidence: 0.0,
     },
-    description: 'Provides balanced assessment across all debate aspects'
-  }
+    description: "Provides balanced assessment across all debate aspects",
+  },
 };
 
 // Tactic types for analysis
 export const DEBATE_TACTICS = [
-  'logical_refutation',
-  'evidence_citation',
-  'emotional_appeal',
-  'frame_redefinition',
-  'questioning',
-  'contradiction',
-  'ridicule',
-  'authority_appeal',
-  'analogy',
-  'redirection',
-  'concession',
-  'escalation',
-  'de_escalation',
-  'personal_attack',
-  'strategic_silence'
+  "logical_refutation",
+  "evidence_citation",
+  "emotional_appeal",
+  "frame_redefinition",
+  "questioning",
+  "contradiction",
+  "ridicule",
+  "authority_appeal",
+  "analogy",
+  "redirection",
+  "concession",
+  "escalation",
+  "de_escalation",
+  "personal_attack",
+  "strategic_silence",
 ] as const;
 
-export type DebateTactic = typeof DEBATE_TACTICS[number];
+export type DebateTactic = (typeof DEBATE_TACTICS)[number];
