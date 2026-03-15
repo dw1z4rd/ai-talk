@@ -11,6 +11,7 @@ import {
   createFallbackAnalysis,
   parseJudgeAnalysis,
   generateRubricHarmonization,
+  computeHarmonizationFlags,
 } from './analysis';
 import type { DebateScorecard, PairwiseRound, MomentumTracker, FrameControlTracker, LiveJudge } from './types';
 import { JUDGE_SPECIALIZATION_CONFIGS } from './types';
@@ -183,6 +184,48 @@ describe('updateScorecard', () => {
     expect(result.winTallies['b'].total).toBe(3);
     expect(result.overallWinner).toBe('a');
   });
+
+  it('records a detected counterfactual to counterfactualTrack', () => {
+    const round: PairwiseRound = {
+      ...makeRound('a', 'Agent A', 'b', 'Agent B', 'a', 'a', 'a'),
+      counterfactualDetected: { agentId: 'a', summary: 'A no-X world argument' },
+    };
+    const result = updateScorecard(emptyScorecard(), round, 'a', 'Agent A', 'b', 'Agent B');
+    expect(result.counterfactualTrack?.['a']).toBe(true);
+    expect(result.counterfactualTrack?.['b']).toBeUndefined();
+  });
+
+  it('marks the correct agent when counterfactual is submitted by the curTurn agent', () => {
+    const round: PairwiseRound = {
+      ...makeRound('a', 'Agent A', 'b', 'Agent B', 'b', 'b', 'b'),
+      counterfactualDetected: { agentId: 'b', summary: 'B counterfactual' },
+    };
+    const result = updateScorecard(emptyScorecard(), round, 'a', 'Agent A', 'b', 'Agent B');
+    expect(result.counterfactualTrack?.['b']).toBe(true);
+    expect(result.counterfactualTrack?.['a']).toBeUndefined();
+  });
+
+  it('persists counterfactualTrack across multiple rounds', () => {
+    const round1: PairwiseRound = {
+      ...makeRound('a', 'Agent A', 'b', 'Agent B', 'a', 'a', 'a', { roundNumber: 1 }),
+      counterfactualDetected: { agentId: 'a', summary: 'A counterfactual Round 1' },
+    };
+    const round2 = makeRound('b', 'Agent B', 'a', 'Agent A', 'b', 'b', 'b', { roundNumber: 2 });
+
+    let sc = updateScorecard(emptyScorecard(), round1, 'a', 'Agent A', 'b', 'Agent B');
+    sc = updateScorecard(sc, round2, 'a', 'Agent A', 'b', 'Agent B');
+
+    // a's counterfactual from round 1 must still be present after round 2
+    expect(sc.counterfactualTrack?.['a']).toBe(true);
+    expect(sc.counterfactualTrack?.['b']).toBeUndefined();
+  });
+
+  it('does not set counterfactualTrack entry when no counterfactual is detected', () => {
+    const round = makeRound('a', 'Agent A', 'b', 'Agent B', 'a', 'a', 'a');
+    const result = updateScorecard(emptyScorecard(), round, 'a', 'Agent A', 'b', 'Agent B');
+    expect(result.counterfactualTrack).toBeDefined();
+    expect(Object.keys(result.counterfactualTrack!)).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -224,6 +267,134 @@ describe('synthScoresFromPairwise', () => {
     for (const v of Object.values(scores)) {
       expect(typeof v).toBe('number');
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeHarmonizationFlags
+// ---------------------------------------------------------------------------
+
+function makeAbsScores(overrides: Partial<import('./types').JudgeScores> = {}): import('./types').JudgeScores {
+  return {
+    logicalCoherence: 20,
+    rhetoricalForce: 15,
+    tacticalEffectiveness: 15,
+    frameControl: 50,
+    credibilityScore: 50,
+    overallScore: 50,
+    ...overrides,
+  };
+}
+
+describe('computeHarmonizationFlags', () => {
+  it('returns empty array when either absolute score set is missing', () => {
+    const round = makeRound('a', 'Agent A', 'b', 'Agent B', 'a', 'a', 'a');
+    expect(computeHarmonizationFlags(round, undefined, undefined)).toHaveLength(0);
+    expect(computeHarmonizationFlags(round, makeAbsScores(), undefined)).toHaveLength(0);
+    expect(computeHarmonizationFlags(round, undefined, makeAbsScores())).toHaveLength(0);
+  });
+
+  it('returns no flags when pairwise winner matches absolute score leader', () => {
+    // curTurn agent 'b' wins logic pairwise; cur also has higher logicalCoherence
+    const round = makeRound('a', 'Agent A', 'b', 'Agent B', 'b', 'b', 'b');
+    const prev = makeAbsScores({ logicalCoherence: 10, rhetoricalForce: 10, tacticalEffectiveness: 10, overallScore: 30 });
+    const cur  = makeAbsScores({ logicalCoherence: 30, rhetoricalForce: 25, tacticalEffectiveness: 25, overallScore: 75 });
+    expect(computeHarmonizationFlags(round, cur, prev)).toHaveLength(0);
+  });
+
+  it('flags logic divergence when gap meets threshold (8) and winner is wrong', () => {
+    // Pairwise says 'a' (prevTurn) wins logic, but cur has higher logicalCoherence
+    const round = makeRound('a', 'Agent A', 'b', 'Agent B', 'a', 'b', 'b');
+    // gap = 30 - 10 = 20, threshold = 8 → should flag
+    const prev = makeAbsScores({ logicalCoherence: 10 });
+    const cur  = makeAbsScores({ logicalCoherence: 30 });
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    const logicFlag = flags.find(f => f.dimension === 'logic');
+    expect(logicFlag).toBeDefined();
+    expect(logicFlag?.pairwiseWinner).toBe('a');
+    expect(logicFlag?.absoluteScoreLeader).toBe('b');
+    expect(logicFlag?.divergenceMagnitude).toBe(20);
+  });
+
+  it('does NOT flag logic divergence when gap is below threshold (8)', () => {
+    // gap = 7, below the 8 threshold
+    const round = makeRound('a', 'Agent A', 'b', 'Agent B', 'a', 'b', 'b');
+    const prev = makeAbsScores({ logicalCoherence: 10 });
+    const cur  = makeAbsScores({ logicalCoherence: 17 });
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    expect(flags.find(f => f.dimension === 'logic')).toBeUndefined();
+  });
+
+  it('flags tactics divergence when gap meets threshold (6) and winner is wrong', () => {
+    // gap = 10 ≥ 6, pairwise gives 'a' but cur has higher tacticalEffectiveness
+    const round = makeRound('a', 'Agent A', 'b', 'Agent B', 'b', 'a', 'b');
+    const prev = makeAbsScores({ tacticalEffectiveness: 8 });
+    const cur  = makeAbsScores({ tacticalEffectiveness: 18 });
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    const tacticsFlag = flags.find(f => f.dimension === 'tactics');
+    expect(tacticsFlag).toBeDefined();
+    expect(tacticsFlag?.divergenceMagnitude).toBe(10);
+  });
+
+  it('flags rhetoric divergence when gap meets threshold (6) and winner is wrong', () => {
+    const round = makeRound('a', 'Agent A', 'b', 'Agent B', 'b', 'b', 'a');
+    const prev = makeAbsScores({ rhetoricalForce: 8 });
+    const cur  = makeAbsScores({ rhetoricalForce: 20 });
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    const rhetoricFlag = flags.find(f => f.dimension === 'rhetoric');
+    expect(rhetoricFlag).toBeDefined();
+    expect(rhetoricFlag?.divergenceMagnitude).toBe(12);
+  });
+
+  it('flags overall divergence when majority pairwise winner mismatches absolute overall leader', () => {
+    // Pairwise: 'a' wins all 3 → overall majority winner = 'a'
+    // Absolute: cur ('b') has much higher overallScore → gap ≥ 15
+    const round = makeRound('a', 'Agent A', 'b', 'Agent B', 'a', 'a', 'a');
+    const prev = makeAbsScores({ overallScore: 80 }); // prevTurn = 'a'
+    const cur  = makeAbsScores({ overallScore: 30 }); // curTurn  = 'b'
+    // gap = 50, cur < prev → absoluteScoreLeader = 'a' (prev) which matches pairwise winner 'a' → no flag
+    // Use the opposite: pairwise says 'a' wins but cur has higher score
+    const round2 = makeRound('a', 'Agent A', 'b', 'Agent B', 'a', 'a', 'a');
+    const prevLow = makeAbsScores({ overallScore: 30 });
+    const curHigh = makeAbsScores({ overallScore: 80 });
+    // pairwise winner = 'a' (prev), absoluteLeader = 'b' (cur), gap = 50 ≥ 15 → flag
+    const flags = computeHarmonizationFlags(round2, curHigh, prevLow);
+    const overallFlag = flags.find(f => f.dimension === 'overall');
+    expect(overallFlag).toBeDefined();
+    expect(overallFlag?.pairwiseWinner).toBe('a');
+    expect(overallFlag?.absoluteScoreLeader).toBe('b');
+  });
+
+  it('does NOT emit overall flag when pairwise winner matches the absolute overall leader', () => {
+    // 'b' (curTurn) wins 2 of 3 dimensions → majority winner = 'b'
+    // Absolute: cur ('b') has higher overallScore → pairwise winner matches absolute leader → no flag
+    const roundBWins = makeRound('a', 'Agent A', 'b', 'Agent B', 'b', 'b', 'a'); // b wins 2 → majority b
+    const prevScore = makeAbsScores({ overallScore: 30 });
+    const curScore  = makeAbsScores({ overallScore: 80 }); // cur='b' has higher score, matches majority winner 'b'
+    const flags = computeHarmonizationFlags(roundBWins, curScore, prevScore);
+    expect(flags.find(f => f.dimension === 'overall')).toBeUndefined();
+  });
+
+  it('does NOT emit overall flag when gap is below threshold (15)', () => {
+    // pairwise 'a' wins all, but overall gap is only 14 → below threshold
+    const round = makeRound('a', 'Agent A', 'b', 'Agent B', 'a', 'a', 'a');
+    const prev = makeAbsScores({ overallScore: 30 });
+    const cur  = makeAbsScores({ overallScore: 44 }); // gap = 14 < 15
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    expect(flags.find(f => f.dimension === 'overall')).toBeUndefined();
+  });
+
+  it('returns multiple flags when several dimensions diverge simultaneously', () => {
+    // Pairwise: 'a' wins all 3 (and overall majority = 'a')
+    // Absolute: cur ('b') higher on logic and tactics
+    const round = makeRound('a', 'Agent A', 'b', 'Agent B', 'a', 'a', 'a');
+    const prev = makeAbsScores({ logicalCoherence: 10, tacticalEffectiveness: 8, overallScore: 30 });
+    const cur  = makeAbsScores({ logicalCoherence: 30, tacticalEffectiveness: 22, overallScore: 80 });
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    const dims = flags.map(f => f.dimension);
+    expect(dims).toContain('logic');
+    expect(dims).toContain('tactics');
+    expect(dims).toContain('overall');
   });
 });
 

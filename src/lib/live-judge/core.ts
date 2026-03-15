@@ -189,6 +189,8 @@ export class LiveJudgeSystem {
         judgeAnalyses = [openingAnalysis];
         aggregatedScores = openingAnalysis.scores;
         absoluteScores = openingAnalysis.scores;
+        // Persist so Turn 2 harmonization check has a prevAbsolute to compare against
+        this.panel.lastAbsoluteScores[agent.id] = absoluteScores;
       } catch {
         // Opening analysis failed — leave neutral scores
       }
@@ -355,14 +357,18 @@ export class LiveJudgeSystem {
       );
     }
 
-    // Derive opts for hidden directive: counterfactual and mechanism pressure
+    // Derive opts for hidden directive: counterfactual and mechanism pressure.
+    // Use turnNumber + 1 (the *next* turn) so the pool index matches what
+    // generateAdaptiveReply() will inject — keeping the log consistent with the
+    // directive the agent actually receives.
     const noCounterfactualYet =
-      turnNumber >= 4 && !this.panel.scorecard.counterfactualTrack?.[agent.id];
+      turnNumber + 1 >= 4 &&
+      !this.panel.scorecard.counterfactualTrack?.[agent.id];
     const mechanismFailureLastRound =
       !!pairwiseRound?.mechanismFailures?.includes(agent.name);
     const hiddenDirective = generateHiddenDirective(
       aggregatedScores,
-      turnNumber,
+      turnNumber + 1,
       {
         noCounterfactualYet,
         mechanismFailureLastRound,
@@ -370,7 +376,7 @@ export class LiveJudgeSystem {
     );
     if (hiddenDirective) {
       console.log(
-        `[Hidden Directive] Turn ${turnNumber} (${agent.name}): ${hiddenDirective}`,
+        `[Hidden Directive] Turn ${turnNumber} → preview for Turn ${turnNumber + 1} (${agent.name}): ${hiddenDirective}`,
       );
     }
 
@@ -699,8 +705,14 @@ export class LiveJudgeSystem {
       dominantFrame: null,
     };
     this.panel.turnCount = 0;
-    this.panel.scorecard = { rounds: [], winTallies: {}, overallWinner: null };
+    this.panel.scorecard = {
+      rounds: [],
+      winTallies: {},
+      overallWinner: null,
+      counterfactualTrack: {},
+    };
     this.panel.previousTurn = null;
+    this.panel.lastAbsoluteScores = {};
   }
 
   getPanelState(): LiveJudgePanel {

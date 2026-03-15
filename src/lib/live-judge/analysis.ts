@@ -477,7 +477,10 @@ function parsePairwiseResponse(
           ? data.mechanism_delta.trim() || undefined
           : undefined,
       mechanismFailures: Array.isArray(data.mechanism_failures)
-        ? data.mechanism_failures.filter((x: unknown) => typeof x === "string")
+        ? data.mechanism_failures
+            .filter((x: unknown) => typeof x === "string")
+            .map((x: string) => x.trim())
+            .filter((x: string) => x.length > 0)
         : undefined,
       counterfactualDetected:
         typeof data.counterfactual_agent === "string" &&
@@ -725,13 +728,29 @@ export function computeHarmonizationFlags(
     curAbsolute.rhetoricalForce,
     6,
   );
-  check(
-    "overall",
-    round.logicWinner,
-    prevAbsolute.overallScore,
-    curAbsolute.overallScore,
-    15,
-  );
+
+  // Derive the overall pairwise winner as the agent that won a majority of
+  // the three dimensions (2 of 3). With an odd number of dimensions a true
+  // three-way tie is impossible — one agent always wins at least 2. The null
+  // branch is a defensive guard for rounds with unexpected winner values.
+  const winners = [round.logicWinner, round.tacticsWinner, round.rhetoricWinner];
+  const prevWins = winners.filter((w) => w === round.prevTurn.agentId).length;
+  const curWins = winners.filter((w) => w === round.curTurn.agentId).length;
+  const overallPairwiseWinner =
+    prevWins >= 2
+      ? round.prevTurn.agentId
+      : curWins >= 2
+        ? round.curTurn.agentId
+        : null;
+  if (overallPairwiseWinner !== null) {
+    check(
+      "overall",
+      overallPairwiseWinner,
+      prevAbsolute.overallScore,
+      curAbsolute.overallScore,
+      15,
+    );
+  }
 
   return flags;
 }
