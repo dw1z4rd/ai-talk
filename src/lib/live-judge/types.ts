@@ -82,6 +82,12 @@ export interface PairwiseRound {
   /** Set when a turn contains a qualifying counterfactual ("no-X world" with full causal chain). */
   counterfactualDetected?: { agentId: string; summary: string };
   languageWarning?: string;
+  /**
+   * Harmonization flags raised for this round: dimensions where the pairwise winner
+   * assignment diverged from absolute per-turn scores (including ties set to "tie").
+   * Populated after reconcileRoundWinners + computeHarmonizationFlags run.
+   */
+  harmonizationFlags?: HarmonizationFlag[];
   isFallback: boolean;
 }
 

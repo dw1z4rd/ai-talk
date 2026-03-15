@@ -50,6 +50,13 @@
     return { id, name: id, color: "#7c6af7" };
   }
 
+  /** Resolves a dimension winner ID to a display-friendly object.
+   *  The "tie" sentinel (set when absolute scores are equal) shows as "Draw". */
+  function getWinnerInfo(id: string): { id: string; name: string; color: string } {
+    if (id === "tie") return { id: "tie", name: "Draw", color: "#6b7280" };
+    return getModelInfo(id);
+  }
+
   interface ChatMessage {
     agentId: string;
     agentName: string;
@@ -398,15 +405,32 @@
         content += "\n\n---\n\n## Live Judge Analysis\n\n";
         content += pairwiseRounds
           .map((round) => {
-            const logicWinnerName = getModelInfo(round.logicWinner).name;
-            const tacticsWinnerName = getModelInfo(round.tacticsWinner).name;
-            const rhetoricWinnerName = getModelInfo(round.rhetoricWinner).name;
-            return (
+            const logicWinnerName = getWinnerInfo(round.logicWinner).name;
+            const tacticsWinnerName = getWinnerInfo(round.tacticsWinner).name;
+            const rhetoricWinnerName = getWinnerInfo(round.rhetoricWinner).name;
+            let roundMd =
               `### Round ${round.roundNumber} · T${round.prevTurn.turnNumber} (${round.prevTurn.agentName}) vs T${round.curTurn.turnNumber} (${round.curTurn.agentName})\n\n` +
               `**Logic:** ${logicWinnerName} · **Tactics:** ${tacticsWinnerName} · **Rhetoric:** ${rhetoricWinnerName}\n\n` +
               `**Logic Analysis:**\n\n> ${round.logicDelta}\n\n` +
-              (round.languageWarning ? `> ⚠ ${round.languageWarning}\n\n` : "")
+              (round.languageWarning ? `> ⚠ ${round.languageWarning}\n\n` : "");
+            // Surface harmonization flags so readers know when the pairwise
+            // winner diverged from the absolute per-turn scores.
+            const dimFlags = (round.harmonizationFlags ?? []).filter(
+              (f: any) => f.dimension !== "overall",
             );
+            if (dimFlags.length > 0) {
+              const notes = dimFlags
+                .map((f: any) => {
+                  const leader =
+                    f.absoluteScoreLeader === "tie"
+                      ? "Draw"
+                      : getModelInfo(f.absoluteScoreLeader).name;
+                  return `⚠ **${f.dimension.charAt(0).toUpperCase() + f.dimension.slice(1)}**: absolute scores indicate ${leader} (gap ${f.divergenceMagnitude})`;
+                })
+                .join(" · ");
+              roundMd += `> _Score discrepancy: ${notes}_\n\n`;
+            }
+            return roundMd;
           })
           .join("---\n\n");
       }
@@ -467,10 +491,26 @@
         content += `\n\n${"═".repeat(40)}\nPAIRWISE SCORECARD\n\n`;
         content += pairwiseRounds
           .map((round) => {
-            return (
+            let line =
               `[Round ${round.roundNumber}  T${round.prevTurn.turnNumber}:${round.prevTurn.agentName} vs T${round.curTurn.turnNumber}:${round.curTurn.agentName}]\n` +
-              `Logic: ${getModelInfo(round.logicWinner).name}  Tactics: ${getModelInfo(round.tacticsWinner).name}  Rhetoric: ${getModelInfo(round.rhetoricWinner).name}\n${round.logicDelta}`
+              `Logic: ${getWinnerInfo(round.logicWinner).name}  Tactics: ${getWinnerInfo(round.tacticsWinner).name}  Rhetoric: ${getWinnerInfo(round.rhetoricWinner).name}\n${round.logicDelta}`;
+            const dimFlags = (round.harmonizationFlags ?? []).filter(
+              (f: any) => f.dimension !== "overall",
             );
+            if (dimFlags.length > 0) {
+              line +=
+                "\nScore discrepancy: " +
+                dimFlags
+                  .map((f: any) => {
+                    const leader =
+                      f.absoluteScoreLeader === "tie"
+                        ? "Draw"
+                        : getModelInfo(f.absoluteScoreLeader).name;
+                    return `${f.dimension} → absolute: ${leader} (gap ${f.divergenceMagnitude})`;
+                  })
+                  .join(", ");
+            }
+            return line;
           })
           .join(`\n\n${"─".repeat(40)}\n\n`);
 
@@ -1275,9 +1315,9 @@
                 {#each pairwiseRounds
                   .slice(-3)
                   .reverse() as round, i (round.roundNumber)}
-                  {@const logicWinnerInfo = getModelInfo(round.logicWinner)}
-                  {@const tacticsWinnerInfo = getModelInfo(round.tacticsWinner)}
-                  {@const rhetoricWinnerInfo = getModelInfo(
+                  {@const logicWinnerInfo = getWinnerInfo(round.logicWinner)}
+                  {@const tacticsWinnerInfo = getWinnerInfo(round.tacticsWinner)}
+                  {@const rhetoricWinnerInfo = getWinnerInfo(
                     round.rhetoricWinner,
                   )}
                   <div

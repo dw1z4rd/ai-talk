@@ -13,6 +13,7 @@ import {
   parseJudgeAnalysis,
   generateRubricHarmonization,
   computeHarmonizationFlags,
+  reconcileRoundWinners,
   detectPositionalConvergence,
   generateNarrativeVerdictText,
 } from "./analysis";
@@ -482,10 +483,10 @@ describe("computeHarmonizationFlags", () => {
     expect(computeHarmonizationFlags(round, cur, prev)).toHaveLength(0);
   });
 
-  it("flags logic divergence when gap meets threshold (8) and winner is wrong", () => {
+  it("flags logic divergence when gap meets threshold (5) and winner is wrong", () => {
     // Pairwise says 'a' (prevTurn) wins logic, but cur has higher logicalCoherence
     const round = makeRound("a", "Agent A", "b", "Agent B", "a", "b", "b");
-    // gap = 30 - 10 = 20, threshold = 8 → should flag
+    // gap = 30 - 10 = 20, threshold = 5 → should flag
     const prev = makeAbsScores({ logicalCoherence: 10 });
     const cur = makeAbsScores({ logicalCoherence: 30 });
     const flags = computeHarmonizationFlags(round, cur, prev);
@@ -496,17 +497,17 @@ describe("computeHarmonizationFlags", () => {
     expect(logicFlag?.divergenceMagnitude).toBe(20);
   });
 
-  it("does NOT flag logic divergence when gap is below threshold (8)", () => {
-    // gap = 7, below the 8 threshold
+  it("does NOT flag logic divergence when gap is below threshold (5)", () => {
+    // gap = 4, below the 5 threshold
     const round = makeRound("a", "Agent A", "b", "Agent B", "a", "b", "b");
     const prev = makeAbsScores({ logicalCoherence: 10 });
-    const cur = makeAbsScores({ logicalCoherence: 17 });
+    const cur = makeAbsScores({ logicalCoherence: 14 });
     const flags = computeHarmonizationFlags(round, cur, prev);
     expect(flags.find((f) => f.dimension === "logic")).toBeUndefined();
   });
 
-  it("flags tactics divergence when gap meets threshold (6) and winner is wrong", () => {
-    // gap = 10 ≥ 6, pairwise gives 'a' but cur has higher tacticalEffectiveness
+  it("flags tactics divergence when gap meets threshold (3) and winner is wrong", () => {
+    // gap = 10 ≥ 3, pairwise gives 'a' but cur has higher tacticalEffectiveness
     const round = makeRound("a", "Agent A", "b", "Agent B", "b", "a", "b");
     const prev = makeAbsScores({ tacticalEffectiveness: 8 });
     const cur = makeAbsScores({ tacticalEffectiveness: 18 });
@@ -516,7 +517,7 @@ describe("computeHarmonizationFlags", () => {
     expect(tacticsFlag?.divergenceMagnitude).toBe(10);
   });
 
-  it("flags rhetoric divergence when gap meets threshold (6) and winner is wrong", () => {
+  it("flags rhetoric divergence when gap meets threshold (3) and winner is wrong", () => {
     const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "a");
     const prev = makeAbsScores({ rhetoricalForce: 8 });
     const cur = makeAbsScores({ rhetoricalForce: 20 });
@@ -524,6 +525,25 @@ describe("computeHarmonizationFlags", () => {
     const rhetoricFlag = flags.find((f) => f.dimension === "rhetoric");
     expect(rhetoricFlag).toBeDefined();
     expect(rhetoricFlag?.divergenceMagnitude).toBe(12);
+  });
+
+  it("always flags when absolute scores are exactly equal and a winner was assigned", () => {
+    // Both agents score identically on tactics — assigning a winner is arbitrary
+    const round = makeRound("a", "Agent A", "b", "Agent B", "a", "a", "b");
+    const scores = makeAbsScores({ tacticalEffectiveness: 20 });
+    const flags = computeHarmonizationFlags(round, scores, scores);
+    const tacticsFlag = flags.find((f) => f.dimension === "tactics");
+    expect(tacticsFlag).toBeDefined();
+    expect(tacticsFlag?.absoluteScoreLeader).toBe("tie");
+    expect(tacticsFlag?.divergenceMagnitude).toBe(0);
+  });
+
+  it("does NOT flag a tie dimension when the winner is already 'tie'", () => {
+    // After reconcileRoundWinners the tactics winner is set to 'tie'; no redundant flag
+    const round = makeRound("a", "Agent A", "b", "Agent B", "a", "tie", "b");
+    const scores = makeAbsScores({ tacticalEffectiveness: 20 });
+    const flags = computeHarmonizationFlags(round, scores, scores);
+    expect(flags.find((f) => f.dimension === "tactics")).toBeUndefined();
   });
 
   it("flags overall divergence when majority pairwise winner mismatches absolute overall leader", () => {
@@ -583,6 +603,88 @@ describe("computeHarmonizationFlags", () => {
     expect(dims).toContain("logic");
     expect(dims).toContain("tactics");
     expect(dims).toContain("overall");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// reconcileRoundWinners
+// ---------------------------------------------------------------------------
+
+describe("reconcileRoundWinners", () => {
+  it("returns the round unchanged when absolute scores are missing", () => {
+    const round = makeRound("a", "Agent A", "b", "Agent B", "a", "a", "a");
+    expect(reconcileRoundWinners(round, undefined, undefined)).toBe(round);
+    expect(reconcileRoundWinners(round, makeAbsScores(), undefined)).toBe(
+      round,
+    );
+    expect(reconcileRoundWinners(round, undefined, makeAbsScores())).toBe(
+      round,
+    );
+  });
+
+  it("sets winner to 'tie' when both turns have equal absolute scores on a dimension", () => {
+    const round = makeRound("a", "Agent A", "b", "Agent B", "a", "a", "a");
+    // All three dimensions equal → all winners should be 'tie'
+    const scores = makeAbsScores();
+    const reconciled = reconcileRoundWinners(round, scores, scores);
+    expect(reconciled.logicWinner).toBe("tie");
+    expect(reconciled.tacticsWinner).toBe("tie");
+    expect(reconciled.rhetoricWinner).toBe("tie");
+  });
+
+  it("preserves the existing pairwise winner when absolute scores differ", () => {
+    const round = makeRound("a", "Agent A", "b", "Agent B", "a", "b", "a");
+    const prev = makeAbsScores({
+      logicalCoherence: 10,
+      tacticalEffectiveness: 20,
+      rhetoricalForce: 10,
+    });
+    const cur = makeAbsScores({
+      logicalCoherence: 30,
+      tacticalEffectiveness: 10,
+      rhetoricalForce: 25,
+    });
+    const reconciled = reconcileRoundWinners(round, cur, prev);
+    // Scores differ on all dims → pairwise winners unchanged
+    expect(reconciled.logicWinner).toBe("a");
+    expect(reconciled.tacticsWinner).toBe("b");
+    expect(reconciled.rhetoricWinner).toBe("a");
+  });
+
+  it("only overrides the tied dimension, leaving others intact", () => {
+    const round = makeRound("a", "Agent A", "b", "Agent B", "a", "a", "b");
+    // tactics tied, logic and rhetoric differ
+    const prev = makeAbsScores({
+      logicalCoherence: 10,
+      tacticalEffectiveness: 15,
+      rhetoricalForce: 20,
+    });
+    const cur = makeAbsScores({
+      logicalCoherence: 30,
+      tacticalEffectiveness: 15,
+      rhetoricalForce: 10,
+    });
+    const reconciled = reconcileRoundWinners(round, cur, prev);
+    expect(reconciled.logicWinner).toBe("a"); // unchanged
+    expect(reconciled.tacticsWinner).toBe("tie"); // overridden
+    expect(reconciled.rhetoricWinner).toBe("b"); // unchanged
+  });
+
+  it("scorecard tally skips 'tie' winners (updateScorecard integration)", () => {
+    // A round where tactics is 'tie' should not increment either agent's tally
+    const round = makeRound("a", "Agent A", "b", "Agent B", "a", "tie", "b");
+    const sc = updateScorecard(
+      emptyScorecard(),
+      round,
+      "a",
+      "Agent A",
+      "b",
+      "Agent B",
+    );
+    expect(sc.winTallies["a"].tactics).toBe(0);
+    expect(sc.winTallies["b"].tactics).toBe(0);
+    expect(sc.winTallies["a"].total).toBe(1); // only logic
+    expect(sc.winTallies["b"].total).toBe(1); // only rhetoric
   });
 });
 

@@ -27,6 +27,7 @@ import {
   generateScorecardSplitNote,
   generateRubricHarmonization,
   computeHarmonizationFlags,
+  reconcileRoundWinners,
   detectPositionalConvergence,
 } from "./analysis";
 import { generateAdaptivePressure, generateHiddenDirective } from "./pressure";
@@ -249,6 +250,17 @@ export class LiveJudgeSystem {
           this.panel.lastAbsoluteScores[agent.id] = absoluteScores;
         }
 
+        // Reconcile pairwise winners with absolute scores: when both turns score
+        // identically on a dimension, the winner is reset to "tie" so no scorecard
+        // win is counted for either agent.
+        if (absoluteScores && !pairwiseRound.isFallback) {
+          pairwiseRound = reconcileRoundWinners(
+            pairwiseRound,
+            absoluteScores,
+            this.panel.lastAbsoluteScores[pairwiseRound.prevTurn.agentId],
+          );
+        }
+
         // Update the scorecard using agent IDs/names from the pairwise round itself
         this.panel.scorecard = updateScorecard(
           this.panel.scorecard,
@@ -331,6 +343,17 @@ export class LiveJudgeSystem {
           `[Harmonization] Round ${f.roundNumber} ${f.dimension}: pairwise winner diverges from absolute scores by ${f.divergenceMagnitude} — ${f.note}`,
         ),
       );
+      // Attach flags to the round and keep the scorecard's stored copy in sync
+      // so the export and UI can surface them.
+      if (pairwiseRound) {
+        pairwiseRound = { ...pairwiseRound, harmonizationFlags };
+        this.panel.scorecard = {
+          ...this.panel.scorecard,
+          rounds: this.panel.scorecard.rounds.map((r) =>
+            r.roundNumber === pairwiseRound!.roundNumber ? pairwiseRound! : r,
+          ),
+        };
+      }
     }
 
     // Derive opts for hidden directive: counterfactual and mechanism pressure.

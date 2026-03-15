@@ -676,6 +676,43 @@ export function synthScoresFromPairwise(
 // ── Harmonization ─────────────────────────────────────────────────────────────
 
 /**
+ * Reconcile pairwise-assigned dimension winners against per-turn absolute scores.
+ * When two turns score identically on a dimension, neither agent can be declared
+ * the winner; the winner field is set to the "tie" sentinel so the scorecard does
+ * not count a win for either agent. Non-tie discrepancies are left to
+ * computeHarmonizationFlags to surface as flags.
+ */
+export function reconcileRoundWinners(
+  round: PairwiseRound,
+  curAbsolute: import("./types").JudgeScores | undefined,
+  prevAbsolute: import("./types").JudgeScores | undefined,
+): PairwiseRound {
+  if (!curAbsolute || !prevAbsolute) return round;
+
+  const reconcile = (winner: string, curScore: number, prevScore: number) =>
+    curScore === prevScore ? "tie" : winner;
+
+  return {
+    ...round,
+    logicWinner: reconcile(
+      round.logicWinner,
+      curAbsolute.logicalCoherence,
+      prevAbsolute.logicalCoherence,
+    ),
+    tacticsWinner: reconcile(
+      round.tacticsWinner,
+      curAbsolute.tacticalEffectiveness,
+      prevAbsolute.tacticalEffectiveness,
+    ),
+    rhetoricWinner: reconcile(
+      round.rhetoricWinner,
+      curAbsolute.rhetoricalForce,
+      prevAbsolute.rhetoricalForce,
+    ),
+  };
+}
+
+/**
  * Synchronous check: compare pairwise winner assignments against per-turn absolute
  * scores for the same round. Returns flags for dimensions where the two systems diverge
  * beyond their scale-specific thresholds. No LLM call — pure arithmetic.
@@ -704,16 +741,42 @@ export function computeHarmonizationFlags(
     curScore: number,
     threshold: number,
   ) => {
-    const absoluteLeaderId = curScore >= prevScore ? curId : prevId;
     const gap = Math.abs(curScore - prevScore);
+
+    // A tied absolute score means neither agent outperformed the other; any
+    // pairwise winner assignment is arbitrary and must always be flagged,
+    // regardless of the threshold.
+    if (gap === 0) {
+      if (pairwiseWinnerId !== "tie") {
+        const winnerName =
+          pairwiseWinnerId === prevId
+            ? round.prevTurn.agentName
+            : round.curTurn.agentName;
+        flags.push({
+          roundNumber: round.roundNumber,
+          dimension,
+          pairwiseWinner: pairwiseWinnerId,
+          absoluteScoreLeader: "tie",
+          divergenceMagnitude: 0,
+          note: `${dimension} pairwise winner (${winnerName}) assigned when absolute scores were equal (prev=${prevScore}, cur=${curScore})`,
+        });
+      }
+      return;
+    }
+
+    const absoluteLeaderId = curScore > prevScore ? curId : prevId;
     if (pairwiseWinnerId !== absoluteLeaderId && gap >= threshold) {
+      const winnerName =
+        pairwiseWinnerId === prevId
+          ? round.prevTurn.agentName
+          : round.curTurn.agentName;
       flags.push({
         roundNumber: round.roundNumber,
         dimension,
         pairwiseWinner: pairwiseWinnerId,
         absoluteScoreLeader: absoluteLeaderId,
         divergenceMagnitude: gap,
-        note: `${dimension} pairwise winner (${pairwiseWinnerId === prevId ? round.prevTurn.agentName : round.curTurn.agentName}) had lower absolute score by ${gap} (prev=${prevScore}, cur=${curScore})`,
+        note: `${dimension} pairwise winner (${winnerName}) had lower absolute score by ${gap} (prev=${prevScore}, cur=${curScore})`,
       });
     }
   };
@@ -723,21 +786,21 @@ export function computeHarmonizationFlags(
     round.logicWinner,
     prevAbsolute.logicalCoherence,
     curAbsolute.logicalCoherence,
-    8,
+    5,
   );
   check(
     "tactics",
     round.tacticsWinner,
     prevAbsolute.tacticalEffectiveness,
     curAbsolute.tacticalEffectiveness,
-    6,
+    3,
   );
   check(
     "rhetoric",
     round.rhetoricWinner,
     prevAbsolute.rhetoricalForce,
     curAbsolute.rhetoricalForce,
-    6,
+    3,
   );
 
   // Derive the overall pairwise winner as the agent that won a majority of
