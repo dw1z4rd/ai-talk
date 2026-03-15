@@ -792,7 +792,7 @@
 {#if showWinnerModal}
   <div
     class="fixed inset-0 z-50 flex items-center justify-center"
-    transition:fade={{ duration: 300 }}
+    transition:fade={{ duration: 500 }}
   >
     <!-- Confetti canvas (sits behind modal content) -->
     <canvas
@@ -1508,7 +1508,7 @@
     <div
       id="live-judge-panel"
       class="flex flex-col gap-4"
-      in:fade={{ duration: 400 }}
+      in:fade={{ duration: 500 }}
     >
       <!-- Section header -->
       <div class="flex items-center gap-3 mt-2">
@@ -1527,7 +1527,7 @@
         <div
           class="rounded-2xl border overflow-hidden bg-[--color-panel]"
           style="border-color: #7c6af740"
-          in:fly={{ y: 20, duration: 320 }}
+          in:fly={{ y: 20, duration: 1000 }}
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
@@ -1578,7 +1578,7 @@
         <div
           class="rounded-2xl border overflow-hidden bg-[--color-panel]"
           style="border-color: #7c6af740"
-          in:fly={{ y: 20, duration: 320 }}
+          in:fly={{ y: 20, duration: 1000 }}
         >
           <div class="px-4 py-3 flex items-center gap-3">
             <div
@@ -1613,7 +1613,7 @@
             <div
               class="rounded-xl border bg-[--color-panel] p-3"
               style="border-color: #7c6af720"
-              in:fly={{ y: 16, duration: 280 }}
+              in:fly={{ y: 16, duration: 500 }}
             >
               <!-- Round header -->
               <div class="flex items-center gap-2 mb-3">
@@ -1667,7 +1667,7 @@
             {#each scoredTurns as r (r.turnNumber)}
               {@const info = getModelInfo(r.agentId)}
               {@const s = r.absoluteScores}
-              <div class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1" style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem" in:fly={{ y: 8, duration: 200 }}>
+              <div class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1" style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem" in:fly={{ y: 8, duration: 500 }}>
                 <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
                 <span class="font-medium truncate" style="color: {info.color}">{info.name}</span>
                 <span class="text-center font-mono text-[11px]" title="Logic: {s.logicalCoherence}/40">{s.logicalCoherence}<span class="text-[--color-muted]">/40</span></span>
@@ -1685,7 +1685,7 @@
         <div
           class="rounded-2xl border overflow-hidden bg-[--color-panel]"
           style="border-color: {narrativeVerdict.agreesWithScorecard ? '#7c6af740' : '#f59e0b40'}"
-          in:fly={{ y: 24, duration: 400 }}
+          in:fly={{ y: 24, duration: 800 }}
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
