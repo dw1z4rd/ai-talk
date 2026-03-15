@@ -10,6 +10,7 @@ import {
   type PairwiseRound,
   type DebateScorecard,
   type NarrativeVerdict,
+  type HarmonizationFlag,
   JUDGE_SPECIALIZATION_CONFIGS,
 } from "./types";
 import type { Agent, Message } from "$lib/agents";
@@ -24,8 +25,9 @@ import {
   generateNarrativeVerdictText,
   generateConflictResolution,
   generateRubricHarmonization,
+  computeHarmonizationFlags,
 } from "./analysis";
-import { generateAdaptivePressure } from "./pressure";
+import { generateAdaptivePressure, generateHiddenDirective } from "./pressure";
 import { MODEL_CATALOG } from "$lib/agents";
 
 // ── Judge model rotation ──────────────────────────────────────────────────────
@@ -110,8 +112,14 @@ export class LiveJudgeSystem {
       },
       turnCount: 0,
       isActive: true,
-      scorecard: { rounds: [], winTallies: {}, overallWinner: null },
+      scorecard: {
+        rounds: [],
+        winTallies: {},
+        overallWinner: null,
+        counterfactualTrack: {},
+      },
       previousTurn: null,
+      lastAbsoluteScores: {},
     };
   }
 
@@ -181,6 +189,8 @@ export class LiveJudgeSystem {
         judgeAnalyses = [openingAnalysis];
         aggregatedScores = openingAnalysis.scores;
         absoluteScores = openingAnalysis.scores;
+        // Persist so Turn 2 harmonization check has a prevAbsolute to compare against
+        this.panel.lastAbsoluteScores[agent.id] = absoluteScores;
       } catch {
         // Opening analysis failed — leave neutral scores
       }
@@ -259,6 +269,8 @@ export class LiveJudgeSystem {
 
         if (absoluteAnalysis) {
           absoluteScores = absoluteAnalysis.scores;
+          // Persist for next round's harmonization check
+          this.panel.lastAbsoluteScores[agent.id] = absoluteScores;
         }
 
         // Update the scorecard using agent IDs/names from the pairwise round itself
@@ -328,6 +340,46 @@ export class LiveJudgeSystem {
       generateAdaptivePressure(analysis, momentumShift, frameControlShift),
     );
 
+    // Compute harmonization flags for this round (synchronous, no LLM)
+    const harmonizationFlags: HarmonizationFlag[] =
+      pairwiseRound && !pairwiseRound.isFallback
+        ? computeHarmonizationFlags(
+            pairwiseRound,
+            absoluteScores,
+            this.panel.lastAbsoluteScores[pairwiseRound.prevTurn.agentId],
+          )
+        : [];
+    if (harmonizationFlags.length > 0) {
+      harmonizationFlags.forEach((f) =>
+        console.warn(
+          `[Harmonization] Round ${f.roundNumber} ${f.dimension}: pairwise winner diverges from absolute scores by ${f.divergenceMagnitude} — ${f.note}`,
+        ),
+      );
+    }
+
+    // Derive opts for hidden directive: counterfactual and mechanism pressure.
+    // Use turnNumber + 1 (the *next* turn) so the pool index matches what
+    // generateAdaptiveReply() will inject — keeping the log consistent with the
+    // directive the agent actually receives.
+    const noCounterfactualYet =
+      turnNumber + 1 >= 4 &&
+      !this.panel.scorecard.counterfactualTrack?.[agent.id];
+    const mechanismFailureLastRound =
+      !!pairwiseRound?.mechanismFailures?.includes(agent.name);
+    const hiddenDirective = generateHiddenDirective(
+      aggregatedScores,
+      turnNumber + 1,
+      {
+        noCounterfactualYet,
+        mechanismFailureLastRound,
+      },
+    );
+    if (hiddenDirective) {
+      console.log(
+        `[Hidden Directive] Turn ${turnNumber} → preview for Turn ${turnNumber + 1} (${agent.name}): ${hiddenDirective}`,
+      );
+    }
+
     // Update panel state
     this.updatePanelState(
       agent,
@@ -351,6 +403,8 @@ export class LiveJudgeSystem {
       pairwiseRound,
       scorecard: pairwiseRound ? { ...this.panel.scorecard } : undefined,
       absoluteScores,
+      harmonizationFlags:
+        harmonizationFlags.length > 0 ? harmonizationFlags : undefined,
     };
   }
 
@@ -651,8 +705,14 @@ export class LiveJudgeSystem {
       dominantFrame: null,
     };
     this.panel.turnCount = 0;
-    this.panel.scorecard = { rounds: [], winTallies: {}, overallWinner: null };
+    this.panel.scorecard = {
+      rounds: [],
+      winTallies: {},
+      overallWinner: null,
+      counterfactualTrack: {},
+    };
     this.panel.previousTurn = null;
+    this.panel.lastAbsoluteScores = {};
   }
 
   getPanelState(): LiveJudgePanel {

@@ -7,6 +7,7 @@ import {
   type PairwiseRound,
   type DebateScorecard,
   type NarrativeVerdict,
+  type HarmonizationFlag,
 } from "./types";
 import type { Agent, Message } from "$lib/agents";
 import { MODEL_CATALOG } from "$lib/agents";
@@ -255,7 +256,7 @@ export function generatePairwiseSystemPrompt(
   return `You are a comparative debate judge. Read two consecutive turns and pick the stronger one on three dimensions. No draws — you must choose one winner per dimension. Respond with a single JSON object only — no preamble, no markdown.
 
 Required format (use exact agent names as shown):
-{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn. For missing causal mechanisms, name which element was absent — e.g. 'stated how X produces Y but omitted why the mechanism holds under competitive markets' or 'gave mechanism but no measurable consequence.' For timeline violations, name the technology/concept and note it clearly postdates the phenomenon. Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn was more persuasive across all four components and why."}
+{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn. For missing causal mechanisms, name which element was absent — e.g. 'stated how X produces Y but omitted why the mechanism holds under competitive markets' or 'gave mechanism but no measurable consequence.' For timeline violations, name the technology/concept and note it clearly postdates the phenomenon. Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn was more persuasive across all four components and why.","mechanism_delta":"1-2 sentences on mechanism quality for BOTH turns. For each, state which elements of the cause→process→measurable consequence chain were present or absent.","mechanism_failures":[],"counterfactual_agent":null,"counterfactual_summary":null}
 
 --- LOGIC (forced choice) ---
 Start each turn from 8. Apply deductions:
@@ -269,6 +270,7 @@ Start each turn from 8. Apply deductions:
 Winner = higher remaining score. If equal, award the turn whose core claim still stands despite errors.
 
 Causal mechanism requirement: for each major causal leap, the argument must supply a mechanism sentence of the form "[how X produces Y] → [why that mechanism operates under these conditions] → [measurable consequence]." A causal leap missing any element of this template is penalized −1 as an unsupported assumption.
+Also populate mechanism_delta (covers both turns) and mechanism_failures (array of agent names that had a mechanism failure) based on this assessment.
 Retroactive necessary condition fallacy: if an argument treats a technology, concept, or practice that postdates the phenomenon being explained as a necessary condition for it, penalize −3. Later developments cannot be used as causal prerequisites for earlier effects. (Example: arguing that social media platforms were required for 19th-century political revolutions — social media is a 21st-century technology, not a prerequisite for 19th-century events.) When citing this violation in logic_delta, name the technology/concept and note that it clearly postdates the phenomenon.
 
 EXCEPTIONS: Do not penalize thought experiments or illustrative hypotheticals as "unverified facts." Judge the mechanism, not the historical precision.
@@ -304,7 +306,12 @@ ${domainNote}
 --- ANTI-BIAS ---
 Tone ≠ Logic. Academic register does not indicate sound reasoning. Confidence does not substitute for evidence. Apply identical evidentiary standards to both turns.
 Citation ≠ Correctness. Cited precision that is mechanistically hollow is not stronger than uncited reasoning with a complete causal chain.
-Style ≠ Rhetoric. Punchiness and brevity alone do not constitute superior rhetoric. Framing quality and structural clarity carry equal weight.`;
+Style ≠ Rhetoric. Punchiness and brevity alone do not constitute superior rhetoric. Framing quality and structural clarity carry equal weight.
+
+--- COUNTERFACTUAL ---
+A counterfactual is a "no-X world" thought experiment: a turn that explicitly names a specific factor, asks what a world without it would look like, and then traces at least one full causal consequence in the form "if [X had not occurred / in a world without X], then [mechanism] → [measurable consequence]." The counterfactual must be the argument's own invention — not a paraphrase of the opponent's.
+Detection: if either turn contains a counterfactual matching this definition, set counterfactual_agent to that agent's exact name and counterfactual_summary to one sentence. If neither qualifies, set both to null.
+Scoring: the existing +1 for a complete explicit causal chain in LOGIC covers a counterfactual with a full chain — no separate bonus. A counterfactual missing the measurable consequence step is still penalized −1 under the mechanism requirement; populate mechanism_failures accordingly.`;
 }
 
 export function generatePairwisePrompt(
@@ -465,6 +472,28 @@ function parsePairwiseResponse(
         typeof data.rhetoric_delta === "string"
           ? data.rhetoric_delta.trim()
           : "No analysis provided.",
+      mechanismDelta:
+        typeof data.mechanism_delta === "string"
+          ? data.mechanism_delta.trim() || undefined
+          : undefined,
+      mechanismFailures: Array.isArray(data.mechanism_failures)
+        ? data.mechanism_failures
+            .filter((x: unknown) => typeof x === "string")
+            .map((x: string) => x.trim())
+            .filter((x: string) => x.length > 0)
+        : undefined,
+      counterfactualDetected:
+        typeof data.counterfactual_agent === "string" &&
+        data.counterfactual_agent !== "null" &&
+        data.counterfactual_agent.trim().length > 0
+          ? {
+              agentId: resolveWinner(data.counterfactual_agent),
+              summary:
+                typeof data.counterfactual_summary === "string"
+                  ? data.counterfactual_summary.trim()
+                  : "",
+            }
+          : undefined,
       languageWarning,
       isFallback: false,
     };
@@ -517,6 +546,9 @@ function createFallbackPairwiseRound(
     logicDelta: "Fallback — judge analysis unavailable for this round.",
     tacticsDelta: "Fallback — judge analysis unavailable for this round.",
     rhetoricDelta: "Fallback — judge analysis unavailable for this round.",
+    mechanismDelta: undefined,
+    mechanismFailures: undefined,
+    counterfactualDetected: undefined,
     languageWarning,
     isFallback: true,
   };
@@ -554,7 +586,13 @@ export function updateScorecard(
       },
     },
     overallWinner: null,
+    counterfactualTrack: { ...(scorecard.counterfactualTrack ?? {}) },
   };
+
+  // Record counterfactual submission if detected in this round
+  if (round.counterfactualDetected) {
+    updated.counterfactualTrack[round.counterfactualDetected.agentId] = true;
+  }
 
   // Tally wins
   const tallyWin = (
@@ -622,6 +660,99 @@ export function synthScoresFromPairwise(
     tacticalEffectiveness: tacticsScore,
     overallScore,
   };
+}
+
+// ── Harmonization ─────────────────────────────────────────────────────────────
+
+/**
+ * Synchronous check: compare pairwise winner assignments against per-turn absolute
+ * scores for the same round. Returns flags for dimensions where the two systems diverge
+ * beyond their scale-specific thresholds. No LLM call — pure arithmetic.
+ *
+ * Scale thresholds (gap required to flag):
+ *   logic:   0–40,   threshold = 8
+ *   tactics: 0–30,   threshold = 6
+ *   rhetoric: 0–30,  threshold = 6
+ *   overall: 0–100,  threshold = 15
+ */
+export function computeHarmonizationFlags(
+  round: PairwiseRound,
+  curAbsolute: import("./types").JudgeScores | undefined,
+  prevAbsolute: import("./types").JudgeScores | undefined,
+): HarmonizationFlag[] {
+  if (!curAbsolute || !prevAbsolute) return [];
+
+  const flags: HarmonizationFlag[] = [];
+  const prevId = round.prevTurn.agentId;
+  const curId = round.curTurn.agentId;
+
+  const check = (
+    dimension: HarmonizationFlag["dimension"],
+    pairwiseWinnerId: string,
+    prevScore: number,
+    curScore: number,
+    threshold: number,
+  ) => {
+    const absoluteLeaderId = curScore >= prevScore ? curId : prevId;
+    const gap = Math.abs(curScore - prevScore);
+    if (pairwiseWinnerId !== absoluteLeaderId && gap >= threshold) {
+      flags.push({
+        roundNumber: round.roundNumber,
+        dimension,
+        pairwiseWinner: pairwiseWinnerId,
+        absoluteScoreLeader: absoluteLeaderId,
+        divergenceMagnitude: gap,
+        note: `${dimension} pairwise winner (${pairwiseWinnerId === prevId ? round.prevTurn.agentName : round.curTurn.agentName}) had lower absolute score by ${gap} (prev=${prevScore}, cur=${curScore})`,
+      });
+    }
+  };
+
+  check(
+    "logic",
+    round.logicWinner,
+    prevAbsolute.logicalCoherence,
+    curAbsolute.logicalCoherence,
+    8,
+  );
+  check(
+    "tactics",
+    round.tacticsWinner,
+    prevAbsolute.tacticalEffectiveness,
+    curAbsolute.tacticalEffectiveness,
+    6,
+  );
+  check(
+    "rhetoric",
+    round.rhetoricWinner,
+    prevAbsolute.rhetoricalForce,
+    curAbsolute.rhetoricalForce,
+    6,
+  );
+
+  // Derive the overall pairwise winner as the agent that won a majority of
+  // the three dimensions (2 of 3). With an odd number of dimensions a true
+  // three-way tie is impossible — one agent always wins at least 2. The null
+  // branch is a defensive guard for rounds with unexpected winner values.
+  const winners = [round.logicWinner, round.tacticsWinner, round.rhetoricWinner];
+  const prevWins = winners.filter((w) => w === round.prevTurn.agentId).length;
+  const curWins = winners.filter((w) => w === round.curTurn.agentId).length;
+  const overallPairwiseWinner =
+    prevWins >= 2
+      ? round.prevTurn.agentId
+      : curWins >= 2
+        ? round.curTurn.agentId
+        : null;
+  if (overallPairwiseWinner !== null) {
+    check(
+      "overall",
+      overallPairwiseWinner,
+      prevAbsolute.overallScore,
+      curAbsolute.overallScore,
+      15,
+    );
+  }
+
+  return flags;
 }
 
 // ── Narrative verdict ─────────────────────────────────────────────────────────

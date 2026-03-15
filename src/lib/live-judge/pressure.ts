@@ -1,4 +1,8 @@
-import { type TurnAnalysis, type AdaptivePressure, type JudgeScores } from './types';
+import {
+  type TurnAnalysis,
+  type AdaptivePressure,
+  type JudgeScores,
+} from "./types";
 
 /**
  * Generate adaptive pressure based on judge analysis and debate dynamics
@@ -6,9 +10,8 @@ import { type TurnAnalysis, type AdaptivePressure, type JudgeScores } from './ty
 export function generateAdaptivePressure(
   analysis: TurnAnalysis,
   momentumShift: number,
-  frameControlShift: number
+  frameControlShift: number,
 ): AdaptivePressure {
-  
   // Calculate pressure types based on analysis
   const cognitivePressure = calculateCognitivePressure(analysis);
   const emotionalPressure = calculateEmotionalPressure(analysis);
@@ -21,11 +24,16 @@ export function generateAdaptivePressure(
     emotionalPressure,
     strategicPressure,
     credibilityPressure,
-    analysis
+    analysis,
   );
 
   // Calculate overall intensity and decay
-  const intensity = Math.max(cognitivePressure, emotionalPressure, strategicPressure, credibilityPressure);
+  const intensity = Math.max(
+    cognitivePressure,
+    emotionalPressure,
+    strategicPressure,
+    credibilityPressure,
+  );
   const decayRate = calculateDecayRate(analysis);
   const duration = calculateDuration(analysis);
 
@@ -39,7 +47,7 @@ export function generateAdaptivePressure(
     traitAdjustments,
     intensity,
     decayRate,
-    duration
+    duration,
   };
 }
 
@@ -147,9 +155,8 @@ function calculateTraitAdjustments(
   emotionalPressure: number,
   strategicPressure: number,
   credibilityPressure: number,
-  analysis: TurnAnalysis
-): AdaptivePressure['traitAdjustments'] {
-  
+  analysis: TurnAnalysis,
+): AdaptivePressure["traitAdjustments"] {
   const adjustments = {
     analyticalDepth: 0,
     evidencePreference: 0,
@@ -162,7 +169,7 @@ function calculateTraitAdjustments(
     argumentStructure: 0,
     linguisticStyle: 0,
     engagementTactics: 0,
-    metaphorUsage: 0
+    metaphorUsage: 0,
   };
 
   // Cognitive pressure affects analytical traits
@@ -211,8 +218,11 @@ function calculateTraitAdjustments(
   }
 
   // Clamp all adjustments to reasonable bounds
-  Object.keys(adjustments).forEach(key => {
-    adjustments[key as keyof typeof adjustments] = Math.max(-3, Math.min(3, adjustments[key as keyof typeof adjustments]));
+  Object.keys(adjustments).forEach((key) => {
+    adjustments[key as keyof typeof adjustments] = Math.max(
+      -3,
+      Math.min(3, adjustments[key as keyof typeof adjustments]),
+    );
   });
 
   return adjustments;
@@ -282,6 +292,20 @@ const OVERALL_DIRECTIVES = [
   "CRITICAL: Your last turn failed to move the debate in your favor. This turn, open with your strongest possible point and build from there.",
 ];
 
+const COUNTERFACTUAL_DIRECTIVES = [
+  "MANDATORY: Construct a concrete counterfactual this turn — identify a specific factor central to the debate and trace what changes if it is removed. Walk through the full mechanism: 'In a world without [X], [how the causal chain differs] → [the measurable consequence that follows].'",
+  "REQUIRED: Build a 'no-X world' argument this turn. Name the factor, remove it, and explain the mechanism step by step: cause → process → measurable consequence. Bare assertions about what 'would have happened' without a causal chain earn no credit.",
+  "CRITICAL: Your argument needs a counterfactual to make the causal stakes concrete. Choose a specific premise your opponent relies on, ask what the world looks like without it, and follow the chain all the way to a measurable consequence.",
+  "OVERRIDE: This turn, lead with a counterfactual thought experiment — explicitly name what you are removing, state the mechanism by which the absence changes outcomes, and name the measurable consequence. This is the single most effective way to test whether your position holds up to scrutiny.",
+];
+
+const MECHANISM_DIRECTIVES = [
+  "CRITICAL: Your last argument was missing a mechanism step. This turn, for every causal claim, write one sentence that names EXACTLY how the cause produces the effect AND what measurable consequence follows. The pattern is: '[cause] → [how it operates in context] → [measurable consequence].'",
+  "MANDATORY: Complete your causal chains this turn. Stating that 'X leads to Y' is insufficient — you must also explain the process by which X produces Y and the observable consequence. Drop any claim you cannot chain all three steps for.",
+  "REQUIRED: Mechanism gap detected in your last turn. Before making any new claims, close the gap: name the missing element (cause, process, or measurable consequence) from your previous argument and supply it now, then build forward.",
+  "OVERRIDE: Your arguments are being penalized for hollow causal leaps. This turn: no claim without all three elements — what causes it, through what mechanism it occurs, and what you would measure as evidence. One tight mechanistic argument beats three incomplete ones.",
+];
+
 function pickDirective(pool: string[], turnNumber: number): string {
   return pool[turnNumber % pool.length];
 }
@@ -291,8 +315,15 @@ function pickDirective(pool: string[], turnNumber: number): string {
  * Returns a one-turn imperative injected silently into the debater's system prompt.
  * Thresholds mirror pressure.ts calibration: logicalCoherence 0-40, rhetoricalForce 0-30,
  * tacticalEffectiveness 0-30, overallScore 0-100.
+ *
+ * @param opts.noCounterfactualYet   - Agent has not submitted a counterfactual and turn >= 4
+ * @param opts.mechanismFailureLastRound - Agent was in mechanismFailures array last round
  */
-export function generateHiddenDirective(scores: JudgeScores, turnNumber: number): string | undefined {
+export function generateHiddenDirective(
+  scores: JudgeScores,
+  turnNumber: number,
+  opts?: { noCounterfactualYet?: boolean; mechanismFailureLastRound?: boolean },
+): string | undefined {
   // Severe logic weakness — highest priority
   if (scores.logicalCoherence < 12) {
     return pickDirective(LOGIC_SEVERE_DIRECTIVES, turnNumber);
@@ -301,9 +332,17 @@ export function generateHiddenDirective(scores: JudgeScores, turnNumber: number)
   if (scores.logicalCoherence < 16) {
     return pickDirective(LOGIC_DIRECTIVES, turnNumber);
   }
+  // Mechanism failure (co-fires with counterfactual only when logic is healthy but mechanism is broken)
+  if (opts?.mechanismFailureLastRound && scores.logicalCoherence < 20) {
+    return pickDirective(MECHANISM_DIRECTIVES, turnNumber);
+  }
   // Rhetoric weakness
   if (scores.rhetoricalForce < 12) {
     return pickDirective(RHETORIC_DIRECTIVES, turnNumber);
+  }
+  // No counterfactual submitted yet — nudge from Turn 4 onward
+  if (opts?.noCounterfactualYet && turnNumber >= 4) {
+    return pickDirective(COUNTERFACTUAL_DIRECTIVES, turnNumber);
   }
   // Tactics weakness
   if (scores.tacticalEffectiveness < 12) {
@@ -319,11 +358,13 @@ export function generateHiddenDirective(scores: JudgeScores, turnNumber: number)
 /**
  * Apply multiple adaptive pressures to an agent (accumulation)
  */
-export function accumulatePressures(pressures: AdaptivePressure[]): AdaptivePressure[] {
+export function accumulatePressures(
+  pressures: AdaptivePressure[],
+): AdaptivePressure[] {
   // Group pressures by source judge
   const pressuresByJudge = new Map<string, AdaptivePressure[]>();
-  
-  pressures.forEach(pressure => {
+
+  pressures.forEach((pressure) => {
     if (!pressuresByJudge.has(pressure.sourceJudge)) {
       pressuresByJudge.set(pressure.sourceJudge, []);
     }
@@ -332,10 +373,10 @@ export function accumulatePressures(pressures: AdaptivePressure[]): AdaptivePres
 
   // For each judge, keep only the most recent pressure
   const accumulatedPressures: AdaptivePressure[] = [];
-  
-  pressuresByJudge.forEach(judgePressures => {
-    const mostRecent = judgePressures.reduce((most, current) => 
-      current.sourceTurn > most.sourceTurn ? current : most
+
+  pressuresByJudge.forEach((judgePressures) => {
+    const mostRecent = judgePressures.reduce((most, current) =>
+      current.sourceTurn > most.sourceTurn ? current : most,
     );
     accumulatedPressures.push(mostRecent);
   });
@@ -346,7 +387,9 @@ export function accumulatePressures(pressures: AdaptivePressure[]): AdaptivePres
 /**
  * Calculate net trait adjustments from multiple pressures
  */
-export function calculateNetTraitAdjustments(pressures: AdaptivePressure[]): AdaptivePressure['traitAdjustments'] {
+export function calculateNetTraitAdjustments(
+  pressures: AdaptivePressure[],
+): AdaptivePressure["traitAdjustments"] {
   const netAdjustments = {
     analyticalDepth: 0,
     evidencePreference: 0,
@@ -359,27 +402,33 @@ export function calculateNetTraitAdjustments(pressures: AdaptivePressure[]): Ada
     argumentStructure: 0,
     linguisticStyle: 0,
     engagementTactics: 0,
-    metaphorUsage: 0
+    metaphorUsage: 0,
   };
 
-  pressures.forEach(pressure => {
-    Object.keys(pressure.traitAdjustments).forEach(trait => {
-      netAdjustments[trait as keyof typeof netAdjustments] += 
-        pressure.traitAdjustments[trait as keyof typeof pressure.traitAdjustments];
+  pressures.forEach((pressure) => {
+    Object.keys(pressure.traitAdjustments).forEach((trait) => {
+      netAdjustments[trait as keyof typeof netAdjustments] +=
+        pressure.traitAdjustments[
+          trait as keyof typeof pressure.traitAdjustments
+        ];
     });
   });
 
   // Apply diminishing returns for strong adjustments
-  Object.keys(netAdjustments).forEach(key => {
+  Object.keys(netAdjustments).forEach((key) => {
     const adjustment = netAdjustments[key as keyof typeof netAdjustments];
     if (Math.abs(adjustment) > 2) {
-      netAdjustments[key as keyof typeof netAdjustments] = Math.sign(adjustment) * (2 + Math.abs(adjustment - 2) * 0.5);
+      netAdjustments[key as keyof typeof netAdjustments] =
+        Math.sign(adjustment) * (2 + Math.abs(adjustment - 2) * 0.5);
     }
   });
 
   // Clamp to reasonable bounds
-  Object.keys(netAdjustments).forEach(key => {
-    netAdjustments[key as keyof typeof netAdjustments] = Math.max(-4, Math.min(4, netAdjustments[key as keyof typeof netAdjustments]));
+  Object.keys(netAdjustments).forEach((key) => {
+    netAdjustments[key as keyof typeof netAdjustments] = Math.max(
+      -4,
+      Math.min(4, netAdjustments[key as keyof typeof netAdjustments]),
+    );
   });
 
   return netAdjustments;

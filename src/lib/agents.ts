@@ -55,15 +55,15 @@ export interface LiveJudgeResult {
   };
   reasoning?: string;
   /** Pairwise comparison result for this turn vs the previous turn. Undefined on Turn 1. */
-  pairwiseRound?: import('$lib/live-judge/types').PairwiseRound;
+  pairwiseRound?: import("$lib/live-judge/types").PairwiseRound;
   /** Running scorecard after this round. Undefined on Turn 1. */
-  scorecard?: import('$lib/live-judge/types').DebateScorecard;
+  scorecard?: import("$lib/live-judge/types").DebateScorecard;
   /**
    * Absolute per-turn scores from analyzeTurn().
    * Best-effort only: may be undefined if per-turn analysis is skipped or fails,
    * so consumers must handle the undefined case (matches $lib/live-judge/types).
    */
-  absoluteScores?: import('$lib/live-judge/types').JudgeScores;
+  absoluteScores?: import("$lib/live-judge/types").JudgeScores;
 }
 
 interface ModelDef {
@@ -876,7 +876,9 @@ export function buildAdaptiveAgents(
   } else {
     shouldSwap = Math.random() < 0.5;
   }
-  const [firstId, secondId] = shouldSwap ? [agentBId, agentAId] : [agentAId, agentBId];
+  const [firstId, secondId] = shouldSwap
+    ? [agentBId, agentAId]
+    : [agentAId, agentBId];
 
   const defA =
     MODEL_CATALOG[firstId] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
@@ -1067,7 +1069,7 @@ function createInitialGoals(archetype: string): MetaGoal[] {
  * Averaging is done correctly: accumulate sum first, divide once per key.
  */
 function mergeEffectivenessMap(
-  judgeAnalyses: JudgeAnalysisResult['judgeAnalyses'],
+  judgeAnalyses: JudgeAnalysisResult["judgeAnalyses"],
 ): { [tactic: string]: number } {
   const sums: { [tactic: string]: number } = {};
   const counts: { [tactic: string]: number } = {};
@@ -1120,13 +1122,15 @@ export async function generateAdaptiveReply(
   const historyText = formatHistory(history);
 
   // Pull the last 2 tactics this agent used so the prompt can discourage repetition
-  const recentTactics = agent.adaptiveState?.tacticalMemory?.usedTactics
-    ?.slice(-2)
-    .map((t) => t.tactic)
-    .filter(Boolean) ?? [];
-  const tacticWarning = recentTactics.length > 0
-    ? `\n\n[RECENT TACTICS — DO NOT REPEAT]: Your last turns used: ${recentTactics.join(', ')}. Choose a different approach this turn.`
-    : '';
+  const recentTactics =
+    agent.adaptiveState?.tacticalMemory?.usedTactics
+      ?.slice(-2)
+      .map((t) => t.tactic)
+      .filter(Boolean) ?? [];
+  const tacticWarning =
+    recentTactics.length > 0
+      ? `\n\n[RECENT TACTICS — DO NOT REPEAT]: Your last turns used: ${recentTactics.join(", ")}. Choose a different approach this turn.`
+      : "";
 
   const prompt =
     history.length === 0
@@ -1151,7 +1155,8 @@ export async function generateAdaptiveReply(
   }
 
   // Capture opponent's last message before onReply mutates history
-  const opponentMessage = history.length > 0 ? history[history.length - 1].text : "";
+  const opponentMessage =
+    history.length > 0 ? history[history.length - 1].text : "";
 
   // Notify caller that the reply is ready — before judge analysis blocks
   onReply?.(reply);
@@ -1174,7 +1179,10 @@ export async function generateAdaptiveReply(
       ),
       new Promise<never>((_, reject) =>
         setTimeout(
-          () => reject(new Error(`Judge analysis timed out after ${JUDGE_TIMEOUT_MS}ms`)),
+          () =>
+            reject(
+              new Error(`Judge analysis timed out after ${JUDGE_TIMEOUT_MS}ms`),
+            ),
           JUDGE_TIMEOUT_MS,
         ),
       ),
@@ -1194,7 +1202,9 @@ export async function generateAdaptiveReply(
         const allTactics = judgeResult.judgeAnalyses.flatMap((ja) =>
           ja.usedTactics.map((t) => t.tactic),
         );
-        const effectivenessMap = mergeEffectivenessMap(judgeResult.judgeAnalyses);
+        const effectivenessMap = mergeEffectivenessMap(
+          judgeResult.judgeAnalyses,
+        );
 
         allTactics.forEach((tactic) => {
           recordTacticUsage(
@@ -1219,7 +1229,19 @@ export async function generateAdaptiveReply(
 
     // Generate a hidden directive for the next turn based on aggregated scores.
     // This is silently injected into the system prompt — the model never sees why.
-    const directive = generateHiddenDirective(judgeResult.aggregatedScores, turnNumber + 1);
+    const noCounterfactualYet =
+      turnNumber + 1 >= 4 &&
+      !judgeResult.scorecard?.counterfactualTrack?.[agent.id];
+    const mechanismFailureLastRound =
+      !!judgeResult.pairwiseRound?.mechanismFailures?.includes(agent.name);
+    const directive = generateHiddenDirective(
+      judgeResult.aggregatedScores,
+      turnNumber + 1,
+      {
+        noCounterfactualYet,
+        mechanismFailureLastRound,
+      },
+    );
     if (directive) {
       agent.hiddenDirective = directive;
     }
@@ -1241,9 +1263,10 @@ export async function generateAdaptiveReply(
           (ja) => ja.exposedWeaknesses,
         ),
       },
-      reasoning: judgeResult.judgeAnalyses
-        .map((ja) => ja.reasoning)
-        .find((r) => r && !r.startsWith('Fallback analysis')) ?? '',
+      reasoning:
+        judgeResult.judgeAnalyses
+          .map((ja) => ja.reasoning)
+          .find((r) => r && !r.startsWith("Fallback analysis")) ?? "",
       pairwiseRound: judgeResult.pairwiseRound,
       scorecard: judgeResult.scorecard,
       absoluteScores: judgeResult.absoluteScores,
@@ -1280,7 +1303,12 @@ export async function generateDebateNarrativeVerdict(
   agentA: Agent,
   agentB: Agent,
 ) {
-  return getLiveJudgeSystem().generateNarrativeVerdict(fullTranscript, topic, agentA, agentB);
+  return getLiveJudgeSystem().generateNarrativeVerdict(
+    fullTranscript,
+    topic,
+    agentA,
+    agentB,
+  );
 }
 
 /**
