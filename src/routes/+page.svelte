@@ -1535,7 +1535,7 @@
       <div
         class="grid gap-4 items-start"
         style="grid-template-columns: {currentLeader && pairwiseRounds.length > 0
-          ? 'minmax(0, 1fr) minmax(0, 1.3fr)'
+          ? 'minmax(0, 1.5fr) minmax(0, 1fr)'
           : '1fr'}; transition: grid-template-columns 0.4s cubic-bezier(0.25, 1, 0.5, 1)"
       >
         <!-- Left column: Scorecard or Fallback + Language warning -->
