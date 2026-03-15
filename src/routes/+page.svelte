@@ -1685,7 +1685,7 @@
   <!-- Responsive main grid: left = scorecard, right = rounds + scores -->
   <div class="judge-main-grid">
     <!-- Left column: Scorecard or Fallback + Language warning -->
-    <div class="flex flex-col gap-3">
+    <div class="flex flex-col gap-3 relative">
       <!-- Scorecard — win tallies -->
       {#if currentLeader?.winTallies}
         {@const tallies = currentLeader.winTallies}
@@ -2090,7 +2090,7 @@
   /* Responsive 2-col grid: stacks on mobile, side-by-side on 860px+ */
   .judge-main-grid {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 1rem;
   }
   @media (min-width: 860px) {
