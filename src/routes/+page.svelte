@@ -910,7 +910,7 @@
   <!-- Setup card -->
   <div
     id="debate-setup"
-    class="w-full min-h-max md:w-[35%] md:flex-none flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
+    class="w-full h-fit md:w-[35%] md:h-fit md:flex-auto flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
   >
     <!-- Topic -->
     <div class="flex flex-col gap-1.5">
