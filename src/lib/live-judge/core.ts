@@ -34,10 +34,10 @@ import { MODEL_CATALOG } from "$lib/agents";
 
 // ── Judge model selection ─────────────────────────────────────────────────────
 
-const JUDGE_MODEL_ID = "gpt-oss:120b-cloud";
+const JUDGE_MODEL_ID = "kimi-k2:1t-cloud";
 
 /**
- * Always returns GPT-OSS 120B as the judge model.
+ * Always returns Kimi K2 as the judge model.
  */
 export function selectJudgeModel(_excludeModelIds: string[]): string {
   return JUDGE_MODEL_ID;
@@ -48,7 +48,7 @@ export function selectJudgeModel(_excludeModelIds: string[]): string {
 export class LiveJudgeSystem {
   private panel: LiveJudgePanel;
 
-  constructor(judgeModelId: string = "gpt-oss:120b-cloud") {
+  constructor(judgeModelId: string = "kimi-k2:1t-cloud") {
     this.panel = this.initializeJudgePanel(judgeModelId);
   }
 
@@ -746,7 +746,7 @@ export class LiveJudgeSystem {
     // Pick a new judge model if debater IDs provided
     const newJudgeModelId = debaterModelIds
       ? selectJudgeModel(debaterModelIds)
-      : this.panel.judges[0]?.modelId || "gpt-oss:120b-cloud";
+      : this.panel.judges[0]?.modelId || "kimi-k2:1t-cloud";
 
     this.panel.judges[0].modelId = newJudgeModelId;
     this.panel.judges[0].lastAnalysis = null;
