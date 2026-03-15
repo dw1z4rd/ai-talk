@@ -267,6 +267,7 @@ Start each turn from 8. Apply deductions:
 -4  Multiple errors or incoherent structure
 +1  Every major claim defended with an explicit causal chain
     Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
++1  Grounded precision (symmetric counterpart to hollow specificity): a claim that names a specific, verifiable datum AND supplies a mechanism chain linking it to the turn's core argument earns +1. Hollow = specificity without mechanism (−1); Grounded = specificity with mechanism (+1). Both adjustments can coexist on the same turn.
 Winner = higher remaining score. If equal, award the turn whose core claim still stands despite errors.
 
 Causal mechanism requirement: for each major causal leap, the argument must supply a mechanism sentence of the form "[how X produces Y] → [why that mechanism operates under these conditions] → [measurable consequence]." A causal leap missing any element of this template is penalized −1 as an unsupported assumption.
@@ -279,22 +280,25 @@ When citing either violation in logic_delta, name the technology/concept and not
 EXCEPTIONS: Do not penalize thought experiments or illustrative hypotheticals as "unverified facts." Judge the mechanism, not the historical precision.
 
 Argumentative stagnation: if a turn restates a prior claim without new evidence, mechanism, or development (see PREVIOUS ROUND NOTE if provided), treat it as a failed advance: −1.
-Thesis drift: if a turn introduces a position that contradicts the debater's earlier stance (visible from PREVIOUS ROUND NOTE), penalize −1 for incoherence.
+Thesis drift (Logic component): penalize −1 ONLY when the drift produces a direct logical contradiction with a prior committed position — when the new claim is logically inconsistent with something the debater already committed to in a prior turn (visible from PREVIOUS ROUND NOTE). Pure strategic retreat to weaker ground without contradiction belongs in TACTICS, not LOGIC. When the drift is both a strategic retreat AND contradictory, both the LOGIC and TACTICS penalties apply.
 
 Strong analogy: a well-constructed analogy that draws a precise structural distinction — where the mapping between domains is explicit and the resulting insight is novel — earns a +1 LOGIC bonus if the structural mapping is valid. A decorative analogy used for rhetorical effect (no structural insight, no new distinction) earns nothing in LOGIC; evaluate it under RHETORIC.
 
 Analogy ≠ mechanism: an analogy — even a structurally valid strong analogy — cannot substitute for the explicit cause→process→measurable consequence chain. If a turn's primary causal explanation is delivered through an analogy (e.g., "works like a skeleton for the body", "like a seed growing into a forest") without translating the mapping into domain-specific cause→process→consequence terms, the mechanism requirement is unmet → −1. The +1 strong-analogy bonus applies only on top of a complete mechanism chain, never as a replacement for it.
 
-Claim types: distinguish before applying evidentiary standards:
-- Conceptual/definitional claims: assess on internal coherence. Penalizing for lack of empirical evidence is a scoring error.
-- Empirical claims: assess on evidentiary grounding and mechanism.
-- Normative claims: assess on consistency with the stated normative framework.
+Claim types — classify each major claim before applying standards. Applying empirical requirements to non-empirical claims is itself a scoring error:
+- Conceptual/definitional: assess on internal coherence. Does the definition do discriminatory work in the argument? Penalizing for lack of empirical evidence is a scoring error.
+- Empirical: assess on evidentiary grounding and mechanism chain.
+- Normative: assess on consistency with the stated normative framework. No empirical requirement unless the claim is presented as empirical.
+- Phenomenological: claims about how a phenomenon is experienced or operates in practice (distinct from measurement or definition). Assess whether the argument's model of the phenomenon maps accurately onto observed behavior. Incorrect phenomenological mapping = −1 unsupported assumption. No empirical measurement required, but accurate phenomenon modeling is.
 
 --- TACTICS (forced choice) ---
 Which turn controlled the exchange? Did it target the opponent's strongest point, expose a real weakness, or redirect to better ground?
 OPENING TURN (no previous opponent to rebut): Judge on framing quality — does it stake a defensible position and anticipate the strongest counterargument? Minimum is competitive framing.
 
-Undefined comparative/superlative: if the motion contains an undefined superlative (e.g., "most X", "best Y") and a turn argues toward that superlative without first establishing a measurement standard, it has a foundational framing gap: −1 tactics. A turn that defines the evaluation metric earns a +1 framing bonus.
+Positional consistency: if PREVIOUS ROUND NOTE shows the core claim has materially shifted (not refined) under pressure, penalize −1 for abandoning defensible ground. Refinement = same claim with new mechanism or evidence added. Drift = replacing the core claim with a different, coexisting weaker one. Contradiction = new claim logically inconsistent with a prior committed position. Drift alone = −1 Tactics only. Drift that is also contradictory = −1 Tactics AND −1 Logic (see above).
+
+Undefined comparative/superlative: if the motion contains an undefined superlative (e.g., "most X", "best Y"), scan BOTH turns before scoring. Did either establish a measurement standard? If NEITHER did, apply −1 to each and describe the shared structural gap in tactics_delta. A turn that defines the evaluation metric earns a +1 framing bonus.
 
 --- RHETORIC (forced choice) ---
 Which turn was more persuasive and intellectually resonant? Evaluate on four equally-weighted components:
@@ -304,6 +308,7 @@ Which turn was more persuasive and intellectually resonant? Evaluate on four equ
 4. Framing quality — does the turn define or reframe the central question to its own advantage?
 Winner = the turn that is stronger across all four in aggregate.
 ANTI-PUNCHINESS: Expression quality carries ONE vote out of four. Framing discipline and structural clarity are equally weighted. A vivid delivery style does not compensate for weak structure or poor framing.
+SERVICE TEST: Do this turn's rhetorical choices make the argument clearer, more defensible, and more compelling — or do they substitute for argument structure? Vivid delivery that doesn't advance the core claim loses to plain expression that directly develops it.
 
 --- DOMAIN CONTEXT ---
 ${domainNote}
@@ -913,12 +918,17 @@ export async function generateConflictResolution(
   narrativeFavouredName: string,
   scorecardSummary: string,
   narrativeText: string,
+  scorecardInternallyConsistent: boolean,
   signal?: AbortSignal,
 ): Promise<string> {
+  const internalSplitNote = scorecardInternallyConsistent
+    ? ""
+    : `\nNOTE: The scorecard itself is internally split — the dimension-win leader and the cumulative-points leader are different agents. This usually means one agent won individual exchanges while the other held position better across the arc. Factor this diagnostic into your assessment.`;
+
   const systemPrompt = `You are a meta-analyst adjudicating a conflict between two debate judging systems. The pairwise scorecard is the primary authoritative record of systematic turn-by-turn assessment. The narrative verdict may override it only when a specific arc-level pattern is present. Write exactly 3 sentences: (1) Identify which of the three valid override patterns applies — COHERENCE COLLAPSE (winner accumulated contradictions), RECOVERY ARC (loser drove a late decisive reframe), or ASYMMETRIC DEPTH (wins were concentrated in a single dimension misaligned with the motion) — or state that none is present. (2) Which verdict is better supported: if a named override pattern is present, the narrative verdict may stand; if none is present, the scorecard winner should stand. (3) What the losing verdict captured correctly despite picking the wrong winner. Be specific. Do not hedge.`;
 
   const prompt = `SCORECARD WINNER: ${scorecardWinnerName}
-NARRATIVE VERDICT FAVOURS: ${narrativeFavouredName}
+NARRATIVE VERDICT FAVOURS: ${narrativeFavouredName}${internalSplitNote}
 
 SCORECARD SUMMARY:
 ${scorecardSummary}
@@ -1120,7 +1130,7 @@ NOW EVALUATE — ${agent.name}'s response: "${message}"
 Respond with the JSON object only:`;
 }
 
-function generateJudgeSystemPrompt(domainNote: string): string {
+export function generateJudgeSystemPrompt(domainNote: string): string {
   return `You are a debate scoring system. Your entire response must be a single JSON object — no preamble, no explanation, no markdown.
 
 Required output format (integers 1–10 only):
@@ -1129,15 +1139,26 @@ Required output format (integers 1–10 only):
 Keep the analysis field under 50 words.
 
 SCORING PHILOSOPHY: A competent-but-unremarkable argument scores 5–6. Reserve 8–10 for genuinely strong work; 1–3 for clear failures.
+INDEPENDENCE: Score this turn entirely on its own merits. Do not anchor to or attempt consistency with previous turns. Each turn recalibrates to zero — smooth score trajectories across turns are a sign of anchoring bias, not analytical accuracy.
 
 --- LOGIC (1–10) ---
 Start at 8. -1 unsupported assumption, -2 significant leap, -3 logical error, -4 multiple errors. +1 if every claim has explicit causal chain.
 Hollow specificity is penalizable: a specific number, percentage, or named study without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account.
++1 Grounded precision (symmetric counterpart): a claim that names a specific, verifiable datum AND supplies a mechanism chain linking it to the turn's core argument earns +1. Hollow = specificity without mechanism (−1); Grounded = specificity with mechanism (+1). Both bonuses can coexist on the same turn.
 Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
 Causal mechanism requirement: for each major causal leap, the argument must supply a mechanism sentence of the form "[how X produces Y] → [why that mechanism operates under these conditions] → [measurable consequence]." A causal leap missing any element of this template is penalized −1 as an unsupported assumption.
 Retroactive necessary condition fallacy: if an argument treats a technology, concept, or practice that postdates the phenomenon being explained as a necessary condition for it, penalize −3. Later developments cannot be used as causal prerequisites for earlier effects.
 Strong analogy: a well-constructed analogy mapping a precise structural distinction earns +1 if the mapping is valid and the insight is novel. A decorative analogy earns nothing here.
-Claim types: conceptual/definitional claims assessed on internal coherence (not empirical evidence); empirical claims need mechanism; normative claims need framework consistency.
+Claim types — classify before applying standards. Applying empirical requirements to non-empirical claims is itself a scoring error:
+- Conceptual/definitional: assess on internal coherence. Does the definition do discriminatory work in the argument?
+- Empirical: assess on evidentiary grounding and mechanism chain.
+- Normative: assess on consistency with the stated normative framework.
+- Phenomenological: claims about how a phenomenon is experienced or operates in practice. Assess whether the argument's model of the phenomenon maps accurately onto observed behavior. Incorrect phenomenological mapping (e.g., claiming people consciously maximize expected utility across all options) = −1 unsupported assumption. No empirical citation required, but accurate phenomenon modeling is.
+
+--- LOGIC CALIBRATION ANCHORS ---
+HIGH (36–40): Mechanism fully present (cause→process→measurable consequence), directly addresses the opponent's weakest load-bearing assumption, claim is falsifiable. E.g. — Phenomenological: "The attention economy erodes autonomous preference formation because the design goal is maximal engagement rather than accurate belief — meaning the mechanism specifically targets and degrades the epistemic substrate preferences require. Consequence: preferences formed under attentional capture systematically reflect the platform's optimisation target, not the agent's considered values." Scores HIGH because: mechanism identifies a specific adversarial process, consequence is measurable and distinct from the cause, directly attacks the autonomy premise. E.g. — Empirical/social science: "Trade liberalisation raises aggregate welfare but increases within-country inequality because it shifts returns toward mobile capital and skilled labour — the mechanism is factor-price equalisation operating on an already unequal endowment distribution. Measurable consequence: the Gini coefficient rises even as GDP per capita improves." Scores HIGH because: identifies the specific distributional mechanism, names the causal channel (factor-price equalisation), arrives at a falsifiable prediction that differs from the aggregate trend.
+MID (24–28): Correct claim, some mechanism, but missing the consequence step or not engaging the opponent's strongest point. E.g.: "Trade liberalisation creates winners and losers because comparative advantage determines who benefits." Scores MID because: correct mechanism concept, but no consequence step (what measurable thing diverges?), and doesn't address the inequality objection.
+LOW (16–20): Assert-only, no mechanism, no consequence, or logical error. E.g.: "Trade liberalisation is good for growth" with no mechanism. Scores LOW because: bare assertion, no causal chain, no consequence.
 
 --- RHETORIC (1–10) ---
 Evaluate on four equally-weighted components in aggregate:
@@ -1146,6 +1167,8 @@ Evaluate on four equally-weighted components in aggregate:
 3. Audience awareness — does it speak to the stakes in terms the audience cares about?
 4. Framing quality — does it define or reframe the central question to its advantage?
 ANTI-PUNCHINESS: Expression quality carries ONE vote out of four. Do not reward stylistic energy as a proxy for persuasive quality.
+SERVICE TEST: Do this turn's rhetorical choices make the argument clearer, more defensible, and more compelling — or do they substitute for argument structure? Vivid delivery that doesn't advance the core claim scores below plain expression that directly develops it.
+EXPRESSION CAP: If Expression quality alone (Component 1) would push the score above 6, but both Framing quality (Component 4) AND Structural clarity (Component 2) are weak, the overall score cannot exceed 6. Stylistic energy cannot override structural failure.
 
 --- TACTICS (1–10) ---
 Opening turn: score on framing quality, min 5. Other turns: 9–10 targets a specific gap with a named move; 5–6 mostly restates position; 1–2 ignores opponent.
@@ -1246,12 +1269,14 @@ export function parseJudgeAnalysis(
         ? data.analysis
         : "No analysis provided";
 
+    // Defensive clamps — should never trigger given the Math.min above,
+    // but guards against any future code path that bypasses the multiplier.
     const scores: JudgeScores = {
-      logicalCoherence: logicScore,
-      rhetoricalForce: rhetoricScore,
+      logicalCoherence: Math.min(40, Math.max(0, logicScore)),
+      rhetoricalForce: Math.min(30, Math.max(0, rhetoricScore)),
       frameControl: totalScore,
       credibilityScore: totalScore,
-      tacticalEffectiveness: tacticsScore,
+      tacticalEffectiveness: Math.min(30, Math.max(0, tacticsScore)),
       overallScore: totalScore,
     };
 
@@ -1415,4 +1440,161 @@ function createJudgeProvider(modelId: string) {
   const modelDef = MODEL_CATALOG[modelId];
   if (!modelDef) throw new Error(`Model ${modelId} not found in catalog`);
   return modelDef.makeProvider();
+}
+
+// ── Positional convergence detection ────────────────────────────────────────────────────
+
+/**
+ * Detect whether both debaters have converged toward similar positions by late
+ * turns, collapsing the ostensible opposition into a definitional or degree
+ * dispute. Only meaningful (and only called) for debates with ≥ 10 turns.
+ *
+ * Returns a structured PositionalConvergenceAnalysis. Temperature is low (0.4)
+ * for determinism; runs as a separate LLM pass to preserve independence from
+ * the narrative verdict.
+ */
+export async function detectPositionalConvergence(
+  judge: import("./types").LiveJudge,
+  fullTranscript: Message[],
+  agentAName: string,
+  agentBName: string,
+  topic: string,
+  signal?: AbortSignal,
+  agentAId?: string,
+  agentBId?: string,
+): Promise<import("./types").PositionalConvergenceAnalysis> {
+  const fallback: import("./types").PositionalConvergenceAnalysis = {
+    detected: false,
+    convergenceTurnRange: null,
+    coreClaimAgentA_early: "",
+    coreClaimAgentA_late: "",
+    coreClaimAgentB_early: "",
+    coreClaimAgentB_late: "",
+    positionalGapDescription: "",
+    remainingDisagreementType: "substantive",
+    motionViability: "inconclusive",
+  };
+
+  if (fullTranscript.length < 10) return fallback;
+
+  // Build an abbreviated transcript showing only early (first 2) and late (last 2) turns per agent.
+  // Prefer stable agentId filtering when IDs are provided; fall back to agentName.
+  const agentATurns = agentAId
+    ? fullTranscript.filter((m) => m.agentId === agentAId)
+    : fullTranscript.filter((m) => m.agentName === agentAName);
+  const agentBTurns = agentBId
+    ? fullTranscript.filter((m) => m.agentId === agentBId)
+    : fullTranscript.filter((m) => m.agentName === agentBName);
+  const earlyA = agentATurns.slice(0, 2);
+  const lateA = agentATurns.slice(-2);
+  const earlyB = agentBTurns.slice(0, 2);
+  const lateB = agentBTurns.slice(-2);
+
+  // Require at least 2 early and 2 late turns per agent to make a meaningful comparison.
+  if (earlyA.length < 2 || lateA.length < 2 || earlyB.length < 2 || lateB.length < 2) {
+    return fallback;
+  }
+
+  const formatTurns = (turns: Message[], label: string) =>
+    turns
+      .map(
+        (m, i) =>
+          `${label} Turn ${i + 1}: "${m.text.slice(0, 400)}${m.text.length > 400 ? "..." : ""}"`,
+      )
+      .join("\n");
+
+  const systemPrompt = `You are a debate analyst detecting positional convergence. You will read early and late turns from both debaters and determine whether their core positions have converged, making the ostensible opposition collapse into a definitional or degree dispute.
+
+Respond with a single valid JSON object matching exactly this shape:
+{"detected":true,"convergenceTurnRange":"Turns 5-6","coreClaimAgentA_early":"...","coreClaimAgentA_late":"...","coreClaimAgentB_early":"...","coreClaimAgentB_late":"...","positionalGapDescription":"...","remainingDisagreementType":"substantive","motionViability":"viable"}
+
+Field definitions:
+- detected: true if both debaters converged toward compatible positions such that the debate's central opposition no longer holds.
+- convergenceTurnRange: the turn range (e.g. "Turns 5-6") where overlap first becomes clear; null if not detected.
+- coreClaimAgentA_early / late: 1 sentence each summarising the debater's core position in early vs late turns.
+- coreClaimAgentB_early / late: same for debater B.
+- positionalGapDescription: what the debaters still genuinely disagree about (even if it's only definitional). 1-2 sentences.
+- remainingDisagreementType: "substantive" (real policy/empirical gap), "definitional" (arguing about word meanings), "degree" (agree on direction, disagree on magnitude), "none" (positions fully compatible).
+- motionViability: "viable" (genuine opposition persists), "degenerate_convergence" (opposition has effectively collapsed), "inconclusive" (insufficient evidence to judge).
+
+Be precise and honest. If positions genuinely differ in substance throughout, set detected: false and motionViability: viable.`;
+
+  const prompt = `DEBATE TOPIC: "${topic}"
+
+EARLY TURNS (first 2 per debater):
+${formatTurns(earlyA, agentAName)}
+${formatTurns(earlyB, agentBName)}
+
+LATE TURNS (last 2 per debater):
+${formatTurns(lateA, agentAName + " (late)")}
+${formatTurns(lateB, agentBName + " (late)")}
+
+Analyse positional convergence and respond with JSON only:`;
+
+  try {
+    const judgeProvider = createJudgeProvider(
+      judge.modelId || "gpt-oss:120b-cloud",
+    );
+    const text = await judgeProvider.generateText(prompt, {
+      systemPrompt,
+      temperature: 0.4,
+      maxTokens: 600,
+      signal,
+    });
+
+    const cleaned = (text || "")
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .trim();
+
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace === -1 || lastBrace <= firstBrace) return fallback;
+
+    const data = JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+    return {
+      detected: Boolean(data.detected),
+      convergenceTurnRange:
+        typeof data.convergenceTurnRange === "string"
+          ? data.convergenceTurnRange
+          : null,
+      coreClaimAgentA_early:
+        typeof data.coreClaimAgentA_early === "string"
+          ? data.coreClaimAgentA_early
+          : "",
+      coreClaimAgentA_late:
+        typeof data.coreClaimAgentA_late === "string"
+          ? data.coreClaimAgentA_late
+          : "",
+      coreClaimAgentB_early:
+        typeof data.coreClaimAgentB_early === "string"
+          ? data.coreClaimAgentB_early
+          : "",
+      coreClaimAgentB_late:
+        typeof data.coreClaimAgentB_late === "string"
+          ? data.coreClaimAgentB_late
+          : "",
+      positionalGapDescription:
+        typeof data.positionalGapDescription === "string"
+          ? data.positionalGapDescription
+          : "",
+      remainingDisagreementType: [
+        "substantive",
+        "definitional",
+        "degree",
+        "none",
+      ].includes(data.remainingDisagreementType)
+        ? data.remainingDisagreementType
+        : "substantive",
+      motionViability: [
+        "viable",
+        "degenerate_convergence",
+        "inconclusive",
+      ].includes(data.motionViability)
+        ? data.motionViability
+        : "inconclusive",
+    };
+  } catch {
+    return fallback;
+  }
 }

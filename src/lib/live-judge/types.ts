@@ -119,15 +119,48 @@ export interface HarmonizationFlag {
   note: string;
 }
 
+/**
+ * Positional convergence analysis: detects when both debaters have converged
+ * toward similar positions by late turns, collapsing the ostensible opposition
+ * into a definitional or degree dispute. Only computed for debates ≥ 10 turns.
+ */
+export interface PositionalConvergenceAnalysis {
+  detected: boolean;
+  /** Turn range where convergence first became apparent, e.g. "Turns 5-6". Null when not detected. */
+  convergenceTurnRange: string | null;
+  /** The debater A position as expressed in the early turns (T1-T2). */
+  coreClaimAgentA_early: string;
+  /** The debater A position as expressed in the late turns (T(n-1)-Tn). */
+  coreClaimAgentA_late: string;
+  /** The debater B position as expressed in the early turns (T1-T2). */
+  coreClaimAgentB_early: string;
+  /** The debater B position as expressed in the late turns (T(n-1)-Tn). */
+  coreClaimAgentB_late: string;
+  /** Plain-language description of what the debaters still genuinely disagree about, if anything. */
+  positionalGapDescription: string;
+  remainingDisagreementType: "substantive" | "definitional" | "degree" | "none";
+  motionViability: "viable" | "degenerate_convergence" | "inconclusive";
+}
+
 /** Full-debate narrative verdict written after all pairwise rounds. */
 export interface NarrativeVerdict {
   text: string;
   favouredAgentId: string | null;
   agreesWithScorecard: boolean;
+  /**
+   * Whether the win-count leader and the cumulative-points leader are the same agent.
+   * False means the two ways of reading the scorecard disagree — diagnostic of a
+   * "won exchanges but lost arc" pattern. Only populated when `agreesWithScorecard` is
+   * false and a single favoured agent is identified; `undefined` in all other cases
+   * (agreement, draw, or a tie in either win-count or points totals).
+   */
+  scorecardInternallyConsistent?: boolean;
   /** Exactly 3 sentence adjudication explaining why scorecard and narrative diverged, populated only when agreesWithScorecard is false. */
   conflictResolution?: string;
   /** Exactly 3 sentence meta-judge report on whether scoring standards were applied consistently across rounds; flags rubric drift if detected. */
   rubricConsistency?: string;
+  /** Positional convergence analysis. Only present for debates ≥ 10 turns. */
+  convergence?: PositionalConvergenceAnalysis;
 }
 
 // ── Existing types kept for adaptive pressure system ─────────────────────────

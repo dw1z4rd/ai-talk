@@ -26,6 +26,7 @@ import {
   generateConflictResolution,
   generateRubricHarmonization,
   computeHarmonizationFlags,
+  detectPositionalConvergence,
 } from "./analysis";
 import { generateAdaptivePressure, generateHiddenDirective } from "./pressure";
 import { MODEL_CATALOG } from "$lib/agents";
@@ -156,11 +157,14 @@ export class LiveJudgeSystem {
         message,
       };
       aggregatedScores = {
-        logicalCoherence: 50,
-        rhetoricalForce: 50,
+        // Use scale midpoints, not 50, for the three bounded sub-scores:
+        // logicalCoherence 0-40, rhetoricalForce 0-30, tacticalEffectiveness 0-30.
+        // frameControl / credibilityScore / overallScore live on 0-100 scale → 50 is correct.
+        logicalCoherence: 20,
+        rhetoricalForce: 15,
         frameControl: 50,
         credibilityScore: 50,
-        tacticalEffectiveness: 50,
+        tacticalEffectiveness: 15,
         overallScore: 50,
       };
 
@@ -496,6 +500,35 @@ export class LiveJudgeSystem {
           const narrativeFavouredName =
             verdict.favouredAgentId === agentA.id ? agentA.name : agentB.name;
 
+          // Determine whether the scorecard is internally self-consistent:
+          // do the win-count leader and the cumulative-points leader agree?
+          const tallies = Object.values(this.panel.scorecard.winTallies);
+          const maxWins = tallies.length >= 2 ? Math.max(...tallies.map((t) => t.total)) : -1;
+          const winCountLeaders = tallies.filter((t) => t.total === maxWins);
+          // In a tie there is no single win-count leader; skip the consistency check.
+          const winCountLeader =
+            winCountLeaders.length === 1 ? winCountLeaders[0].agentName : null;
+
+          const pointsTotals = Object.entries(this.panel.currentScores)
+            .map(([id, s]) => ({
+              id,
+              agentName: s.agentName,
+              total: s.totalScore,
+            }))
+            .sort((a, b) => b.total - a.total);
+          const maxPoints = pointsTotals[0]?.total ?? -Infinity;
+          // In a points tie there is also no single leader; skip the consistency check.
+          const pointsLeaderName =
+            pointsTotals.filter((p) => p.total === maxPoints).length === 1
+              ? (pointsTotals[0]?.agentName ?? null)
+              : null;
+
+          const scorecardInternallyConsistent =
+            winCountLeader !== null &&
+            pointsLeaderName !== null &&
+            winCountLeader === pointsLeaderName;
+          verdict.scorecardInternallyConsistent = scorecardInternallyConsistent;
+
           const adjController = new AbortController();
           const adjTimer = setTimeout(() => adjController.abort(), 20_000);
           const conflictResolutionText = await generateConflictResolution(
@@ -504,6 +537,7 @@ export class LiveJudgeSystem {
             narrativeFavouredName,
             scorecardSummary,
             verdict.text,
+            scorecardInternallyConsistent,
             adjController.signal,
           ).finally(() => clearTimeout(adjTimer));
           const trimmedConflictResolution = conflictResolutionText.trim();
@@ -520,23 +554,50 @@ export class LiveJudgeSystem {
       // NOTE: `rubricConsistency` is treated as internal-only / enhanced-reporting metadata.
       // It is best-effort and may not be serialized or streamed to all downstream consumers;
       // callers that need this detail must explicitly opt in to handle it.
-      try {
-        const harmController = new AbortController();
-        const harmTimer = setTimeout(() => harmController.abort(), 15_000);
-        const harmonizationText = await generateRubricHarmonization(
-          judge,
-          this.panel.scorecard.rounds,
-          agentA.name,
-          agentB.name,
-          verdict.text,
-          harmController.signal,
-        ).finally(() => clearTimeout(harmTimer));
-        if (harmonizationText.trim().length > 0) {
-          verdict.rubricConsistency = harmonizationText.trim();
-        }
-      } catch {
-        // Harmonization failed — non-critical
-      }
+      //
+      // Positional convergence detection runs in parallel with harmonization.
+      // Only attempted for debates with ≥ 10 turns (5+ per agent).
+      await Promise.all([
+        (async () => {
+          try {
+            const harmController = new AbortController();
+            const harmTimer = setTimeout(() => harmController.abort(), 15_000);
+            const harmonizationText = await generateRubricHarmonization(
+              judge,
+              this.panel.scorecard.rounds,
+              agentA.name,
+              agentB.name,
+              verdict.text,
+              harmController.signal,
+            ).finally(() => clearTimeout(harmTimer));
+            if (harmonizationText.trim().length > 0) {
+              verdict.rubricConsistency = harmonizationText.trim();
+            }
+          } catch {
+            // Harmonization failed — non-critical
+          }
+        })(),
+        (async () => {
+          if (fullTranscript.length < 10) return;
+          try {
+            const convController = new AbortController();
+            const convTimer = setTimeout(() => convController.abort(), 15_000);
+            const convergence = await detectPositionalConvergence(
+              judge,
+              fullTranscript,
+              agentA.name,
+              agentB.name,
+              topic,
+              convController.signal,
+              agentA.id,
+              agentB.id,
+            ).finally(() => clearTimeout(convTimer));
+            verdict.convergence = convergence;
+          } catch {
+            // Convergence detection failed — non-critical
+          }
+        })(),
+      ]);
 
       return verdict;
     } catch (error) {
