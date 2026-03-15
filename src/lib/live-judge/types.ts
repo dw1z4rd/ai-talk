@@ -102,6 +102,8 @@ export interface NarrativeVerdict {
   agreesWithScorecard: boolean;
   /** Exactly 3 sentence adjudication explaining why scorecard and narrative diverged, populated only when agreesWithScorecard is false. */
   conflictResolution?: string;
+  /** 2-3 sentence meta-judge report on whether scoring standards were applied consistently across rounds; flags rubric drift if detected. */
+  rubricConsistency?: string;
 }
 
 // ── Existing types kept for adaptive pressure system ─────────────────────────
