@@ -2,24 +2,12 @@
   import Nav from "$lib/Nav.svelte";
   import { fade } from "svelte/transition";
   import { tick } from "svelte";
-  import { expoInOut, circOut, cubicInOut } from "svelte/easing";
+  import { circOut, cubicInOut } from "svelte/easing";
 
-  function scaleFade(
-  node: Element,
-  { duration = 500, delay = 0 }: { duration?: number; delay?: number } = {},
-) {
-  return {
-    delay,
-    duration,
-    easing: cubicInOut,
-    css: (t: number) =>
-      `opacity: ${t}; transform: scale(${0.5 + 0.5 * t});`,
-  };
-}
 
 function flyFade(
   node: Element,
-  { duration = 500, delay = 0, easing = expoInOut, x = '100vw', spins = 1 } = {}
+  { duration = 1500, delay = 0, easing = circOut, x = '100vw', spins = 1 } = {}
 ) {
   return {
     delay,
@@ -881,7 +869,7 @@ function flyFade(
 {#if showWinnerModal}
   <div
     class="fixed inset-0 z-50 flex items-center justify-center"
-    transition:flyFade={{ duration: 1500, spins: 3 }}
+    transition:flyFade={{ duration: 2500, spins: 3 }}
   >
     <!-- Confetti canvas (sits behind modal content) -->
     <canvas
@@ -895,7 +883,7 @@ function flyFade(
     <!-- Content -->
     <div
       class="relative z-10 flex flex-col items-center gap-6 text-center px-8"
-      transition:flyFade={{ duration: 1500, spins: 3 }}
+      transition:flyFade={{ duration: 2500, spins: 3 }}
     >
       <!-- Glow + name -->
       <div class="relative">
@@ -1426,8 +1414,8 @@ function flyFade(
             <div
               class="flex flex-col items-center gap-2 px-6 py-6 border-t border-[--color-border-subtle]"
               style="animation: fadeSlide 0.2s ease both; animation-delay: {Math.min(
-                i * 20,
-                100,
+                i * 250,
+                250,
               )}ms"
             >
               <span
@@ -1445,7 +1433,7 @@ function flyFade(
               class="group flex gap-3 px-3 py-3 sm:px-6 sm:py-4 border-t border-[--color-border-subtle] {isLeft
                 ? ''
                 : 'sm:flex-row-reverse'}"
-              style="animation: fadeSlide 0.2s ease both; animation-delay: {Math.min(
+              style="animation: fadeSlide 0.5s ease both; animation-delay: {Math.min(
                 i * 20,
                 100,
               )}ms"
@@ -1497,7 +1485,7 @@ function flyFade(
               class="flex gap-3 px-3 py-3 sm:px-6 sm:py-4 border-t border-[--color-border-subtle] {isLeft
                 ? ''
                 : 'sm:flex-row-reverse'}"
-              style="animation: fadeSlide 0.15s ease both"
+              style="animation: fadeSlide 0.75s ease both"
             >
               <div class="flex-shrink-0 flex flex-col items-center gap-1.5">
                 <div
@@ -1558,11 +1546,11 @@ function flyFade(
                   style="background: {typingAgentColor || 'var(--color-muted)'}"
                 ></span>
                 <span
-                  class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:160ms]"
+                  class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:250ms]"
                   style="background: {typingAgentColor || 'var(--color-muted)'}"
                 ></span>
                 <span
-                  class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:320ms]"
+                  class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:500ms]"
                   style="background: {typingAgentColor || 'var(--color-muted)'}"
                 ></span>
               </div>
@@ -1599,7 +1587,7 @@ function flyFade(
     <div
       id="live-judge-panel"
       class="flex flex-col gap-4 judge-panel"
-      transition:flyFade={{ duration: 1500, spins: 3}}
+      transition:flyFade={{ duration: 2500, spins: 3}}
     >
       <!-- Section header -->
       <div class="flex items-center gap-3 mt-2 judge-header">
@@ -1618,7 +1606,7 @@ function flyFade(
           style="border-color: {narrativeVerdict.agreesWithScorecard
             ? '#7c6af740'
             : '#f59e0b40'}; animation-delay: 150ms"
-          transition:flyFade={{ duration: 1500, spins: 3 }}
+          transition:flyFade={{ duration: 2500, spins: 3 }}
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
@@ -1725,8 +1713,8 @@ function flyFade(
             {@const tallies = currentLeader.winTallies}
             <div
               class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
-              style="border-color: #7c6af740; animation-delay: 120ms"
-              transition:flyFade={{ duration: 1500, spins: 3 }}
+              style="border-color: #7c6af740; animation-delay: 250ms"
+              transition:flyFade={{ duration: 2500, spins: 3 }}
             >
               <div
                 class="flex items-center gap-3 px-4 py-3 border-b"
@@ -1826,8 +1814,8 @@ function flyFade(
             {@const leaderInfo = getModelInfo(currentLeader.agentId)}
             <div
               class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
-              style="border-color: #7c6af740; animation-delay: 120ms"
-              transition:flyFade={{ duration: 1500, spins: 3 }}
+              style="border-color: #7c6af740; animation-delay: 350ms"
+              transition:flyFade={{ duration: 2500, spins: 3 }}
             >
               <div class="px-4 py-3 flex items-center gap-3">
                 <div
@@ -1856,7 +1844,7 @@ function flyFade(
             <div
               class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
               style="animation-delay: 0ms"
-              transition:flyFade={{ duration: 1500, spins: 3 }}
+              transition:flyFade={{ duration: 2500, spins: 3 }}
             >
               {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
             </div>
@@ -1883,7 +1871,7 @@ function flyFade(
                   <div
                     class="rounded-xl border bg-[--color-panel] p-3 judge-card"
                     style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-                    transition:flyFade={{ duration: 1500, spins: 3 }}
+                    transition:flyFade={{ duration: 2500, spins: 3 }}
                   >
                     <!-- Round header -->
                     <div class="flex items-center gap-2 mb-3 min-w-0">
@@ -1988,8 +1976,8 @@ function flyFade(
                     <div
                       class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
                       style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i *
-                        40}ms"
-                      transition:flyFade={{ duration: 1500, spins: 3 }}
+                        100}ms"
+                      transition:flyFade={{ duration: 2500, spins: 3 }}
                     >
                       <span class="text-[--color-muted] text-[11px]"
                         >T{r.turnNumber}</span
@@ -2130,7 +2118,7 @@ function flyFade(
   }
   .judge-header {
     animation: judgeHeaderReveal 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
-    animation-delay: 80ms;
+    animation-delay: 250ms;
   }
 
   /* Responsive 2-col grid: stacks on mobile, side-by-side on 860px+ */
