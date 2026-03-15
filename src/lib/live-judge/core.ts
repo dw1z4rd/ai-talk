@@ -509,9 +509,10 @@ export class LiveJudgeSystem {
       const scorecardSummary = [agentA.id, agentB.id]
         .map((id) => {
           const t = this.panel.scorecard.winTallies[id];
-          return t
-            ? `${t.agentName}: Logic ${t.logic}, Tactics ${t.tactics}, Rhetoric ${t.rhetoric} (${t.total} total)`
-            : "";
+          const s = this.panel.currentScores[id];
+          if (!t) return "";
+          const absScore = s ? ` | abs score ${s.totalScore.toFixed(1)}` : "";
+          return `${t.agentName}: Logic ${t.logic}, Tactics ${t.tactics}, Rhetoric ${t.rhetoric} (${t.total} total${absScore})`;
         })
         .filter(Boolean)
         .join(" | ");
