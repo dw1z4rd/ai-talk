@@ -271,7 +271,10 @@ Winner = higher remaining score. If equal, award the turn whose core claim still
 
 Causal mechanism requirement: for each major causal leap, the argument must supply a mechanism sentence of the form "[how X produces Y] → [why that mechanism operates under these conditions] → [measurable consequence]." A causal leap missing any element of this template is penalized −1 as an unsupported assumption.
 Also populate mechanism_delta (covers both turns) and mechanism_failures (array of agent names that had a mechanism failure) based on this assessment.
-Retroactive necessary condition fallacy: if an argument treats a technology, concept, or practice that postdates the phenomenon being explained as a necessary condition for it, penalize −3. Later developments cannot be used as causal prerequisites for earlier effects. (Example: arguing that social media platforms were required for 19th-century political revolutions — social media is a 21st-century technology, not a prerequisite for 19th-century events.) When citing this violation in logic_delta, name the technology/concept and note that it clearly postdates the phenomenon.
+Retroactive causation (timeline category error): before awarding any causal credit, verify that every technology, framework, study, or institutional form invoked could plausibly have existed at the era being argued about. Two graduated penalties apply:
+−3  The postdating item is treated as a necessary condition or causal prerequisite — the argument cannot stand without it. (Example: arguing that social media was required for 19th-century political revolutions — social media is a 21st-century technology and cannot be a prerequisite for 19th-century events.)
+−1  The postdating item is used as supporting evidence, a contributing factor, or an illustrative analogy, but is not strictly necessary — the argument leans on it but could in principle survive without it. (Example: invoking modern regression analysis as evidence of a claim about pre-statistical-era economic behaviour.) The argument receives partial causal credit for what the period-appropriate elements actually establish.
+When citing either violation in logic_delta, name the technology/concept and note that it clearly postdates the phenomenon. This graduated −3/−1 treatment applies to the pairwise scoring rubric; the legacy per-turn scoring prompt used by analyzeTurn() intentionally retains only the −3 "necessary condition" penalty to keep adaptive pressure conservative.
 
 EXCEPTIONS: Do not penalize thought experiments or illustrative hypotheticals as "unverified facts." Judge the mechanism, not the historical precision.
 
@@ -279,6 +282,8 @@ Argumentative stagnation: if a turn restates a prior claim without new evidence,
 Thesis drift: if a turn introduces a position that contradicts the debater's earlier stance (visible from PREVIOUS ROUND NOTE), penalize −1 for incoherence.
 
 Strong analogy: a well-constructed analogy that draws a precise structural distinction — where the mapping between domains is explicit and the resulting insight is novel — earns a +1 LOGIC bonus if the structural mapping is valid. A decorative analogy used for rhetorical effect (no structural insight, no new distinction) earns nothing in LOGIC; evaluate it under RHETORIC.
+
+Analogy ≠ mechanism: an analogy — even a structurally valid strong analogy — cannot substitute for the explicit cause→process→measurable consequence chain. If a turn's primary causal explanation is delivered through an analogy (e.g., "works like a skeleton for the body", "like a seed growing into a forest") without translating the mapping into domain-specific cause→process→consequence terms, the mechanism requirement is unmet → −1. The +1 strong-analogy bonus applies only on top of a complete mechanism chain, never as a replacement for it.
 
 Claim types: distinguish before applying evidentiary standards:
 - Conceptual/definitional claims: assess on internal coherence. Penalizing for lack of empirical evidence is a scoring error.
@@ -733,7 +738,11 @@ export function computeHarmonizationFlags(
   // the three dimensions (2 of 3). With an odd number of dimensions a true
   // three-way tie is impossible — one agent always wins at least 2. The null
   // branch is a defensive guard for rounds with unexpected winner values.
-  const winners = [round.logicWinner, round.tacticsWinner, round.rhetoricWinner];
+  const winners = [
+    round.logicWinner,
+    round.tacticsWinner,
+    round.rhetoricWinner,
+  ];
   const prevWins = winners.filter((w) => w === round.prevTurn.agentId).length;
   const curWins = winners.filter((w) => w === round.curTurn.agentId).length;
   const overallPairwiseWinner =
@@ -847,6 +856,7 @@ Rules:
 - Reference specific turns and arguments by name.
 - Do not reward style over substance. Academic register is not a proxy for rigorous reasoning.
 - Do not be diplomatic. Pick a winner and explain why.
+- The pairwise scorecard is the authoritative record of turn-by-turn argument quality. Treat it as presumptively correct. You may diverge with your arc-level verdict only if you identify and explicitly name one of three specific patterns: COHERENCE COLLAPSE (a debater won pairwise rounds but accumulated contradictions that hollow out the position), RECOVERY ARC (a debater fell behind on the scorecard but drove a decisive reframe that resolved the debate's core tension), or ASYMMETRIC DEPTH (one debater's wins were concentrated in logic while the other's were purely tactical or rhetorical — and the debate's motion rewards one over the other). If none of these patterns is present, your verdict must agree with the scorecard leader. When invoking an override pattern, name it explicitly in Paragraph 3.
 - At the very end, on its own line with nothing after, write exactly: VERDICT: ${nameA} OR VERDICT: ${nameB}`;
 }
 
@@ -905,7 +915,7 @@ export async function generateConflictResolution(
   narrativeText: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const systemPrompt = `You are a meta-analyst adjudicating a conflict between two debate judging systems. Write exactly 3 sentences: (1) Why they diverged — identify the structural difference between turn-by-turn logic assessment and arc-level coherence. (2) Which verdict better reflects overall debate quality and why. (3) What the losing verdict got right despite picking the wrong winner. Be specific. Do not hedge.`;
+  const systemPrompt = `You are a meta-analyst adjudicating a conflict between two debate judging systems. The pairwise scorecard is the primary authoritative record of systematic turn-by-turn assessment. The narrative verdict may override it only when a specific arc-level pattern is present. Write exactly 3 sentences: (1) Identify which of the three valid override patterns applies — COHERENCE COLLAPSE (winner accumulated contradictions), RECOVERY ARC (loser drove a late decisive reframe), or ASYMMETRIC DEPTH (wins were concentrated in a single dimension misaligned with the motion) — or state that none is present. (2) Which verdict is better supported: if a named override pattern is present, the narrative verdict may stand; if none is present, the scorecard winner should stand. (3) What the losing verdict captured correctly despite picking the wrong winner. Be specific. Do not hedge.`;
 
   const prompt = `SCORECARD WINNER: ${scorecardWinnerName}
 NARRATIVE VERDICT FAVOURS: ${narrativeFavouredName}
@@ -975,7 +985,7 @@ export async function generateRubricHarmonization(
     ? `\n\nNARRATIVE VERDICT (excerpt):\n${narrativeVerdictText.slice(0, 400)}`
     : "";
 
-  const systemPrompt = `You are a meta-judge auditing scoring consistency across debate rounds. Review all round analyses plus the narrative verdict if provided. Produce exactly 3 sentences: (1) Per-round rubric consistency — were the same evidentiary, causal, and timeline standards applied uniformly across rounds? Cite specific round numbers if not. (2) Arc reconciliation — does the per-round win distribution across all three dimensions match the narrative verdict's favoured debater? If they diverge, name who the rounds favour vs. who the narrative favours and the most plausible reason. (3) Drift flag — the most significant rubric inconsistency with specific rounds named, or "No significant drift detected." Be specific and concise. Do not hedge.`;
+  const systemPrompt = `You are a meta-judge auditing scoring consistency across debate rounds. Review all round analyses plus the narrative verdict if provided. Produce exactly 3 sentences: (1) Per-round rubric consistency — were the same evidentiary, causal, and timeline standards applied uniformly across rounds? Specifically check whether (a) analogy-as-mechanism was penalized consistently (rounds where an analogy stood in for a cause→process→consequence chain should each show a mechanism failure, not just some) and (b) retroactive causation was applied uniformly (postdating items at the −3 necessary-condition tier vs. the −1 contributing-factor tier should be distinguished, not conflated). Cite specific round numbers if inconsistent. (2) Arc reconciliation — does the per-round win distribution across all three dimensions match the narrative verdict's favoured debater? If they diverge, name who the rounds favour vs. who the narrative favours, and identify which valid override pattern (COHERENCE COLLAPSE, RECOVERY ARC, or ASYMMETRIC DEPTH) best explains the divergence — or state that none applies. (3) Drift flag — the most significant rubric inconsistency with specific rounds named, or "No significant drift detected." Be specific and concise. Do not hedge.`;
 
   const prompt = `DEBATERS: ${agentAName} vs ${agentBName}
 
