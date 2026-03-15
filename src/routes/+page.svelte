@@ -434,6 +434,16 @@
             content += `\n> **Why they diverged:** ${narrativeVerdict.conflictResolution}\n`;
           }
         }
+        if (narrativeVerdict.convergence?.detected) {
+          const conv = narrativeVerdict.convergence;
+          content += `\n\n### ⚠ Positional Convergence Detected`;
+          if (conv.convergenceTurnRange) content += ` · ${conv.convergenceTurnRange}`;
+          content += `\n\n`;
+          if (conv.positionalGapDescription) content += `${conv.positionalGapDescription}\n\n`;
+          content += `**Remaining disagreement:** ${conv.remainingDisagreementType}\n\n`;
+          const viability = conv.motionViability === 'degenerate_convergence' ? 'degenerate — opposition collapsed' : conv.motionViability;
+          content += `**Motion viability:** ${viability}\n`;
+        }
       }
 
       const scoredResults = liveJudgeResults.filter((r: any) => r.absoluteScores);
@@ -481,6 +491,15 @@
         if (narrativeVerdict.favouredAgentId) {
           content += `\nVerdict: ${getModelInfo(narrativeVerdict.favouredAgentId).name}\n`;
         }
+        if (narrativeVerdict.convergence?.detected) {
+          const conv = narrativeVerdict.convergence;
+          content += `\n${"─".repeat(40)}\nPOSITIONAL CONVERGENCE DETECTED`;
+          if (conv.convergenceTurnRange) content += ` (${conv.convergenceTurnRange})`;
+          content += `\n`;
+          if (conv.positionalGapDescription) content += `${conv.positionalGapDescription}\n`;
+          const viability = conv.motionViability === 'degenerate_convergence' ? 'degenerate — opposition collapsed' : conv.motionViability;
+          content += `Remaining disagreement: ${conv.remainingDisagreementType}\nMotion viability: ${viability}\n`;
+        }
         content += "\n";
       }
 
@@ -505,6 +524,10 @@
     a.download = `debate-${safeTitle}.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function exportPdf() {
+    window.print();
   }
 
   function pauseConversation() {
@@ -886,7 +909,8 @@
   <div class="flex flex-col md:flex-row gap-4 items-start">
   <!-- Setup card -->
   <div
-    class="w-full md:w-[35%] md:flex-none flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
+    id="debate-setup"
+    class="w-full h-full md:w-[35%] md:flex-none flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
   >
     <!-- Topic -->
     <div class="flex flex-col gap-1.5">
@@ -1775,7 +1799,7 @@
 
   <!-- Export -->
   {#if messages.length > 0}
-    <div class="flex items-center gap-2">
+    <div id="export-bar" class="flex items-center gap-2">
       <span
         class="text-[11px] font-semibold uppercase tracking-widest text-[--color-muted] mr-1"
         >Export</span
@@ -1815,6 +1839,24 @@
           /></svg
         >
         Plain text
+      </button>
+      <button
+        onclick={exportPdf}
+        class="flex items-center gap-1.5 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] hover:text-white text-[--color-muted-fg] text-xs font-medium px-3.5 py-2 rounded-lg transition-all cursor-pointer"
+      >
+        <svg
+          class="w-3.5 h-3.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          ><path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M7 21h10a2 2 0 0 0 2-2V9.414a1 1 0 0 0-.293-.707l-5.414-5.414A1 1 0 0 0 13.586 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2zm7-18v5h5M9 13h6m-6 4h6m-6-8h2"
+          /></svg
+        >
+        PDF
       </button>
       <button
         onclick={resetConversation}
@@ -1891,6 +1933,34 @@
     font-style: italic;
     opacity: 0.88;
   }
+  @media print {
+    :global(*) {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    #debate-setup,
+    #export-bar {
+      display: none !important;
+    }
+
+    :global(nav) {
+      display: none !important;
+    }
+
+    /* Collapse scrollable chat so all messages print */
+    :global(div[style*="max-height"]) {
+      max-height: none !important;
+      overflow: visible !important;
+    }
+
+    /* Avoid breaking messages/cards across pages */
+    .group,
+    .judge-card {
+      break-inside: avoid;
+    }
+  }
+
   .message-content :global(code) {
     font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
     font-size: 0.84em;
