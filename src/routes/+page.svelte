@@ -857,7 +857,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="w-full max-w-2xl flex flex-col gap-6"
+  class="w-[90vw] max-w-[1600px] mx-auto flex flex-col gap-4 px-[6px]"
   ondragover={(e) => e.preventDefault()}
   ondrop={(e) => e.preventDefault()}
 >
@@ -882,9 +882,11 @@
     <Nav />
   </header>
 
+  <!-- Main content row: setup (left) + chat (right) -->
+  <div class="flex flex-col md:flex-row gap-4 items-start">
   <!-- Setup card -->
   <div
-    class="flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
+    class="w-full md:w-[35%] md:flex-none flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
   >
     <!-- Topic -->
     <div class="flex flex-col gap-1.5">
@@ -1225,7 +1227,7 @@
 
   <!-- Chat -->
   <div
-    class="flex flex-col rounded-2xl border border-[--color-border] overflow-hidden bg-[--color-panel]"
+    class="flex-1 min-w-0 flex flex-col rounded-2xl border border-[--color-border] overflow-hidden bg-[--color-panel]"
   >
     <!-- Sticky progress bar -->
     {#if running || (done && messages.length > 0)}
@@ -1512,12 +1514,13 @@
       {/if}
     </div>
   </div>
+  </div>
 
   <!-- ── Live Judge Panel ─────────────────────────────────────────────────────── -->
   {#if showLiveJudgePanel}
     <div
       id="live-judge-panel"
-      class="flex flex-col gap-4 judge-panel judge-wide"
+      class="flex flex-col gap-4 judge-panel"
       out:shrinkFade={{ duration: 250 }}
     >
       <!-- Section header -->
@@ -1731,6 +1734,24 @@
               <span class="ml-auto text-xs font-semibold" style="color: {favouredInfo.color}">→ {favouredInfo.name}</span>
             {/if}
           </div>
+           {#if narrativeVerdict.convergence?.detected}
+            {@const conv = narrativeVerdict.convergence}
+            <div class="px-4 pb-4 pt-0">
+              <div class="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2.5">
+                <p class="text-[11px] font-semibold text-sky-400 mb-1">
+                  ⚠ Positional convergence detected!
+                  {#if conv.convergenceTurnRange} · {conv.convergenceTurnRange}{/if}
+                </p>
+                {#if conv.positionalGapDescription}
+                  <p class="text-[11px] text-[--color-muted-fg] leading-relaxed mb-1">{conv.positionalGapDescription}</p>
+                {/if}
+                <p class="text-[11px] text-[--color-muted] leading-relaxed">
+                  Remaining disagreement: <span class="text-sky-300/80">{conv.remainingDisagreementType}</span>
+                  · Motion viability: <span class="text-sky-300/80">{conv.motionViability === 'degenerate_convergence' ? 'degenerate — opposition collapsed' : conv.motionViability}</span>
+                </p>
+              </div>
+            </div>
+          {/if}
           <div class="px-4 py-4">
             <p class="text-sm text-[--color-muted-fg] leading-relaxed whitespace-pre-line">{narrativeVerdict.text}</p>
           </div>
@@ -1743,24 +1764,6 @@
                   <p class="text-[11px] font-semibold text-amber-400 mb-1">Why they diverged</p>
                 {/if}
                 <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{narrativeVerdict.conflictResolution}</p>
-              </div>
-            </div>
-          {/if}
-          {#if narrativeVerdict.convergence?.detected}
-            {@const conv = narrativeVerdict.convergence}
-            <div class="px-4 pb-4 pt-0">
-              <div class="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2.5">
-                <p class="text-[11px] font-semibold text-sky-400 mb-1">
-                  ⚠ Positional convergence detected
-                  {#if conv.convergenceTurnRange} · {conv.convergenceTurnRange}{/if}
-                </p>
-                {#if conv.positionalGapDescription}
-                  <p class="text-[11px] text-[--color-muted-fg] leading-relaxed mb-1">{conv.positionalGapDescription}</p>
-                {/if}
-                <p class="text-[11px] text-[--color-muted] leading-relaxed">
-                  Remaining disagreement: <span class="text-sky-300/80">{conv.remainingDisagreementType}</span>
-                  · Motion viability: <span class="text-sky-300/80">{conv.motionViability === 'degenerate_convergence' ? 'degenerate — opposition collapsed' : conv.motionViability}</span>
-                </p>
               </div>
             </div>
           {/if}
@@ -1856,18 +1859,6 @@
   .judge-header {
     animation: judgeHeaderReveal 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
     animation-delay: 80ms;
-  }
-
-  /* Viewport breakout: 75vw on wide screens, full-width on mobile */
-  .judge-wide {
-    width: 100%;
-  }
-  @media (min-width: 860px) {
-    .judge-wide {
-      --jw: min(75vw, 1100px);
-      width: var(--jw);
-      margin-left: calc((100% - var(--jw)) / 2);
-    }
   }
 
   /* Responsive 2-col grid: stacks on mobile, side-by-side on 860px+ */
