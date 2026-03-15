@@ -964,11 +964,11 @@ export async function generateRubricHarmonization(
   narrativeVerdictText?: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  if (rounds.length < 2) return "";
+  if (rounds.length < 3) return "";
 
   // Use the last 8 non-fallback rounds to keep the prompt focused
   const analysisRounds = rounds.filter((r) => !r.isFallback).slice(-8);
-  if (analysisRounds.length < 2) return "";
+  if (analysisRounds.length < 3) return "";
 
   const roundSummaries = analysisRounds
     .map(
