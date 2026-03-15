@@ -267,7 +267,7 @@ Start each turn from 8. Apply deductions:
 -4  Multiple errors or incoherent structure
 +1  Every major claim defended with an explicit causal chain
     Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
-+1  Grounded precision (symmetric counterpart to hollow specificity): a claim that names a specific, verifiable datum AND supplies a mechanism chain linking it to the turn's core argument earns +1. Hollow = specificity without mechanism (−1); Grounded = specificity with mechanism (+1). Both bonuses can coexist on the same turn.
++1  Grounded precision (symmetric counterpart to hollow specificity): a claim that names a specific, verifiable datum AND supplies a mechanism chain linking it to the turn's core argument earns +1. Hollow = specificity without mechanism (−1); Grounded = specificity with mechanism (+1). Both adjustments can coexist on the same turn.
 Winner = higher remaining score. If equal, award the turn whose core claim still stands despite errors.
 
 Causal mechanism requirement: for each major causal leap, the argument must supply a mechanism sentence of the form "[how X produces Y] → [why that mechanism operates under these conditions] → [measurable consequence]." A causal leap missing any element of this template is penalized −1 as an unsupported assumption.
@@ -1460,6 +1460,8 @@ export async function detectPositionalConvergence(
   agentBName: string,
   topic: string,
   signal?: AbortSignal,
+  agentAId?: string,
+  agentBId?: string,
 ): Promise<import("./types").PositionalConvergenceAnalysis> {
   const fallback: import("./types").PositionalConvergenceAnalysis = {
     detected: false,
@@ -1475,13 +1477,23 @@ export async function detectPositionalConvergence(
 
   if (fullTranscript.length < 10) return fallback;
 
-  // Build an abbreviated transcript showing only early (first 2) and late (last 2) turns per agent
-  const agentATurns = fullTranscript.filter((m) => m.agentName === agentAName);
-  const agentBTurns = fullTranscript.filter((m) => m.agentName === agentBName);
+  // Build an abbreviated transcript showing only early (first 2) and late (last 2) turns per agent.
+  // Prefer stable agentId filtering when IDs are provided; fall back to agentName.
+  const agentATurns = agentAId
+    ? fullTranscript.filter((m) => m.agentId === agentAId)
+    : fullTranscript.filter((m) => m.agentName === agentAName);
+  const agentBTurns = agentBId
+    ? fullTranscript.filter((m) => m.agentId === agentBId)
+    : fullTranscript.filter((m) => m.agentName === agentBName);
   const earlyA = agentATurns.slice(0, 2);
   const lateA = agentATurns.slice(-2);
   const earlyB = agentBTurns.slice(0, 2);
   const lateB = agentBTurns.slice(-2);
+
+  // Require at least 2 early and 2 late turns per agent to make a meaningful comparison.
+  if (earlyA.length < 2 || lateA.length < 2 || earlyB.length < 2 || lateB.length < 2) {
+    return fallback;
+  }
 
   const formatTurns = (turns: Message[], label: string) =>
     turns
