@@ -174,9 +174,14 @@ export class LiveJudgeSystem {
         message
       };
 
-      const previousLogicDelta = this.panel.scorecard.rounds.length > 0
-        ? this.panel.scorecard.rounds[this.panel.scorecard.rounds.length - 1].logicDelta
+      const lastRound = this.panel.scorecard.rounds.length > 0
+        ? this.panel.scorecard.rounds[this.panel.scorecard.rounds.length - 1]
         : undefined;
+
+      const previousLogicDelta =
+        lastRound && !lastRound.isFallback && lastRound.logicWeakerTurn === 'prev'
+          ? lastRound.logicDelta
+          : undefined;
 
       try {
         const controller = new AbortController();
