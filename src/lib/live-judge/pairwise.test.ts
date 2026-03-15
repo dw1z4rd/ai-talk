@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   updateScorecard,
   synthScoresFromPairwise,
@@ -10,9 +10,33 @@ import {
   classifyDebateDomain,
   createFallbackAnalysis,
   parseJudgeAnalysis,
+  generateRubricHarmonization,
 } from './analysis';
 import type { DebateScorecard, PairwiseRound, MomentumTracker, FrameControlTracker, LiveJudge } from './types';
 import { JUDGE_SPECIALIZATION_CONFIGS } from './types';
+
+// ---------------------------------------------------------------------------
+// Mock $lib/agents for generateRubricHarmonization tests
+// ---------------------------------------------------------------------------
+
+const { mockGenerateText } = vi.hoisted(() => ({
+  mockGenerateText: vi.fn<[string, Record<string, unknown>], Promise<string>>(),
+}));
+
+vi.mock('$lib/agents', async (importOriginal) => {
+  const original = await importOriginal<typeof import('$lib/agents')>();
+  return {
+    ...original,
+    MODEL_CATALOG: {
+      ...original.MODEL_CATALOG,
+      'gpt-oss:120b-cloud': {
+        name: 'Test Model',
+        color: '#000',
+        makeProvider: () => ({ generateText: mockGenerateText }),
+      },
+    },
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -521,5 +545,190 @@ describe('generatePairwisePrompt previousLogicDelta injection', () => {
       'Is AI conscious?', false
     );
     expect(prompt).not.toContain('PREVIOUS ROUND JUDGE NOTE');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateRubricHarmonization — deterministic behaviour
+// ---------------------------------------------------------------------------
+
+function makeJudge(): LiveJudge {
+  const config = JUDGE_SPECIALIZATION_CONFIGS['logic'];
+  return {
+    id: 'j', name: 'Test Judge', modelId: 'gpt-oss:120b-cloud',
+    specialization: 'logic',
+    scoringWeights: config.scoringWeights,
+    biasProfile: config.typicalBias,
+    lastAnalysis: null,
+    analysisCount: 0,
+  };
+}
+
+/** Returns the prompt argument from the most recent mockGenerateText call. */
+function lastPromptArg(): string {
+  const calls = mockGenerateText.mock.calls;
+  return calls[calls.length - 1][0];
+}
+
+describe('generateRubricHarmonization', () => {
+  beforeEach(() => {
+    mockGenerateText.mockClear();
+    mockGenerateText.mockResolvedValue('Round 1 was consistent. Arc matches. No significant drift detected.');
+  });
+
+  // ── Early-return conditions ───────────────────────────────────────────────
+
+  it('returns empty string when rounds array is empty', async () => {
+    const result = await generateRubricHarmonization(makeJudge(), [], 'Alice', 'Bob');
+    expect(result).toBe('');
+    expect(mockGenerateText).not.toHaveBeenCalled();
+  });
+
+  it('returns empty string when fewer than 3 rounds provided (1 round)', async () => {
+    const rounds = [makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: 1 })];
+    const result = await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    expect(result).toBe('');
+    expect(mockGenerateText).not.toHaveBeenCalled();
+  });
+
+  it('returns empty string when fewer than 3 rounds provided (2 rounds)', async () => {
+    const rounds = [1, 2].map((n) => makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n }));
+    const result = await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    expect(result).toBe('');
+    expect(mockGenerateText).not.toHaveBeenCalled();
+  });
+
+  // ── isFallback filtering ──────────────────────────────────────────────────
+
+  it('returns empty string when all rounds are fallbacks (even with 3+ rounds)', async () => {
+    const rounds = [1, 2, 3, 4].map((n) =>
+      makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n, isFallback: true }),
+    );
+    const result = await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    expect(result).toBe('');
+    expect(mockGenerateText).not.toHaveBeenCalled();
+  });
+
+  it('returns empty string when fewer than 3 non-fallback rounds remain after filtering', async () => {
+    const rounds = [
+      makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: 1, isFallback: true }),
+      makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: 2, isFallback: false }),
+      makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: 3, isFallback: true }),
+      makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: 4, isFallback: false }),
+    ];
+    const result = await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    expect(result).toBe('');
+    expect(mockGenerateText).not.toHaveBeenCalled();
+  });
+
+  it('proceeds when at least 3 non-fallback rounds exist amid fallbacks', async () => {
+    const rounds = [1, 2, 3, 4, 5].map((n) =>
+      makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n, isFallback: n % 2 === 0 }),
+    );
+    // rounds 1, 3, 5 are non-fallback (3 rounds → threshold met)
+    const result = await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    expect(result).not.toBe('');
+    expect(mockGenerateText).toHaveBeenCalled();
+  });
+
+  // ── Last-N limiting (slice(-8)) ───────────────────────────────────────────
+
+  it('uses only the last 8 non-fallback rounds when more than 8 are provided', async () => {
+    // 10 non-fallback rounds numbered 1–10
+    const rounds = Array.from({ length: 10 }, (_, i) =>
+      makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: i + 1, isFallback: false }),
+    );
+    await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    const promptArg = lastPromptArg();
+    // Rounds 1 and 2 should be excluded (only last 8 = rounds 3–10)
+    expect(promptArg).not.toContain('Round 1 ');
+    expect(promptArg).not.toContain('Round 2 ');
+    expect(promptArg).toContain('Round 3 ');
+    expect(promptArg).toContain('Round 10 ');
+  });
+
+  it('uses all rounds when 8 or fewer non-fallback rounds are provided', async () => {
+    const rounds = Array.from({ length: 5 }, (_, i) =>
+      makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: i + 1, isFallback: false }),
+    );
+    await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    const promptArg = lastPromptArg();
+    expect(promptArg).toContain('Round 1 ');
+    expect(promptArg).toContain('Round 5 ');
+  });
+
+  // ── Trimming / empty-string output behaviour ──────────────────────────────
+
+  it('trims leading and trailing whitespace from provider output', async () => {
+    mockGenerateText.mockResolvedValue('  consistency report  ');
+    const rounds = [1, 2, 3].map((n) => makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n }));
+    const result = await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    expect(result).toBe('consistency report');
+  });
+
+  it('strips <thinking> blocks from provider output', async () => {
+    mockGenerateText.mockResolvedValue('<thinking>internal monologue</thinking>The rubric was applied consistently.');
+    const rounds = [1, 2, 3].map((n) => makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n }));
+    const result = await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    expect(result).toBe('The rubric was applied consistently.');
+    expect(result).not.toContain('internal monologue');
+  });
+
+  it('strips <think> blocks from provider output', async () => {
+    mockGenerateText.mockResolvedValue('<think>step-by-step</think>No significant drift detected.');
+    const rounds = [1, 2, 3].map((n) => makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n }));
+    const result = await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    expect(result).toBe('No significant drift detected.');
+  });
+
+  it('returns empty string when provider returns an empty string', async () => {
+    mockGenerateText.mockResolvedValue('');
+    const rounds = [1, 2, 3].map((n) => makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n }));
+    const result = await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    expect(result).toBe('');
+  });
+
+  it('returns empty string when provider returns whitespace-only output', async () => {
+    mockGenerateText.mockResolvedValue('   ');
+    const rounds = [1, 2, 3].map((n) => makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n }));
+    const result = await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    expect(result).toBe('');
+  });
+
+  it('returns empty string when provider throws', async () => {
+    mockGenerateText.mockRejectedValue(new Error('network error'));
+    const rounds = [1, 2, 3].map((n) => makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n }));
+    const result = await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    expect(result).toBe('');
+  });
+
+  // ── narrativeVerdictText injection ───────────────────────────────────────
+
+  it('injects narrative verdict excerpt (up to 400 chars) into the prompt when provided', async () => {
+    const narrative = 'Alice clearly dominated all three rounds by delivering precise evidence.';
+    const rounds = [1, 2, 3].map((n) => makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n }));
+    await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob', narrative);
+    const promptArg = lastPromptArg();
+    expect(promptArg).toContain('NARRATIVE VERDICT');
+    expect(promptArg).toContain('Alice clearly dominated');
+  });
+
+  it('does NOT inject NARRATIVE VERDICT block when narrativeVerdictText is omitted', async () => {
+    const rounds = [1, 2, 3].map((n) => makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n }));
+    await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob');
+    const promptArg = lastPromptArg();
+    expect(promptArg).not.toContain('NARRATIVE VERDICT');
+  });
+
+  it('truncates narrative excerpt to 400 characters in the prompt', async () => {
+    const longNarrative = 'X'.repeat(600);
+    const rounds = [1, 2, 3].map((n) => makeRound('a', 'Alice', 'b', 'Bob', 'a', 'a', 'a', { roundNumber: n }));
+    await generateRubricHarmonization(makeJudge(), rounds, 'Alice', 'Bob', longNarrative);
+    const promptArg = lastPromptArg();
+    const narrativeStart = promptArg.indexOf('NARRATIVE VERDICT');
+    const excerpt = promptArg.slice(narrativeStart);
+    // The full 600-char string should not appear; only the first 400 chars
+    expect(excerpt).not.toContain('X'.repeat(600));
+    expect(excerpt).toContain('X'.repeat(400));
   });
 });
