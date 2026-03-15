@@ -330,10 +330,14 @@ export class LiveJudgeSystem {
 
           const adjController = new AbortController();
           const adjTimer = setTimeout(() => adjController.abort(), 20_000);
-          verdict.conflictResolution = await generateConflictResolution(
+          const conflictResolutionText = await generateConflictResolution(
             judge, scorecardWinnerName, narrativeFavouredName,
             scorecardSummary, verdict.text, adjController.signal
           ).finally(() => clearTimeout(adjTimer));
+          const trimmedConflictResolution = conflictResolutionText.trim();
+          if (trimmedConflictResolution.length > 0) {
+            verdict.conflictResolution = trimmedConflictResolution;
+          }
         } catch {
           // Adjudication failed — non-critical
         }
