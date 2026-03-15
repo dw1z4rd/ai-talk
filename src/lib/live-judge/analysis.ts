@@ -269,7 +269,7 @@ Start each turn from 8. Apply deductions:
 Winner = higher remaining score. If equal, award the turn whose core claim still stands despite errors.
 
 Causal mechanism requirement: for each major causal leap, the argument must supply a mechanism sentence of the form "[how X produces Y] → [why that mechanism operates under these conditions] → [measurable consequence]." A causal leap missing any element of this template is penalized −1 as an unsupported assumption.
-Retroactive necessary condition fallacy: if an argument treats a technology, concept, or practice that postdates the phenomenon being explained as a necessary condition for it, penalize −3. Later developments cannot be used as causal prerequisites for earlier effects. (Example: arguing that mass literacy was required for medieval church authority — literacy was a 20th-century condition, not a prerequisite for 12th-century outcomes.) When citing this violation in logic_delta, name the technology/concept and note that it clearly postdates the phenomenon.
+Retroactive necessary condition fallacy: if an argument treats a technology, concept, or practice that postdates the phenomenon being explained as a necessary condition for it, penalize −3. Later developments cannot be used as causal prerequisites for earlier effects. (Example: arguing that social media platforms were required for 19th-century political revolutions — social media is a 21st-century technology, not a prerequisite for 19th-century events.) When citing this violation in logic_delta, name the technology/concept and note that it clearly postdates the phenomenon.
 
 EXCEPTIONS: Do not penalize thought experiments or illustrative hypotheticals as "unverified facts." Judge the mechanism, not the historical precision.
 
