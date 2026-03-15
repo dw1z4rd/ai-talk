@@ -237,6 +237,78 @@ describe('generateHiddenDirective', () => {
       });
     });
   });
+
+  describe('opts: noCounterfactualYet', () => {
+    // Healthy scores so no base-threshold directive fires
+    const healthy = makeScores({ logicalCoherence: 28, rhetoricalForce: 21, tacticalEffectiveness: 21, overallScore: 70 });
+
+    it('returns a counterfactual directive when noCounterfactualYet=true and turnNumber >= 4', () => {
+      const result = generateHiddenDirective(healthy, 4, { noCounterfactualYet: true });
+      expect(result).toBeDefined();
+      expect(result).toMatch(/counterfactual|no-X world|without/i);
+    });
+
+    it('does NOT return a counterfactual directive when turnNumber < 4 even if noCounterfactualYet=true', () => {
+      const result = generateHiddenDirective(healthy, 3, { noCounterfactualYet: true });
+      expect(result).toBeUndefined();
+    });
+
+    it('does NOT return a counterfactual directive when noCounterfactualYet=false', () => {
+      const result = generateHiddenDirective(healthy, 5, { noCounterfactualYet: false });
+      expect(result).toBeUndefined();
+    });
+
+    it('does NOT return a counterfactual directive when opts is omitted', () => {
+      const result = generateHiddenDirective(healthy, 5);
+      expect(result).toBeUndefined();
+    });
+
+    it('counterfactual directive cycles through pool entries across turns', () => {
+      const results = [4, 5, 6, 7].map(t => generateHiddenDirective(healthy, t, { noCounterfactualYet: true }));
+      const unique = new Set(results);
+      expect(unique.size).toBeGreaterThan(1);
+    });
+  });
+
+  describe('opts: mechanismFailureLastRound', () => {
+    // Scores where logicalCoherence is 16–19: logic is not weak enough for logic directives,
+    // but mechanismFailureLastRound should fire because logicalCoherence < 20
+    const borderlineLogic = makeScores({ logicalCoherence: 18, rhetoricalForce: 21, tacticalEffectiveness: 21, overallScore: 60 });
+
+    it('returns a mechanism directive when mechanismFailureLastRound=true and logicalCoherence < 20', () => {
+      const result = generateHiddenDirective(borderlineLogic, 0, { mechanismFailureLastRound: true });
+      expect(result).toBeDefined();
+      expect(result).toMatch(/mechanism|causal chain|cause|measurable consequence/i);
+    });
+
+    it('does NOT return a mechanism directive when logicalCoherence >= 20', () => {
+      const healthyLogic = makeScores({ logicalCoherence: 20, rhetoricalForce: 21, tacticalEffectiveness: 21, overallScore: 65 });
+      const result = generateHiddenDirective(healthyLogic, 0, { mechanismFailureLastRound: true });
+      expect(result).toBeUndefined();
+    });
+
+    it('does NOT return a mechanism directive when mechanismFailureLastRound=false', () => {
+      const result = generateHiddenDirective(borderlineLogic, 0, { mechanismFailureLastRound: false });
+      expect(result).toBeUndefined();
+    });
+
+    it('mechanism directive fires even when noCounterfactualYet is also true (mechanism has higher priority)', () => {
+      const result = generateHiddenDirective(
+        borderlineLogic,
+        4,
+        { mechanismFailureLastRound: true, noCounterfactualYet: true },
+      );
+      expect(result).toBeDefined();
+      expect(result).toMatch(/mechanism|causal chain|cause|measurable consequence/i);
+      expect(result).not.toMatch(/counterfactual|no-X world|without/i);
+    });
+
+    it('severe logic directive takes priority over mechanism failure', () => {
+      const severeLogic = makeScores({ logicalCoherence: 8, rhetoricalForce: 21, tacticalEffectiveness: 21, overallScore: 40 });
+      const result = generateHiddenDirective(severeLogic, 0, { mechanismFailureLastRound: true });
+      expect(result).toMatch(/CRITICAL PRIORITY|OVERRIDE/);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
