@@ -18,27 +18,29 @@
 }
 
 function flyFade(
-    node: Element,
-    { duration = 500, delay = 0, easing = expoInOut, x = '100vw' } = {}
-  ) {
-    return {
-      delay,
-      duration,
-      easing,
-      css: (t: number) => {
-        // Opacity: Goes from 0 (invisible) to 1 (solid)
+  node: Element,
+  { duration = 500, delay = 0, easing = expoInOut, x = '100vw', spins = 1 } = {}
+) {
+  return {
+    delay,
+    duration,
+    easing,
+    css: (t: number) => {
+      // Calculate horizontal position
+      const xOffset = typeof x === 'number' ? `${(1 - t) * x}px` : `calc(${1 - t} * ${x})`;
+      
+      // Calculate rotation. 
+      // t=0 (hidden): rotation is spins * 360deg
+      // t=1 (rendered): rotation is 0deg
+      const rotation = (1 - t) * spins * 360;
 
-        // Y Offset: We want it to go from `y` to `0`.
-        // We use `(1 - t) * y` to calculate the current position.
-        // t=0 (hidden): (1 - 0) * 100vh = 100vh offset (off-screen bottom)
-        // t=1 (rendered): (1 - 1) * 100vh = 0 offset (its final position)
-        const eased = expoInOut(t);
-        const xOffset = typeof x === 'number' ? `${(1 - eased) * x}px` : `calc(${1 - eased} * ${x})`;
-
-        return `opacity: ${eased}; transform: translateY(${xOffset});`;
-      },
-    };
-  }
+      return `
+        opacity: ${t}; 
+        transform: translateX(${xOffset}) rotate(${rotation}deg);
+      `;
+    },
+  };
+}
 
   const MODEL_OPTIONS = [
     {
@@ -879,7 +881,7 @@ function flyFade(
 {#if showWinnerModal}
   <div
     class="fixed inset-0 z-50 flex items-center justify-center"
-    transition:flyFade={{ duration: 500 }}
+    transition:flyFade={{ duration: 500, spins: 3 }}
   >
     <!-- Confetti canvas (sits behind modal content) -->
     <canvas
@@ -893,7 +895,7 @@ function flyFade(
     <!-- Content -->
     <div
       class="relative z-10 flex flex-col items-center gap-6 text-center px-8"
-      transition:flyFade={{ duration: 500 }}
+      transition:flyFade={{ duration: 500, spins: 3 }}
     >
       <!-- Glow + name -->
       <div class="relative">
@@ -1597,7 +1599,7 @@ function flyFade(
     <div
       id="live-judge-panel"
       class="flex flex-col gap-4 judge-panel"
-      transition:flyFade={{ duration: 500 }}
+      transition:flyFade={{ duration: 500, spins: 3
     >
       <!-- Section header -->
       <div class="flex items-center gap-3 mt-2 judge-header">
