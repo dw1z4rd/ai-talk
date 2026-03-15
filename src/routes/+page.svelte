@@ -1581,6 +1581,7 @@
                 {#each Object.entries(tallies) as [agentId, tally]}
                   {@const info = getModelInfo(agentId)}
                   {@const isLeader = agentId === currentLeader.agentId}
+                  {@const typedTally = tally as { agentName: string; logic: number; tactics: number; rhetoric: number; total: number }}
                   <div class="flex items-center gap-3">
                     <div
                       class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
@@ -1589,24 +1590,24 @@
                       {info.name[0]}
                     </div>
                     <span class="text-sm font-medium flex-1 {isLeader ? '' : 'text-[--color-muted-fg]'}" style="{isLeader ? `color: ${info.color}` : ''}">
-                      {tally.agentName}
+                      {typedTally.agentName}
                     </span>
                     <div class="flex items-center gap-3 text-xs">
                       <span title="Logic wins" class="flex flex-col items-center">
                         <span class="text-[--color-muted] text-[10px]">Logic</span>
-                        <span style="color: {tally.logic > 0 ? '#34d399' : '#6b7280'}">{tally.logic}</span>
+                        <span style="color: {typedTally.logic > 0 ? '#34d399' : '#6b7280'}">{typedTally.logic}</span>
                       </span>
                       <span title="Tactics wins" class="flex flex-col items-center">
                         <span class="text-[--color-muted] text-[10px]">Tactics</span>
-                        <span style="color: {tally.tactics > 0 ? '#60a5fa' : '#6b7280'}">{tally.tactics}</span>
+                        <span style="color: {typedTally.tactics > 0 ? '#60a5fa' : '#6b7280'}">{typedTally.tactics}</span>
                       </span>
                       <span title="Rhetoric wins" class="flex flex-col items-center">
                         <span class="text-[--color-muted] text-[10px]">Rhetoric</span>
-                        <span style="color: {tally.rhetoric > 0 ? '#f472b6' : '#6b7280'}">{tally.rhetoric}</span>
+                        <span style="color: {typedTally.rhetoric > 0 ? '#f472b6' : '#6b7280'}">{typedTally.rhetoric}</span>
                       </span>
                       <span title="Total wins" class="flex flex-col items-center border-l border-[--color-border] pl-3">
                         <span class="text-[--color-muted] text-[10px]">Total</span>
-                        <span class="font-bold" style="color: {info.color}">{tally.total}</span>
+                        <span class="font-bold" style="color: {info.color}">{typedTally.total}</span>
                       </span>
                     </div>
                   </div>
@@ -1934,28 +1935,32 @@
     opacity: 0.88;
   }
   @media print {
-    :global(*) {
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
 
     #debate-setup,
-    #export-bar {
+    #export-bar,
+    header nav {
       display: none !important;
     }
 
-    :global(nav) {
-      display: none !important;
+    /* Remove the side-by-side layout so chat fills full width */
+    .flex.flex-col.md\:flex-row {
+      flex-direction: column !important;
     }
 
     /* Collapse scrollable chat so all messages print */
-    :global(div[style*="max-height"]) {
+    div[style*="max-height: 68vh"] {
       max-height: none !important;
       overflow: visible !important;
     }
 
-    /* Avoid breaking messages/cards across pages */
-    .group,
+    /* Avoid breaking message bubbles across pages */
+    .group {
+      break-inside: avoid;
+    }
+
+    /* Avoid breaking judge cards across pages */
     .judge-card {
       break-inside: avoid;
     }
