@@ -910,7 +910,7 @@
   <!-- Setup card -->
   <div
     id="debate-setup"
-    class="w-full h-full md:w-[35%] md:flex-none flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
+    class="w-full min-h-max md:w-[35%] md:flex-none flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
   >
     <!-- Topic -->
     <div class="flex flex-col gap-1.5">
@@ -1581,7 +1581,6 @@
                 {#each Object.entries(tallies) as [agentId, tally]}
                   {@const info = getModelInfo(agentId)}
                   {@const isLeader = agentId === currentLeader.agentId}
-                  {@const typedTally = tally as { agentName: string; logic: number; tactics: number; rhetoric: number; total: number }}
                   <div class="flex items-center gap-3">
                     <div
                       class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
@@ -1590,24 +1589,24 @@
                       {info.name[0]}
                     </div>
                     <span class="text-sm font-medium flex-1 {isLeader ? '' : 'text-[--color-muted-fg]'}" style="{isLeader ? `color: ${info.color}` : ''}">
-                      {typedTally.agentName}
+                      {tally.agentName}
                     </span>
                     <div class="flex items-center gap-3 text-xs">
                       <span title="Logic wins" class="flex flex-col items-center">
                         <span class="text-[--color-muted] text-[10px]">Logic</span>
-                        <span style="color: {typedTally.logic > 0 ? '#34d399' : '#6b7280'}">{typedTally.logic}</span>
+                        <span style="color: {tally.logic > 0 ? '#34d399' : '#6b7280'}">{tally.logic}</span>
                       </span>
                       <span title="Tactics wins" class="flex flex-col items-center">
                         <span class="text-[--color-muted] text-[10px]">Tactics</span>
-                        <span style="color: {typedTally.tactics > 0 ? '#60a5fa' : '#6b7280'}">{typedTally.tactics}</span>
+                        <span style="color: {tally.tactics > 0 ? '#60a5fa' : '#6b7280'}">{tally.tactics}</span>
                       </span>
                       <span title="Rhetoric wins" class="flex flex-col items-center">
                         <span class="text-[--color-muted] text-[10px]">Rhetoric</span>
-                        <span style="color: {typedTally.rhetoric > 0 ? '#f472b6' : '#6b7280'}">{typedTally.rhetoric}</span>
+                        <span style="color: {tally.rhetoric > 0 ? '#f472b6' : '#6b7280'}">{tally.rhetoric}</span>
                       </span>
                       <span title="Total wins" class="flex flex-col items-center border-l border-[--color-border] pl-3">
                         <span class="text-[--color-muted] text-[10px]">Total</span>
-                        <span class="font-bold" style="color: {info.color}">{typedTally.total}</span>
+                        <span class="font-bold" style="color: {info.color}">{tally.total}</span>
                       </span>
                     </div>
                   </div>
@@ -1935,32 +1934,28 @@
     opacity: 0.88;
   }
   @media print {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    :global(*) {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
 
     #debate-setup,
-    #export-bar,
-    header nav {
+    #export-bar {
       display: none !important;
     }
 
-    /* Remove the side-by-side layout so chat fills full width */
-    .flex.flex-col.md\:flex-row {
-      flex-direction: column !important;
+    :global(nav) {
+      display: none !important;
     }
 
     /* Collapse scrollable chat so all messages print */
-    div[style*="max-height: 68vh"] {
+    :global(div[style*="max-height"]) {
       max-height: none !important;
       overflow: visible !important;
     }
 
-    /* Avoid breaking message bubbles across pages */
-    .group {
-      break-inside: avoid;
-    }
-
-    /* Avoid breaking judge cards across pages */
+    /* Avoid breaking messages/cards across pages */
+    .group,
     .judge-card {
       break-inside: avoid;
     }
