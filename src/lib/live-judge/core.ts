@@ -462,6 +462,10 @@ export class LiveJudgeSystem {
       }
 
       // Meta-judge harmonization — reconcile per-round scores with arc-level coherence.
+      //
+      // NOTE: `rubricConsistency` is treated as internal-only / enhanced-reporting metadata.
+      // It is best-effort and may not be serialized or streamed to all downstream consumers;
+      // callers that need this detail must explicitly opt in to handle it.
       try {
         const harmController = new AbortController();
         const harmTimer = setTimeout(() => harmController.abort(), 15_000);
