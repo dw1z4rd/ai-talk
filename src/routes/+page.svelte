@@ -910,7 +910,7 @@
   <!-- Setup card -->
   <div
     id="debate-setup"
-    class="w-full h-full md:w-[35%] md:flex-auto flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
+    class="w-full md:w-[35%] md:flex-none flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
   >
     <!-- Topic -->
     <div class="flex flex-col gap-1.5">
@@ -1934,28 +1934,32 @@
     opacity: 0.88;
   }
   @media print {
-    :global(*) {
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
 
     #debate-setup,
-    #export-bar {
+    #export-bar,
+    header nav {
       display: none !important;
     }
 
-    :global(nav) {
-      display: none !important;
+    /* Remove the side-by-side layout so chat fills full width */
+    .flex.flex-col.md\:flex-row {
+      flex-direction: column !important;
     }
 
     /* Collapse scrollable chat so all messages print */
-    :global(div[style*="max-height"]) {
+    div[style*="max-height: 68vh"] {
       max-height: none !important;
       overflow: visible !important;
     }
 
-    /* Avoid breaking messages/cards across pages */
-    .group,
+    /* Avoid breaking message bubbles across pages */
+    .group {
+      break-inside: avoid;
+    }
+
+    /* Avoid breaking judge cards across pages */
     .judge-card {
       break-inside: avoid;
     }
