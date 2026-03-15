@@ -2,7 +2,7 @@
   import Nav from "$lib/Nav.svelte";
   import { fade } from "svelte/transition";
   import { tick } from "svelte";
-  import { circOut, cubicInOut } from "svelte/easing";
+  import { expoInOut, circOut, cubicInOut } from "svelte/easing";
 
   function scaleFade(
   node: Element,
@@ -19,7 +19,7 @@
 
 function flyFade(
     node: Element,
-    { duration = 500, delay = 0, easing = circOut, y = '100vh' } = {}
+    { duration = 500, delay = 0, easing = expoInOut, x = '100vw' } = {}
   ) {
     return {
       delay,
@@ -32,10 +32,10 @@ function flyFade(
         // We use `(1 - t) * y` to calculate the current position.
         // t=0 (hidden): (1 - 0) * 100vh = 100vh offset (off-screen bottom)
         // t=1 (rendered): (1 - 1) * 100vh = 0 offset (its final position)
-        const eased = circOut(t);
-        const yOffset = typeof y === 'number' ? `${(1 - eased) * y}px` : `calc(${1 - eased} * ${y})`;
+        const eased = expoInOut(t);
+        const xOffset = typeof x === 'number' ? `${(1 - eased) * x}px` : `calc(${1 - eased} * ${x})`;
 
-        return `opacity: ${eased}; transform: translateY(${yOffset});`;
+        return `opacity: ${eased}; transform: translateY(${xOffset});`;
       },
     };
   }
@@ -1609,7 +1609,111 @@ function flyFade(
         >
         <div class="flex-1 h-px bg-[--color-border]"></div>
       </div>
-
+ <!-- Narrative verdict (shown after debate completes) -->
+      {#if narrativeVerdict}
+        <div
+          class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
+          style="border-color: {narrativeVerdict.agreesWithScorecard
+            ? '#7c6af740'
+            : '#f59e0b40'}; animation-delay: 150ms"
+          transition:flyFade={{ duration: 500 }}
+        >
+          <div
+            class="flex items-center gap-3 px-4 py-3 border-b"
+            style="border-color: {narrativeVerdict.agreesWithScorecard
+              ? '#7c6af725'
+              : '#f59e0b25'}; background: {narrativeVerdict.agreesWithScorecard
+              ? '#7c6af708'
+              : '#f59e0b08'}"
+          >
+            <div class="flex flex-col">
+              <span
+                class="text-sm font-bold"
+                style="color: {narrativeVerdict.agreesWithScorecard
+                  ? '#c084fc'
+                  : '#fbbf24'}"
+              >
+                {narrativeVerdict.agreesWithScorecard
+                  ? "Narrative Verdict"
+                  : "⚡ Narrative Arc Diverges"}
+              </span>
+              <span class="text-[10px] text-[--color-muted]"
+                >arc-level · cumulative thesis coherence</span
+              >
+            </div>
+            {#if narrativeVerdict.favouredAgentId}
+              {@const favouredInfo = getModelInfo(
+                narrativeVerdict.favouredAgentId,
+              )}
+              <span
+                class="ml-auto text-xs font-semibold"
+                style="color: {favouredInfo.color}">→ {favouredInfo.name}</span
+              >
+            {/if}
+          </div>
+          {#if narrativeVerdict.convergence?.detected}
+            {@const conv = narrativeVerdict.convergence}
+            <div class="px-4 pb-4 pt-0">
+              <div
+                class="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2.5"
+              >
+                <p class="text-[11px] font-semibold text-sky-400 mb-1">
+                  ⚠ Positional convergence detected!
+                  {#if conv.convergenceTurnRange}
+                    · {conv.convergenceTurnRange}{/if}
+                </p>
+                {#if conv.positionalGapDescription}
+                  <p
+                    class="text-[11px] text-[--color-muted-fg] leading-relaxed mb-1"
+                  >
+                    {conv.positionalGapDescription}
+                  </p>
+                {/if}
+                <p class="text-[11px] text-[--color-muted] leading-relaxed">
+                  Remaining disagreement: <span class="text-sky-300/80"
+                    >{conv.remainingDisagreementType}</span
+                  >
+                  · Motion viability:
+                  <span class="text-sky-300/80"
+                    >{conv.motionViability === "degenerate_convergence"
+                      ? "degenerate — opposition collapsed"
+                      : conv.motionViability}</span
+                  >
+                </p>
+              </div>
+            </div>
+          {/if}
+          <div class="px-4 py-4">
+            <p
+              class="text-sm text-[--color-muted-fg] leading-relaxed whitespace-pre-line"
+            >
+              {narrativeVerdict.text}
+            </p>
+          </div>
+          {#if narrativeVerdict.conflictResolution}
+            <div class="px-4 pb-4 pt-0">
+              <div
+                class="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5"
+              >
+                {#if narrativeVerdict.scorecardInternallyConsistent === false}
+                  <p class="text-[11px] font-semibold text-amber-400 mb-1">
+                    Why they diverged · scorecard internally split
+                  </p>
+                {:else}
+                  <p class="text-[11px] font-semibold text-amber-400 mb-1">
+                    Why they diverged
+                  </p>
+                {/if}
+                <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">
+                  {narrativeVerdict.conflictResolution}
+                </p>
+              </div>
+            </div>
+          {/if}
+        </div>
+      {/if}
+    </div>
+  {/if}
       <!-- Responsive main grid: left = scorecard, right = rounds + scores -->
       <div class="judge-main-grid">
         <!-- Left column: Scorecard or Fallback + Language warning -->
@@ -1926,111 +2030,6 @@ function flyFade(
         {/if}
       </div>
 
-      <!-- Narrative verdict (shown after debate completes) -->
-      {#if narrativeVerdict}
-        <div
-          class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
-          style="border-color: {narrativeVerdict.agreesWithScorecard
-            ? '#7c6af740'
-            : '#f59e0b40'}; animation-delay: 150ms"
-          transition:flyFade={{ duration: 500 }}
-        >
-          <div
-            class="flex items-center gap-3 px-4 py-3 border-b"
-            style="border-color: {narrativeVerdict.agreesWithScorecard
-              ? '#7c6af725'
-              : '#f59e0b25'}; background: {narrativeVerdict.agreesWithScorecard
-              ? '#7c6af708'
-              : '#f59e0b08'}"
-          >
-            <div class="flex flex-col">
-              <span
-                class="text-sm font-bold"
-                style="color: {narrativeVerdict.agreesWithScorecard
-                  ? '#c084fc'
-                  : '#fbbf24'}"
-              >
-                {narrativeVerdict.agreesWithScorecard
-                  ? "Narrative Verdict"
-                  : "⚡ Narrative Arc Diverges"}
-              </span>
-              <span class="text-[10px] text-[--color-muted]"
-                >arc-level · cumulative thesis coherence</span
-              >
-            </div>
-            {#if narrativeVerdict.favouredAgentId}
-              {@const favouredInfo = getModelInfo(
-                narrativeVerdict.favouredAgentId,
-              )}
-              <span
-                class="ml-auto text-xs font-semibold"
-                style="color: {favouredInfo.color}">→ {favouredInfo.name}</span
-              >
-            {/if}
-          </div>
-          {#if narrativeVerdict.convergence?.detected}
-            {@const conv = narrativeVerdict.convergence}
-            <div class="px-4 pb-4 pt-0">
-              <div
-                class="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2.5"
-              >
-                <p class="text-[11px] font-semibold text-sky-400 mb-1">
-                  ⚠ Positional convergence detected!
-                  {#if conv.convergenceTurnRange}
-                    · {conv.convergenceTurnRange}{/if}
-                </p>
-                {#if conv.positionalGapDescription}
-                  <p
-                    class="text-[11px] text-[--color-muted-fg] leading-relaxed mb-1"
-                  >
-                    {conv.positionalGapDescription}
-                  </p>
-                {/if}
-                <p class="text-[11px] text-[--color-muted] leading-relaxed">
-                  Remaining disagreement: <span class="text-sky-300/80"
-                    >{conv.remainingDisagreementType}</span
-                  >
-                  · Motion viability:
-                  <span class="text-sky-300/80"
-                    >{conv.motionViability === "degenerate_convergence"
-                      ? "degenerate — opposition collapsed"
-                      : conv.motionViability}</span
-                  >
-                </p>
-              </div>
-            </div>
-          {/if}
-          <div class="px-4 py-4">
-            <p
-              class="text-sm text-[--color-muted-fg] leading-relaxed whitespace-pre-line"
-            >
-              {narrativeVerdict.text}
-            </p>
-          </div>
-          {#if narrativeVerdict.conflictResolution}
-            <div class="px-4 pb-4 pt-0">
-              <div
-                class="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5"
-              >
-                {#if narrativeVerdict.scorecardInternallyConsistent === false}
-                  <p class="text-[11px] font-semibold text-amber-400 mb-1">
-                    Why they diverged · scorecard internally split
-                  </p>
-                {:else}
-                  <p class="text-[11px] font-semibold text-amber-400 mb-1">
-                    Why they diverged
-                  </p>
-                {/if}
-                <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">
-                  {narrativeVerdict.conflictResolution}
-                </p>
-              </div>
-            </div>
-          {/if}
-        </div>
-      {/if}
-    </div>
-  {/if}
 
   <!-- Export -->
   {#if messages.length > 0}
