@@ -883,7 +883,7 @@
   </header>
 
   <!-- Main content row: setup (left) + chat (right) -->
-  <div class="flex flex-col md:flex-row gap-4 items-start">
+  <div class="flex flex-col md:flex-row gap-4">
   <!-- Setup card -->
   <div
     class="w-full md:w-[35%] md:flex-none flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
