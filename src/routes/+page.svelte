@@ -2,7 +2,7 @@
   import Nav from "$lib/Nav.svelte";
   import { fade, fly, scale } from "svelte/transition";
   import { tick } from "svelte";
-  import { cubicInOut, cubicIn } from "svelte/easing";
+  import { circOut, cubicIn } from "svelte/easing";
 
   function shrinkFade(
     node: Element,
@@ -1574,7 +1574,8 @@
     <div
       id="live-judge-panel"
       class="flex flex-col gap-4 judge-panel"
-      out:shrinkFade={{ duration: 250 }}
+      in:fly={{ y: 200, duration: 500, easing: circOut}}
+      out:shrinkFade={{ duration: 500 }}
     >
       <!-- Section header -->
       <div class="flex items-center gap-3 mt-2 judge-header">
@@ -1597,7 +1598,8 @@
             <div
               class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
               style="border-color: #7c6af740; animation-delay: 120ms"
-              out:shrinkFade={{ duration: 180 }}
+              in:fly={{ y: 100, duration: 350, easing: circOut}}
+              out:shrinkFade={{ duration: 350 }}
             >
               <div
                 class="flex items-center gap-3 px-4 py-3 border-b"
@@ -1691,6 +1693,7 @@
             <div
               class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
               style="border-color: #7c6af740; animation-delay: 120ms"
+              in:fly={{ y: 75, duration: 250, easing: circOut}}
               out:shrinkFade={{ duration: 180 }}
             >
               <div class="px-4 py-3 flex items-center gap-3">
@@ -1720,6 +1723,7 @@
             <div
               class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
               style="animation-delay: 0ms"
+              in:fly={{ y: 50, duration: 200, easing: circOut}}
               out:shrinkFade={{ duration: 150 }}
             >
               {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
@@ -1747,6 +1751,7 @@
                   <div
                     class="rounded-xl border bg-[--color-panel] p-3 judge-card"
                     style="border-color: #7c6af720; animation-delay: {i * 70}ms"
+                    in:fly={{ y: 25, duration: 150, easing: circOut}}
                     out:shrinkFade={{ duration: 180 }}
                   >
                     <!-- Round header -->
@@ -1853,7 +1858,8 @@
                       class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
                       style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i *
                         40}ms"
-                      out:shrinkFade={{ duration: 100 }}
+                        in:fly={{ y: 20, duration: 50, easing: circOut}}
+                        out:shrinkFade={{ duration: 100 }}
                     >
                       <span class="text-[--color-muted] text-[11px]"
                         >T{r.turnNumber}</span
@@ -1903,6 +1909,7 @@
           style="border-color: {narrativeVerdict.agreesWithScorecard
             ? '#7c6af740'
             : '#f59e0b40'}; animation-delay: 150ms"
+              in:fly={{ y: 50, duration: 100, easing: circOut}}
           out:shrinkFade={{ duration: 200 }}
         >
           <div
