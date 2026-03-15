@@ -1,5 +1,6 @@
 <script lang="ts">
   import Nav from "$lib/Nav.svelte";
+  import { flip } from 'svelte/animate';
   import { flyInFromTop, flyOutToBottom } from "$lib/transitions";
   import { tick } from "svelte";
 
@@ -1823,7 +1824,7 @@
       <div class="flex flex-col gap-4">
         <!-- Recent pairwise rounds -->
         {#if pairwiseRounds.length > 0}
-          <div class="flex flex-col gap-3">
+          <div class="flex flex-col gap-3 relative">
             <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
               Recent Rounds
             </h3>
@@ -1838,6 +1839,7 @@
                 style="border-color: #7c6af720; animation-delay: {i * 70}ms"
                 in:flyInFromTop
                 out:flyOutToBottom
+                animate:flip={{ duration: 1000 }}
               >
                 <!-- Round header -->
                 <div class="flex items-center gap-2 mb-3 min-w-0">

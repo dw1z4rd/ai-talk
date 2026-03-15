@@ -2,7 +2,7 @@ import { expoOut } from "svelte/easing";
 
 export function flyInFromTop(
   node: Element,
-  { duration = 3000, delay = 0, easing = expoOut } = {},
+  { duration = 1000, delay = 0, easing = expoOut } = {},
 ) {
   // 1. Grab the element's computed styles
   const style = getComputedStyle(node);
@@ -31,21 +31,17 @@ export function flyInFromTop(
   };
 }
 
-export function flyOutToBottom(
+export function flyToBottom(
   node: Element,
-  { duration = 3000, delay = 0, easing = expoOut } = {},
+  { duration = 1000, delay = 0, easing = expoOut } = {},
 ) {
-  // 1. Grab the computed styles so we don't destroy natural CSS
   const style = getComputedStyle(node);
-  const targetOpacity = parseFloat(style.opacity);
+  const parsedOpacity = parseFloat(style.opacity);
+  const targetOpacity = parsedOpacity === 0 ? 1 : parsedOpacity;
   const transform = style.transform === "none" ? "" : style.transform;
 
-  // 2. Calculate the exact distance to push the element off-screen
+  // We must capture the exact dimensions before it leaves the document flow
   const nodeRect = node.getBoundingClientRect();
-
-  // We subtract the element's top position from the viewport height.
-  // This calculates the exact number of pixels needed to move the
-  // top edge of the element down until it hits the bottom viewport edge.
   const distanceToBottom = window.innerHeight - nodeRect.top;
 
   return {
@@ -53,6 +49,8 @@ export function flyOutToBottom(
     duration,
     easing,
     css: (t: number, u: number) => `
+      position: absolute;
+      width: ${nodeRect.width}px;
       transform: ${transform} translateY(${u * distanceToBottom}px);
       opacity: ${targetOpacity * t};
     `,
