@@ -1091,15 +1091,17 @@ ${body}${scoreHtml}${verdictHtml}${scoresHtml}
 
   <!-- ── Two-column desktop layout ─────────────────────────────────────────────── -->
   <div class="main-two-col">
-    <!-- LEFT COLUMN: judge analysis panel (inner 3-col grid via judge-main-grid) -->
-    <div class="left-col">
-  <!-- ── Live Judge Panel ─────────────────────────────────────────────────────── -->
+    <!-- LEFT COLUMN: judge analysis panel — only injected when live judge data arrives -->
   {#if showLiveJudgePanel}
+    <div
+      class="left-col"
+      in:flyInFromLeft={{ duration: 500 }}
+      out:flyOutToRight={{ duration: 400 }}
+    >
+  <!-- ── Live Judge Panel ─────────────────────────────────────────────────────── -->
     <div
       id="live-judge-panel"
       class="flex flex-col gap-4 judge-panel"
-      in:flyInFromTop
-      out:flyOutToBottom
     >
       <!-- Section header -->
       <div class="flex items-center gap-3 mt-2 judge-header">
@@ -1519,8 +1521,8 @@ ${body}${scoreHtml}${verdictHtml}${scoresHtml}
                 {/each}
       {/if}
     </div>
-  {/if}
     </div>
+  {/if}
     <!-- RIGHT COLUMN: debate setup + live chat -->
     <div class="right-col">
     <!-- Setup card -->
@@ -2271,34 +2273,47 @@ ${body}${scoreHtml}${verdictHtml}${scoresHtml}
     animation-delay: 250ms;
   }
 
-  /* Two-column desktop layout: judge panel left, setup+chat right */
+  /* Two-column desktop layout: judge panel left, setup+chat right.
+     Single centered column until the live judge panel is instantiated,
+     at which point a second column slides in from the left. */
   .main-two-col {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    align-items: start;
+    justify-content: center;
   }
 
-  @media (min-width: 1024px) {
-    .main-two-col {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      align-items: start;
-    }
-  }
-
-  /* Judge analysis panel stacks items vertically in the left column */
+  /* Judge analysis panel — appears as left column when live judge data arrives */
   .left-col {
+    width: 45vw;
+    max-width: 760px;
+    min-width: 280px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     gap: 1rem;
     min-width: 0;
   }
 
-  /* Setup card + chat stack vertically in the right column */
+  /* Setup card + chat — centered alone, shifts right when judge panel appears */
   .right-col {
+    width: 45vw;
+    max-width: 760px;
+    min-width: 280px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     gap: 1rem;
     min-width: 0;
+  }
+
+  @media (max-width: 1023px) {
+    .left-col,
+    .right-col {
+      width: 100%;
+      max-width: 100%;
+    }
   }
 
   /* 3-col grid inside the judge panel: full-row items use col-span-3, round cards take 1 col */
