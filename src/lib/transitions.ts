@@ -12,7 +12,13 @@ export function flyInFromTop(
   // 2. Calculate the distance to the viewport top
   const nodeRect = node.getBoundingClientRect();
   const startY = -nodeRect.top;
-
+  console.log({
+    node: node.tagName,
+    startY,
+    targetOpacity,
+    easingIsDefined: !!easing,
+    classes: node.className,
+  });
   return {
     delay,
     duration,
