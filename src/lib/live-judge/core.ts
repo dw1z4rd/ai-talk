@@ -32,44 +32,15 @@ import {
 import { generateAdaptivePressure, generateHiddenDirective } from "./pressure";
 import { MODEL_CATALOG } from "$lib/agents";
 
-// ── Judge model rotation ──────────────────────────────────────────────────────
+// ── Judge model selection ─────────────────────────────────────────────────────
+
+const JUDGE_MODEL_ID = "gpt-oss:120b-cloud";
 
 /**
- * Models available as judges. Using a different model than the debaters prevents
- * systematic bias. Rotate across runs for consistency testing.
+ * Always returns GPT-OSS 120B as the judge model.
  */
-const JUDGE_MODEL_POOL = [
-  "kimi-k2:1t-cloud",
-  "deepseek-v3.1:671b-cloud",
-  "gpt-oss:120b-cloud",
-  "qwen3-vl:235b-cloud",
-  "deepseek-v3.2-cloud",
-];
-
-let judgeRotationIndex = 0;
-
-/**
- * Pick a judge model that is NOT one of the debaters, rotating across runs.
- */
-export function selectJudgeModel(excludeModelIds: string[]): string {
-  const pool = JUDGE_MODEL_POOL.filter(
-    (m) => !excludeModelIds.includes(m) && MODEL_CATALOG[m],
-  );
-  if (pool.length === 0) {
-    // All pool models are debaters — fallback to first available
-    const fallback =
-      JUDGE_MODEL_POOL.find((m) => MODEL_CATALOG[m]) || "gpt-oss:120b-cloud";
-    console.warn(
-      `[Judge] All preferred judge models are debaters. Using ${fallback} as fallback.`,
-    );
-    return fallback;
-  }
-  const selected = pool[judgeRotationIndex % pool.length];
-  judgeRotationIndex++;
-  console.log(
-    `[Judge] Selected judge model: ${selected} (rotation index ${judgeRotationIndex - 1})`,
-  );
-  return selected;
+export function selectJudgeModel(_excludeModelIds: string[]): string {
+  return JUDGE_MODEL_ID;
 }
 
 // ── LiveJudgeSystem ───────────────────────────────────────────────────────────
