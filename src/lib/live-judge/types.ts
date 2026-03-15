@@ -100,6 +100,8 @@ export interface NarrativeVerdict {
   text: string;
   favouredAgentId: string | null;
   agreesWithScorecard: boolean;
+  /** 2-3 sentence adjudication explaining why scorecard and narrative diverged, populated only when agreesWithScorecard is false. */
+  conflictResolution?: string;
 }
 
 // ── Existing types kept for adaptive pressure system ─────────────────────────
