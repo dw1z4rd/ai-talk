@@ -2,7 +2,7 @@
   import Nav from "$lib/Nav.svelte";
   import { fade } from "svelte/transition";
   import { tick } from "svelte";
-  import { cubicOut, cubicInOut } from "svelte/easing";
+  import { circOut, cubicInOut } from "svelte/easing";
 
   function scaleFade(
   node: Element,
@@ -19,7 +19,7 @@
 
 function flyFade(
     node: Element,
-    { duration = 500, delay = 0, easing = cubicOut, x = '100vw' } = {}
+    { duration = 500, delay = 0, easing = circOut, y = '100vh' } = {}
   ) {
     return {
       delay,
@@ -28,13 +28,14 @@ function flyFade(
       css: (t: number) => {
         // Opacity: Goes from 0 (invisible) to 1 (solid)
 
-        // X Offset: We want it to go from `x` to `0`.
-        // We use `(1 - t) * x` to calculate the current position.
-        // t=0 (hidden): (1 - 0) * 100vw = 100vw offset (off-screen right)
-        // t=1 (rendered): (1 - 1) * 100vw = 0 offset (its final position)
-        const xOffset = typeof x === 'number' ? `${(1 - t) * x}px` : `calc(${1 - t} * ${x})`;
+        // Y Offset: We want it to go from `y` to `0`.
+        // We use `(1 - t) * y` to calculate the current position.
+        // t=0 (hidden): (1 - 0) * 100vh = 100vh offset (off-screen bottom)
+        // t=1 (rendered): (1 - 1) * 100vh = 0 offset (its final position)
+        const eased = circOut(t);
+        const yOffset = typeof y === 'number' ? `${(1 - eased) * y}px` : `calc(${1 - eased} * ${y})`;
 
-        return `opacity: ${t}; transform: translateX(${xOffset});`;
+        return `opacity: ${eased}; transform: translateY(${yOffset});`;
       },
     };
   }
