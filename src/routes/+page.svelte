@@ -1,7 +1,7 @@
 <script lang="ts">
   import Nav from "$lib/Nav.svelte";
   import { flip } from 'svelte/animate';
-  import { flyInFromLeft, flyOutToRight } from "$lib/transitions";
+  import { flyInFromLeft, flyOutToRight, flyInFromTop, flyOutToBottom } from "$lib/transitions";
   import { tick } from "svelte";
 
   const MODEL_OPTIONS = [
@@ -1607,8 +1607,8 @@
                   class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
                   style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i *
                     100}ms"
-                  in:flyInFromLeft
-      out:flyOutToRight
+                  in:flyInFromTop
+      out:flyOutToBottom
                 >
                   <span class="text-[--color-muted] text-[11px]"
                     >T{r.turnNumber}</span
