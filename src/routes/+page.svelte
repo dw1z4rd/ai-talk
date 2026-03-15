@@ -1691,7 +1691,7 @@
           >
             <div class="flex flex-col">
               <span class="text-sm font-bold" style="color: {narrativeVerdict.agreesWithScorecard ? '#c084fc' : '#fbbf24'}">
-                {narrativeVerdict.agreesWithScorecard ? 'Narrative Verdict' : '⚡ Narrative Disagrees with Scorecard'}
+                {narrativeVerdict.agreesWithScorecard ? 'Narrative Verdict' : '⚡ Narrative Arc Diverges'}
               </span>
               <span class="text-[10px] text-[--color-muted]">arc-level · cumulative thesis coherence</span>
             </div>
@@ -1706,8 +1706,30 @@
           {#if narrativeVerdict.conflictResolution}
             <div class="px-4 pb-4 pt-0">
               <div class="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
-                <p class="text-[11px] font-semibold text-amber-400 mb-1">Why they diverged</p>
+                {#if narrativeVerdict.scorecardInternallyConsistent === false}
+                  <p class="text-[11px] font-semibold text-amber-400 mb-1">Why they diverged · scorecard internally split</p>
+                {:else}
+                  <p class="text-[11px] font-semibold text-amber-400 mb-1">Why they diverged</p>
+                {/if}
                 <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{narrativeVerdict.conflictResolution}</p>
+              </div>
+            </div>
+          {/if}
+          {#if narrativeVerdict.convergence?.detected}
+            {@const conv = narrativeVerdict.convergence}
+            <div class="px-4 pb-4 pt-0">
+              <div class="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2.5">
+                <p class="text-[11px] font-semibold text-sky-400 mb-1">
+                  ⚠ Positional convergence detected
+                  {#if conv.convergenceTurnRange} · {conv.convergenceTurnRange}{/if}
+                </p>
+                {#if conv.positionalGapDescription}
+                  <p class="text-[11px] text-[--color-muted-fg] leading-relaxed mb-1">{conv.positionalGapDescription}</p>
+                {/if}
+                <p class="text-[11px] text-[--color-muted] leading-relaxed">
+                  Remaining disagreement: <span class="text-sky-300/80">{conv.remainingDisagreementType}</span>
+                  · Motion viability: <span class="text-sky-300/80">{conv.motionViability === 'degenerate_convergence' ? 'degenerate — opposition collapsed' : conv.motionViability}</span>
+                </p>
               </div>
             </div>
           {/if}
