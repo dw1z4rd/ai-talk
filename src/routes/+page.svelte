@@ -1,7 +1,12 @@
 <script lang="ts">
   import Nav from "$lib/Nav.svelte";
-  import { flip } from 'svelte/animate';
-  import { flyInFromLeft, flyOutToRight, flyInFromTop, flyOutToBottom } from "$lib/transitions";
+  import { flip } from "svelte/animate";
+  import {
+    flyInFromLeft,
+    flyOutToRight,
+    flyInFromTop,
+    flyOutToBottom,
+  } from "$lib/transitions";
   import { tick } from "svelte";
 
   const MODEL_OPTIONS = [
@@ -1563,8 +1568,8 @@
     <div
       id="live-judge-panel"
       class="flex flex-col gap-4 judge-panel"
-      in:flyInFromLeft
-      out:flyOutToRight
+      in:flyInFromTop
+      out:flyOutToBottom
     >
       <!-- Section header -->
       <div class="flex items-center gap-3 mt-2 judge-header">
@@ -1576,483 +1581,491 @@
         >
         <div class="flex-1 h-px bg-[--color-border]"></div>
       </div>
-       <!-- Per-turn absolute scores -->
-        {#if liveJudgeResults.some((r) => r.absoluteScores)}
-          {@const scoredTurns = liveJudgeResults.filter(
-            (r) => r.absoluteScores,
-          )}
-          <div class="flex flex-col gap-2">
-            <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
-              Turn Scores
-            </h3>
+      <!-- Per-turn absolute scores -->
+      {#if liveJudgeResults.some((r) => r.absoluteScores)}
+        {@const scoredTurns = liveJudgeResults.filter((r) => r.absoluteScores)}
+        <div class="flex flex-col gap-2">
+          <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
+            Turn Scores
+          </h3>
+          <div
+            class="rounded-xl border bg-[--color-panel] overflow-hidden"
+            style="border-color: #7c6af720"
+          >
             <div
-              class="rounded-xl border bg-[--color-panel] overflow-hidden"
-              style="border-color: #7c6af720"
+              class="grid text-[10px] font-semibold uppercase tracking-wide text-[--color-muted] px-3 py-2 border-b border-[--color-border]"
+              style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem"
             >
+              <span>Turn</span>
+              <span>Agent</span>
+              <span class="text-center">Logic</span>
+              <span class="text-center">Rhet.</span>
+              <span class="text-center">Tact.</span>
+              <span class="text-center">Score</span>
+            </div>
+            {#each scoredTurns as r, i (r.turnNumber)}
+              {@const info = getModelInfo(r.agentId)}
+              {@const s = r.absoluteScores}
               <div
-                class="grid text-[10px] font-semibold uppercase tracking-wide text-[--color-muted] px-3 py-2 border-b border-[--color-border]"
-                style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem"
+                class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
+                style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i *
+                  100}ms"
+                in:flyInFromTop
+                out:flyOutToBottom
               >
-                <span>Turn</span>
-                <span>Agent</span>
-                <span class="text-center">Logic</span>
-                <span class="text-center">Rhet.</span>
-                <span class="text-center">Tact.</span>
-                <span class="text-center">Score</span>
-              </div>
-              {#each scoredTurns as r, i (r.turnNumber)}
-                {@const info = getModelInfo(r.agentId)}
-                {@const s = r.absoluteScores}
-                <div
-                  class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
-                  style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i *
-                    100}ms"
-                  in:flyInFromTop
-      out:flyOutToBottom
+                <span class="text-[--color-muted] text-[11px]"
+                  >T{r.turnNumber}</span
                 >
-                  <span class="text-[--color-muted] text-[11px]"
-                    >T{r.turnNumber}</span
-                  >
-                  <span class="font-medium truncate" style="color: {info.color}"
-                    >{info.name}</span
-                  >
-                  <span
-                    class="text-center font-mono text-[11px]"
-                    title="Logic: {s.logicalCoherence}/40"
-                    >{s.logicalCoherence}<span class="text-[--color-muted]"
-                      >/40</span
-                    ></span
-                  >
-                  <span
-                    class="text-center font-mono text-[11px]"
-                    title="Rhetoric: {s.rhetoricalForce}/30"
-                    >{s.rhetoricalForce}<span class="text-[--color-muted]"
-                      >/30</span
-                    ></span
-                  >
-                  <span
-                    class="text-center font-mono text-[11px]"
-                    title="Tactics: {s.tacticalEffectiveness}/30"
-                    >{s.tacticalEffectiveness}<span class="text-[--color-muted]"
-                      >/30</span
-                    ></span
-                  >
-                  <span
-                    class="text-center font-mono text-[11px] font-semibold"
-                    style="color: {info.color}">{s.overallScore}</span
-                  >
-                </div>
-              {/each}
+                <span class="font-medium truncate" style="color: {info.color}"
+                  >{info.name}</span
+                >
+                <span
+                  class="text-center font-mono text-[11px]"
+                  title="Logic: {s.logicalCoherence}/40"
+                  >{s.logicalCoherence}<span class="text-[--color-muted]"
+                    >/40</span
+                  ></span
+                >
+                <span
+                  class="text-center font-mono text-[11px]"
+                  title="Rhetoric: {s.rhetoricalForce}/30"
+                  >{s.rhetoricalForce}<span class="text-[--color-muted]"
+                    >/30</span
+                  ></span
+                >
+                <span
+                  class="text-center font-mono text-[11px]"
+                  title="Tactics: {s.tacticalEffectiveness}/30"
+                  >{s.tacticalEffectiveness}<span class="text-[--color-muted]"
+                    >/30</span
+                  ></span
+                >
+                <span
+                  class="text-center font-mono text-[11px] font-semibold"
+                  style="color: {info.color}">{s.overallScore}</span
+                >
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Narrative verdict (shown after debate completes) -->
+    {#if narrativeVerdict}
+      <div
+        class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
+        style="border-color: {narrativeVerdict.agreesWithScorecard
+          ? '#7c6af740'
+          : '#f59e0b40'}; animation-delay: 150ms"
+        in:flyInFromLeft
+        out:flyOutToRight
+      >
+        <div
+          class="flex items-center gap-3 px-4 py-3 border-b"
+          style="border-color: {narrativeVerdict.agreesWithScorecard
+            ? '#7c6af725'
+            : '#f59e0b25'}; background: {narrativeVerdict.agreesWithScorecard
+            ? '#7c6af708'
+            : '#f59e0b08'}"
+        >
+          <div class="flex flex-col">
+            <span
+              class="text-sm font-bold"
+              style="color: {narrativeVerdict.agreesWithScorecard
+                ? '#c084fc'
+                : '#fbbf24'}"
+            >
+              {narrativeVerdict.agreesWithScorecard
+                ? "Narrative Verdict"
+                : "⚡ Narrative Arc Diverges"}
+            </span>
+            <span class="text-[10px] text-[--color-muted]"
+              >arc-level · cumulative thesis coherence</span
+            >
+          </div>
+          {#if narrativeVerdict.favouredAgentId}
+            {@const favouredInfo = getModelInfo(
+              narrativeVerdict.favouredAgentId,
+            )}
+            <span
+              class="ml-auto text-xs font-semibold"
+              style="color: {favouredInfo.color}">→ {favouredInfo.name}</span
+            >
+          {/if}
+        </div>
+        {#if narrativeVerdict.convergence?.detected}
+          {@const conv = narrativeVerdict.convergence}
+          <div class="px-4 pb-4 pt-0">
+            <div
+              class="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2.5"
+            >
+              <p class="text-[11px] font-semibold text-sky-400 mb-1">
+                ⚠ Positional convergence detected!
+                {#if conv.convergenceTurnRange}
+                  · {conv.convergenceTurnRange}{/if}
+              </p>
+              {#if conv.positionalGapDescription}
+                <p
+                  class="text-[11px] text-[--color-muted-fg] leading-relaxed mb-1"
+                >
+                  {conv.positionalGapDescription}
+                </p>
+              {/if}
+              <p class="text-[11px] text-[--color-muted] leading-relaxed">
+                Remaining disagreement: <span class="text-sky-300/80"
+                  >{conv.remainingDisagreementType}</span
+                >
+                · Motion viability:
+                <span class="text-sky-300/80"
+                  >{conv.motionViability === "degenerate_convergence"
+                    ? "degenerate — opposition collapsed"
+                    : conv.motionViability}</span
+                >
+              </p>
+            </div>
+          </div>
+        {/if}
+        <div class="px-4 py-4">
+          <p
+            class="text-sm text-[--color-muted-fg] leading-relaxed whitespace-pre-line"
+          >
+            {narrativeVerdict.text}
+          </p>
+        </div>
+        {#if narrativeVerdict.conflictResolution}
+          <div class="px-4 pb-4 pt-0">
+            <div
+              class="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5"
+            >
+              {#if narrativeVerdict.scorecardInternallyConsistent === false}
+                <p class="text-[11px] font-semibold text-amber-400 mb-1">
+                  Why they diverged · scorecard internally split
+                </p>
+              {:else}
+                <p class="text-[11px] font-semibold text-amber-400 mb-1">
+                  Why they diverged
+                </p>
+              {/if}
+              <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">
+                {narrativeVerdict.conflictResolution}
+              </p>
             </div>
           </div>
         {/if}
       </div>
     {/if}
-    
-      <!-- Narrative verdict (shown after debate completes) -->
-      {#if narrativeVerdict}
-        <div
-          class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
-          style="border-color: {narrativeVerdict.agreesWithScorecard
-            ? '#7c6af740'
-            : '#f59e0b40'}; animation-delay: 150ms"
-          in:flyInFromLeft
-          out:flyOutToRight
-        >
+    <!-- Responsive main grid: left = scorecard, right = rounds + scores -->
+    <div class="judge-main-grid">
+      <!-- Left column: Scorecard or Fallback + Language warning -->
+      <div class="flex flex-col gap-3 relative">
+        <!-- Scorecard — win tallies -->
+        {#if currentLeader?.winTallies}
+          {@const tallies = currentLeader.winTallies}
           <div
-            class="flex items-center gap-3 px-4 py-3 border-b"
-            style="border-color: {narrativeVerdict.agreesWithScorecard
-              ? '#7c6af725'
-              : '#f59e0b25'}; background: {narrativeVerdict.agreesWithScorecard
-              ? '#7c6af708'
-              : '#f59e0b08'}"
+            class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
+            style="border-color: #7c6af740; animation-delay: 250ms"
+            in:flyInFromLeft
+            out:flyOutToRight
           >
-            <div class="flex flex-col">
-              <span
-                class="text-sm font-bold"
-                style="color: {narrativeVerdict.agreesWithScorecard
-                  ? '#c084fc'
-                  : '#fbbf24'}"
-              >
-                {narrativeVerdict.agreesWithScorecard
-                  ? "Narrative Verdict"
-                  : "⚡ Narrative Arc Diverges"}
-              </span>
-              <span class="text-[10px] text-[--color-muted]"
-                >arc-level · cumulative thesis coherence</span
-              >
-            </div>
-            {#if narrativeVerdict.favouredAgentId}
-              {@const favouredInfo = getModelInfo(
-                narrativeVerdict.favouredAgentId,
-              )}
-              <span
-                class="ml-auto text-xs font-semibold"
-                style="color: {favouredInfo.color}">→ {favouredInfo.name}</span
-              >
-            {/if}
-          </div>
-          {#if narrativeVerdict.convergence?.detected}
-            {@const conv = narrativeVerdict.convergence}
-            <div class="px-4 pb-4 pt-0">
-              <div
-                class="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2.5"
-              >
-                <p class="text-[11px] font-semibold text-sky-400 mb-1">
-                  ⚠ Positional convergence detected!
-                  {#if conv.convergenceTurnRange}
-                    · {conv.convergenceTurnRange}{/if}
-                </p>
-                {#if conv.positionalGapDescription}
-                  <p
-                    class="text-[11px] text-[--color-muted-fg] leading-relaxed mb-1"
-                  >
-                    {conv.positionalGapDescription}
-                  </p>
-                {/if}
-                <p class="text-[11px] text-[--color-muted] leading-relaxed">
-                  Remaining disagreement: <span class="text-sky-300/80"
-                    >{conv.remainingDisagreementType}</span
-                  >
-                  · Motion viability:
-                  <span class="text-sky-300/80"
-                    >{conv.motionViability === "degenerate_convergence"
-                      ? "degenerate — opposition collapsed"
-                      : conv.motionViability}</span
-                  >
-                </p>
-              </div>
-            </div>
-          {/if}
-          <div class="px-4 py-4">
-            <p
-              class="text-sm text-[--color-muted-fg] leading-relaxed whitespace-pre-line"
-            >
-              {narrativeVerdict.text}
-            </p>
-          </div>
-          {#if narrativeVerdict.conflictResolution}
-            <div class="px-4 pb-4 pt-0">
-              <div
-                class="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5"
-              >
-                {#if narrativeVerdict.scorecardInternallyConsistent === false}
-                  <p class="text-[11px] font-semibold text-amber-400 mb-1">
-                    Why they diverged · scorecard internally split
-                  </p>
-                {:else}
-                  <p class="text-[11px] font-semibold text-amber-400 mb-1">
-                    Why they diverged
-                  </p>
-                {/if}
-                <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">
-                  {narrativeVerdict.conflictResolution}
-                </p>
-              </div>
-            </div>
-          {/if}
-        </div>
-      {/if}
-    </div>
-  <!-- Responsive main grid: left = scorecard, right = rounds + scores -->
-  <div class="judge-main-grid">
-    <!-- Left column: Scorecard or Fallback + Language warning -->
-    <div class="flex flex-col gap-3 relative">
-      <!-- Scorecard — win tallies -->
-      {#if currentLeader?.winTallies}
-        {@const tallies = currentLeader.winTallies}
-        <div
-          class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
-          style="border-color: #7c6af740; animation-delay: 250ms"
-          in:flyInFromLeft
-          out:flyOutToRight
-        >
-          <div
-            class="flex items-center gap-3 px-4 py-3 border-b"
-            style="border-color: #7c6af725; background: #7c6af708"
-          >
-            <span class="text-sm font-bold" style="color: #c084fc"
-              >Scorecard</span
-            >
-            <span class="text-[10px] text-[--color-muted] ml-1"
-              >turn-by-turn · per-round argument quality</span
-            >
-          </div>
-          <div class="px-4 py-3 flex flex-col gap-2">
-            {#each Object.entries(tallies) as [agentId, tallyObj]}
-              {@const tally = tallyObj as {
-                agentName: string;
-                logic: number;
-                tactics: number;
-                rhetoric: number;
-                total: number;
-              }}
-              {@const info = getModelInfo(agentId)}
-              {@const isLeader = agentId === currentLeader.agentId}
-              <div class="flex items-center gap-3">
-                <div
-                  class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
-                  style="background: {info.color}18; color: {info.color}; border: 1px solid {info.color}28"
-                >
-                  {info.name[0]}
-                </div>
-                <span
-                  class="text-sm font-medium flex-1 {isLeader
-                    ? ''
-                    : 'text-[--color-muted-fg]'}"
-                  style={isLeader ? `color: ${info.color}` : ""}
-                >
-                  {tally.agentName}
-                </span>
-                <div class="flex items-center gap-3 text-xs">
-                  <span title="Logic wins" class="flex flex-col items-center">
-                    <span class="text-[--color-muted] text-[10px]">Logic</span>
-                    <span
-                      style="color: {tally.logic > 0 ? '#34d399' : '#6b7280'}"
-                      >{tally.logic}</span
-                    >
-                  </span>
-                  <span title="Tactics wins" class="flex flex-col items-center">
-                    <span class="text-[--color-muted] text-[10px]">Tactics</span
-                    >
-                    <span
-                      style="color: {tally.tactics > 0 ? '#60a5fa' : '#6b7280'}"
-                      >{tally.tactics}</span
-                    >
-                  </span>
-                  <span
-                    title="Rhetoric wins"
-                    class="flex flex-col items-center"
-                  >
-                    <span class="text-[--color-muted] text-[10px]"
-                      >Rhetoric</span
-                    >
-                    <span
-                      style="color: {tally.rhetoric > 0
-                        ? '#f472b6'
-                        : '#6b7280'}">{tally.rhetoric}</span
-                    >
-                  </span>
-                  <span
-                    title="Total wins"
-                    class="flex flex-col items-center border-l border-[--color-border] pl-3"
-                  >
-                    <span class="text-[--color-muted] text-[10px]">Total</span>
-                    <span class="font-bold" style="color: {info.color}"
-                      >{tally.total}</span
-                    >
-                  </span>
-                </div>
-              </div>
-            {/each}
-          </div>
-        </div>
-      {:else if currentLeader}
-        <!-- Fallback leader display before first pairwise round -->
-        {@const leaderInfo = getModelInfo(currentLeader.agentId)}
-        <div
-          class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
-          style="border-color: #7c6af740; animation-delay: 350ms"
-          in:flyInFromLeft
-          out:flyOutToRight
-        >
-          <div class="px-4 py-3 flex items-center gap-3">
             <div
-              class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0"
-              style="background: {leaderInfo.color}15; color: {leaderInfo.color}"
+              class="flex items-center gap-3 px-4 py-3 border-b"
+              style="border-color: #7c6af725; background: #7c6af708"
             >
-              {leaderInfo.name[0]}
-            </div>
-            <div>
-              <div
-                class="text-sm font-semibold"
-                style="color: {leaderInfo.color}"
+              <span class="text-sm font-bold" style="color: #c084fc"
+                >Scorecard</span
               >
-                {leaderInfo.name}
-              </div>
-              <div class="text-[10px] text-[--color-muted]">
-                Early leader — pairwise scoring starts Turn 2
-              </div>
+              <span class="text-[10px] text-[--color-muted] ml-1"
+                >turn-by-turn · per-round argument quality</span
+              >
+            </div>
+            <div class="px-4 py-3 flex flex-col gap-2">
+              {#each Object.entries(tallies) as [agentId, tallyObj]}
+                {@const tally = tallyObj as {
+                  agentName: string;
+                  logic: number;
+                  tactics: number;
+                  rhetoric: number;
+                  total: number;
+                }}
+                {@const info = getModelInfo(agentId)}
+                {@const isLeader = agentId === currentLeader.agentId}
+                <div class="flex items-center gap-3">
+                  <div
+                    class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                    style="background: {info.color}18; color: {info.color}; border: 1px solid {info.color}28"
+                  >
+                    {info.name[0]}
+                  </div>
+                  <span
+                    class="text-sm font-medium flex-1 {isLeader
+                      ? ''
+                      : 'text-[--color-muted-fg]'}"
+                    style={isLeader ? `color: ${info.color}` : ""}
+                  >
+                    {tally.agentName}
+                  </span>
+                  <div class="flex items-center gap-3 text-xs">
+                    <span title="Logic wins" class="flex flex-col items-center">
+                      <span class="text-[--color-muted] text-[10px]">Logic</span
+                      >
+                      <span
+                        style="color: {tally.logic > 0 ? '#34d399' : '#6b7280'}"
+                        >{tally.logic}</span
+                      >
+                    </span>
+                    <span
+                      title="Tactics wins"
+                      class="flex flex-col items-center"
+                    >
+                      <span class="text-[--color-muted] text-[10px]"
+                        >Tactics</span
+                      >
+                      <span
+                        style="color: {tally.tactics > 0
+                          ? '#60a5fa'
+                          : '#6b7280'}">{tally.tactics}</span
+                      >
+                    </span>
+                    <span
+                      title="Rhetoric wins"
+                      class="flex flex-col items-center"
+                    >
+                      <span class="text-[--color-muted] text-[10px]"
+                        >Rhetoric</span
+                      >
+                      <span
+                        style="color: {tally.rhetoric > 0
+                          ? '#f472b6'
+                          : '#6b7280'}">{tally.rhetoric}</span
+                      >
+                    </span>
+                    <span
+                      title="Total wins"
+                      class="flex flex-col items-center border-l border-[--color-border] pl-3"
+                    >
+                      <span class="text-[--color-muted] text-[10px]">Total</span
+                      >
+                      <span class="font-bold" style="color: {info.color}"
+                        >{tally.total}</span
+                      >
+                    </span>
+                  </div>
+                </div>
+              {/each}
             </div>
           </div>
-        </div>
-      {/if}
-
-      <!-- Language warning -->
-      {#if pairwiseRounds.some((r) => r.languageWarning)}
-        <div
-          class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
-          style="animation-delay: 0ms"
-          in:flyInFromLeft
-          out:flyOutToRight
-        >
-          {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
-        </div>
-      {/if}
-    </div>
-
-    <!-- Right column: Recent Rounds + Turn Scores -->
-    {#if pairwiseRounds.length > 0 || liveJudgeResults.some((r) => r.absoluteScores)}
-      <div class="flex flex-col gap-4">
-        <!-- Recent pairwise rounds -->
-        {#if pairwiseRounds.length > 0}
-          <div class="flex flex-col gap-3 relative">
-            <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
-              Recent Rounds
-            </h3>
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
-            {#each pairwiseRounds
-              .slice(-3)
-              .reverse() as round, i (round.roundNumber)}
-              {@const logicWinnerInfo = getModelInfo(round.logicWinner)}
-              {@const tacticsWinnerInfo = getModelInfo(round.tacticsWinner)}
-              {@const rhetoricWinnerInfo = getModelInfo(round.rhetoricWinner)}
+        {:else if currentLeader}
+          <!-- Fallback leader display before first pairwise round -->
+          {@const leaderInfo = getModelInfo(currentLeader.agentId)}
+          <div
+            class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
+            style="border-color: #7c6af740; animation-delay: 350ms"
+            in:flyInFromLeft
+            out:flyOutToRight
+          >
+            <div class="px-4 py-3 flex items-center gap-3">
               <div
-                class="rounded-xl border bg-[--color-panel] p-3 judge-card"
-                style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-                in:flyInFromLeft
-                out:flyOutToRight
-                animate:flip={{ duration: 1000 }}
+                class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0"
+                style="background: {leaderInfo.color}15; color: {leaderInfo.color}"
               >
-                <!-- Round header -->
-                <div class="flex items-center gap-2 mb-3 min-w-0">
-                  <span
-                    class="text-[10px] font-bold uppercase tracking-widest text-[--color-muted] shrink-0"
-                    >Round {round.roundNumber}</span
-                  >
-                  <span class="text-[10px] text-[--color-muted] shrink-0"
-                    >·</span
-                  >
-                  <span
-                    class="text-[10px] text-[--color-muted] min-w-0 truncate"
-                    >T{round.prevTurn.turnNumber} ({round.prevTurn.agentName})
-                    vs T{round.curTurn.turnNumber} ({round.curTurn
-                      .agentName})</span
-                  >
-                  {#if round.isFallback}
-                    <span class="ml-auto shrink-0 text-[10px] text-yellow-500"
-                      >fallback</span
-                    >
-                  {/if}
+                {leaderInfo.name[0]}
+              </div>
+              <div>
+                <div
+                  class="text-sm font-semibold"
+                  style="color: {leaderInfo.color}"
+                >
+                  {leaderInfo.name}
                 </div>
-
-                <!-- Winner chips -->
-                <div class="grid grid-cols-3 gap-2 mb-3">
-                  <div class="flex flex-col gap-1">
-                    <span
-                      class="text-[10px] text-[--color-muted] uppercase tracking-wide"
-                      >Logic</span
-                    >
-                    <span
-                      class="text-xs font-semibold truncate"
-                      style="color: {logicWinnerInfo.color}"
-                      >{logicWinnerInfo.name}</span
-                    >
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <span
-                      class="text-[10px] text-[--color-muted] uppercase tracking-wide"
-                      >Tactics</span
-                    >
-                    <span
-                      class="text-xs font-semibold truncate"
-                      style="color: {tacticsWinnerInfo.color}"
-                      >{tacticsWinnerInfo.name}</span
-                    >
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <span
-                      class="text-[10px] text-[--color-muted] uppercase tracking-wide"
-                      >Rhetoric</span
-                    >
-                    <span
-                      class="text-xs font-semibold truncate"
-                      style="color: {rhetoricWinnerInfo.color}"
-                      >{rhetoricWinnerInfo.name}</span
-                    >
-                  </div>
-                </div>
-
-                <!-- Logic delta (2-3 sentences) -->
-                <div class="pt-2 border-t border-[--color-border]">
-                  <p
-                    class="text-[11px] text-[--color-muted-fg] leading-relaxed"
-                  >
-                    {round.logicDelta}
-                  </p>
+                <div class="text-[10px] text-[--color-muted]">
+                  Early leader — pairwise scoring starts Turn 2
                 </div>
               </div>
-            {/each}
             </div>
           </div>
         {/if}
+
+        <!-- Language warning -->
+        {#if pairwiseRounds.some((r) => r.languageWarning)}
+          <div
+            class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
+            style="animation-delay: 0ms"
+            in:flyInFromLeft
+            out:flyOutToRight
+          >
+            {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
+          </div>
+        {/if}
+      </div>
+
+      <!-- Right column: Recent Rounds + Turn Scores -->
+      {#if pairwiseRounds.length > 0 || liveJudgeResults.some((r) => r.absoluteScores)}
+        <div class="flex flex-col gap-4">
+          <!-- Recent pairwise rounds -->
+          {#if pairwiseRounds.length > 0}
+            <div class="flex flex-col gap-3 relative">
+              <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
+                Recent Rounds
+              </h3>
+              <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
+                {#each pairwiseRounds
+                  .slice(-3)
+                  .reverse() as round, i (round.roundNumber)}
+                  {@const logicWinnerInfo = getModelInfo(round.logicWinner)}
+                  {@const tacticsWinnerInfo = getModelInfo(round.tacticsWinner)}
+                  {@const rhetoricWinnerInfo = getModelInfo(
+                    round.rhetoricWinner,
+                  )}
+                  <div
+                    class="rounded-xl border bg-[--color-panel] p-3 judge-card"
+                    style="border-color: #7c6af720; animation-delay: {i * 70}ms"
+                    in:flyInFromLeft
+                    out:flyOutToRight
+                    animate:flip={{ duration: 1000 }}
+                  >
+                    <!-- Round header -->
+                    <div class="flex items-center gap-2 mb-3 min-w-0">
+                      <span
+                        class="text-[10px] font-bold uppercase tracking-widest text-[--color-muted] shrink-0"
+                        >Round {round.roundNumber}</span
+                      >
+                      <span class="text-[10px] text-[--color-muted] shrink-0"
+                        >·</span
+                      >
+                      <span
+                        class="text-[10px] text-[--color-muted] min-w-0 truncate"
+                        >T{round.prevTurn.turnNumber} ({round.prevTurn
+                          .agentName}) vs T{round.curTurn.turnNumber} ({round
+                          .curTurn.agentName})</span
+                      >
+                      {#if round.isFallback}
+                        <span
+                          class="ml-auto shrink-0 text-[10px] text-yellow-500"
+                          >fallback</span
+                        >
+                      {/if}
+                    </div>
+
+                    <!-- Winner chips -->
+                    <div class="grid grid-cols-3 gap-2 mb-3">
+                      <div class="flex flex-col gap-1">
+                        <span
+                          class="text-[10px] text-[--color-muted] uppercase tracking-wide"
+                          >Logic</span
+                        >
+                        <span
+                          class="text-xs font-semibold truncate"
+                          style="color: {logicWinnerInfo.color}"
+                          >{logicWinnerInfo.name}</span
+                        >
+                      </div>
+                      <div class="flex flex-col gap-1">
+                        <span
+                          class="text-[10px] text-[--color-muted] uppercase tracking-wide"
+                          >Tactics</span
+                        >
+                        <span
+                          class="text-xs font-semibold truncate"
+                          style="color: {tacticsWinnerInfo.color}"
+                          >{tacticsWinnerInfo.name}</span
+                        >
+                      </div>
+                      <div class="flex flex-col gap-1">
+                        <span
+                          class="text-[10px] text-[--color-muted] uppercase tracking-wide"
+                          >Rhetoric</span
+                        >
+                        <span
+                          class="text-xs font-semibold truncate"
+                          style="color: {rhetoricWinnerInfo.color}"
+                          >{rhetoricWinnerInfo.name}</span
+                        >
+                      </div>
+                    </div>
+
+                    <!-- Logic delta (2-3 sentences) -->
+                    <div class="pt-2 border-t border-[--color-border]">
+                      <p
+                        class="text-[11px] text-[--color-muted-fg] leading-relaxed"
+                      >
+                        {round.logicDelta}
+                      </p>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
         </div>
       {/if}
-  </div>
-
-  <!-- Export -->
-  {#if messages.length > 0}
-    <div class="flex items-center gap-2">
-      <span
-        class="text-[11px] font-semibold uppercase tracking-widest text-[--color-muted] mr-1"
-        >Export</span
-      >
-      <button
-        onclick={() => exportDebate("md")}
-        class="flex items-center gap-1.5 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] hover:text-white text-[--color-muted-fg] text-xs font-medium px-3.5 py-2 rounded-lg transition-all cursor-pointer"
-      >
-        <svg
-          class="w-3.5 h-3.5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          ><path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-4-4 4m0 0-4-4m4 4V4"
-          /></svg
-        >
-        Markdown
-      </button>
-      <button
-        onclick={() => exportDebate("txt")}
-        class="flex items-center gap-1.5 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] hover:text-white text-[--color-muted-fg] text-xs font-medium px-3.5 py-2 rounded-lg transition-all cursor-pointer"
-      >
-        <svg
-          class="w-3.5 h-3.5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          ><path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-4-4 4m0 0-4-4m4 4V4"
-          /></svg
-        >
-        Plain text
-      </button>
-      <button
-        onclick={resetConversation}
-        class="ml-auto flex items-center gap-1.5 text-[--color-muted] hover:text-red-400 text-xs font-medium px-3.5 py-2 rounded-lg border border-transparent hover:border-red-900/50 transition-all cursor-pointer"
-      >
-        <svg
-          class="w-3.5 h-3.5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          ><path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16"
-          /></svg
-        >
-        Clear
-      </button>
     </div>
   {/if}
+</div>
+
+<!-- Export -->
+{#if messages.length > 0}
+  <div class="flex items-center gap-2">
+    <span
+      class="text-[11px] font-semibold uppercase tracking-widest text-[--color-muted] mr-1"
+      >Export</span
+    >
+    <button
+      onclick={() => exportDebate("md")}
+      class="flex items-center gap-1.5 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] hover:text-white text-[--color-muted-fg] text-xs font-medium px-3.5 py-2 rounded-lg transition-all cursor-pointer"
+    >
+      <svg
+        class="w-3.5 h-3.5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        ><path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-4-4 4m0 0-4-4m4 4V4"
+        /></svg
+      >
+      Markdown
+    </button>
+    <button
+      onclick={() => exportDebate("txt")}
+      class="flex items-center gap-1.5 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] hover:text-white text-[--color-muted-fg] text-xs font-medium px-3.5 py-2 rounded-lg transition-all cursor-pointer"
+    >
+      <svg
+        class="w-3.5 h-3.5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        ><path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-4-4 4m0 0-4-4m4 4V4"
+        /></svg
+      >
+      Plain text
+    </button>
+    <button
+      onclick={resetConversation}
+      class="ml-auto flex items-center gap-1.5 text-[--color-muted] hover:text-red-400 text-xs font-medium px-3.5 py-2 rounded-lg border border-transparent hover:border-red-900/50 transition-all cursor-pointer"
+    >
+      <svg
+        class="w-3.5 h-3.5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        ><path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16"
+        /></svg
+      >
+      Clear
+    </button>
+  </div>
+{/if}
 
 <style>
   @keyframes judgeReveal {
