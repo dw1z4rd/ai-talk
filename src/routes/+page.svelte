@@ -740,6 +740,8 @@
               favouredAgentId: data.favouredAgentId,
               agreesWithScorecard: data.agreesWithScorecard,
               conflictResolution: data.conflictResolution ?? null,
+              scorecardInternallyConsistent: data.scorecardInternallyConsistent,
+              convergence: data.convergence ?? null,
             };
 
           } else if (data.type === "finalScorecard") {

@@ -118,4 +118,4 @@ Add `convergence?: PositionalConvergenceAnalysis` to `NarrativeVerdict`.
 - [ ] Unit test: opening fallback scores — no field exceeds native max
 - [ ] Run economics debate through upgraded judge; per-turn Logic scores must vary ≥ 3 points between consecutive turns for the same model (validates anchoring fix)
 - [ ] Spot-check rhetoric scores on a vivid-but-weak-structure turn: should not exceed 6 after cap rule
-- [ ] Convergence smoke test: 6-turn debate designed to converge → `detected: true`, `motionViability: "degenerate_convergence"`
+- [ ] Convergence smoke test: ≥ 10-turn debate designed to converge (each agent with ≥ 2 early and ≥ 2 late turns) → `detected: true`, `motionViability: "degenerate_convergence"`

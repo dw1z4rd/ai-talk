@@ -503,10 +503,12 @@ export class LiveJudgeSystem {
           // Determine whether the scorecard is internally self-consistent:
           // do the win-count leader and the cumulative-points leader agree?
           const tallies = Object.values(this.panel.scorecard.winTallies);
+          const maxWins = tallies.length >= 2 ? Math.max(...tallies.map((t) => t.total)) : -1;
+          const winCountLeaders = tallies.filter((t) => t.total === maxWins);
+          // In a tie there is no single win-count leader; skip the consistency check.
           const winCountLeader =
-            tallies.length >= 2
-              ? tallies.reduce((a, b) => (a.total >= b.total ? a : b)).agentName
-              : null;
+            winCountLeaders.length === 1 ? winCountLeaders[0].agentName : null;
+
           const pointsTotals = Object.entries(this.panel.currentScores)
             .map(([id, s]) => ({
               id,
@@ -514,7 +516,13 @@ export class LiveJudgeSystem {
               total: s.totalScore,
             }))
             .sort((a, b) => b.total - a.total);
-          const pointsLeaderName = pointsTotals[0]?.agentName ?? null;
+          const maxPoints = pointsTotals[0]?.total ?? -Infinity;
+          // In a points tie there is also no single leader; skip the consistency check.
+          const pointsLeaderName =
+            pointsTotals.filter((p) => p.total === maxPoints).length === 1
+              ? (pointsTotals[0]?.agentName ?? null)
+              : null;
+
           const scorecardInternallyConsistent =
             winCountLeader !== null &&
             pointsLeaderName !== null &&
@@ -581,6 +589,8 @@ export class LiveJudgeSystem {
               agentB.name,
               topic,
               convController.signal,
+              agentA.id,
+              agentB.id,
             ).finally(() => clearTimeout(convTimer));
             verdict.convergence = convergence;
           } catch {
