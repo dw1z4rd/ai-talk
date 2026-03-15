@@ -1,21 +1,21 @@
 <script lang="ts">
   import Nav from "$lib/Nav.svelte";
-  import { fade, fly, scale } from "svelte/transition";
+  import { fade } from "svelte/transition";
   import { tick } from "svelte";
-  import { circOut, cubicIn } from "svelte/easing";
+  import { cubicInOut } from "svelte/easing";
 
-  function shrinkFade(
-    node: Element,
-    { duration = 200, delay = 0 }: { duration?: number; delay?: number } = {},
-  ) {
-    return {
-      delay,
-      duration,
-      easing: cubicIn,
-      css: (t: number) =>
-        `opacity: ${t}; transform: scale(${0.94 + 0.06 * t});`,
-    };
-  }
+  function scaleFade(
+  node: Element,
+  { duration = 500, delay = 0 }: { duration?: number; delay?: number } = {},
+) {
+  return {
+    delay,
+    duration,
+    easing: cubicInOut,
+    css: (t: number) =>
+      `opacity: ${t}; transform: scale(${0.5 + 0.5 * t});`,
+  };
+}
 
   const MODEL_OPTIONS = [
     {
@@ -856,7 +856,7 @@
 {#if showWinnerModal}
   <div
     class="fixed inset-0 z-50 flex items-center justify-center"
-    transition:fade={{ duration: 500 }}
+    transition:scaleFade={{ duration: 500 }}
   >
     <!-- Confetti canvas (sits behind modal content) -->
     <canvas
@@ -870,7 +870,7 @@
     <!-- Content -->
     <div
       class="relative z-10 flex flex-col items-center gap-6 text-center px-8"
-      in:scale={{ start: 0.7, duration: 500 }}
+      transition:scaleFade={{ duration: 500 }}
     >
       <!-- Glow + name -->
       <div class="relative">
@@ -1574,8 +1574,7 @@
     <div
       id="live-judge-panel"
       class="flex flex-col gap-4 judge-panel"
-      in:fly={{ y: 400, duration: 500, easing: circOut }}
-      out:shrinkFade={{ duration: 500 }}
+      transition:scaleFade={{ duration: 500 }}
     >
       <!-- Section header -->
       <div class="flex items-center gap-3 mt-2 judge-header">
@@ -1598,8 +1597,7 @@
             <div
               class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
               style="border-color: #7c6af740; animation-delay: 120ms"
-              in:fly={{ y: 400, duration: 500, easing: circOut }}
-              out:shrinkFade={{ duration: 500 }}
+              transition:scaleFade={{ duration: 500 }}
             >
               <div
                 class="flex items-center gap-3 px-4 py-3 border-b"
@@ -1613,7 +1611,14 @@
                 >
               </div>
               <div class="px-4 py-3 flex flex-col gap-2">
-                {#each Object.entries(tallies) as [agentId, tally]}
+                {#each Object.entries(tallies) as [agentId, tallyObj]}
+                  {@const tally = tallyObj as {
+                    agentName: string;
+                    logic: number;
+                    tactics: number;
+                    rhetoric: number;
+                    total: number;
+                  }}
                   {@const info = getModelInfo(agentId)}
                   {@const isLeader = agentId === currentLeader.agentId}
                   <div class="flex items-center gap-3">
@@ -1693,8 +1698,7 @@
             <div
               class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
               style="border-color: #7c6af740; animation-delay: 120ms"
-              in:fly={{ y: 400, duration: 500, easing: circOut }}
-              out:shrinkFade={{ duration: 500 }}
+              transition:scaleFade={{ duration: 500 }}
             >
               <div class="px-4 py-3 flex items-center gap-3">
                 <div
@@ -1723,8 +1727,7 @@
             <div
               class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
               style="animation-delay: 0ms"
-              in:fly={{ y: 400, duration: 500, easing: circOut }}
-              out:shrinkFade={{ duration: 500 }}
+              transition:scaleFade={{ duration: 500 }}
             >
               {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
             </div>
@@ -1751,8 +1754,7 @@
                   <div
                     class="rounded-xl border bg-[--color-panel] p-3 judge-card"
                     style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-                    in:fly={{ y: 400, duration: 500, easing: circOut }}
-                    out:shrinkFade={{ duration: 500 }}
+                    transition:scaleFade={{ duration: 500 }}
                   >
                     <!-- Round header -->
                     <div class="flex items-center gap-2 mb-3 min-w-0">
@@ -1858,8 +1860,7 @@
                       class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
                       style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i *
                         40}ms"
-                      in:fly={{ y: 400, duration: 500, easing: circOut }}
-                      out:shrinkFade={{ duration: 500 }}
+                      transition:scaleFade={{ duration: 500 }}
                     >
                       <span class="text-[--color-muted] text-[11px]"
                         >T{r.turnNumber}</span
@@ -1909,8 +1910,7 @@
           style="border-color: {narrativeVerdict.agreesWithScorecard
             ? '#7c6af740'
             : '#f59e0b40'}; animation-delay: 150ms"
-          in:fly={{ y: 400, duration: 500, easing: circOut }}
-          out:shrinkFade={{ duration: 500 }}
+          transition:scaleFade={{ duration: 500 }}
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
