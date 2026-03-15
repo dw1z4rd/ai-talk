@@ -6,7 +6,8 @@ export function flyInFromTop(
 ) {
   // 1. Grab the element's computed styles
   const style = getComputedStyle(node);
-  const targetOpacity = parseFloat(style.opacity);
+  const parsedOpacity = parseFloat(style.opacity);
+  const targetOpacity = parsedOpacity === 0 ? 1 : parsedOpacity;
   const transform = style.transform === "none" ? "" : style.transform;
 
   // 2. Calculate the distance to the viewport top
