@@ -274,7 +274,7 @@ Also populate mechanism_delta (covers both turns) and mechanism_failures (array 
 Retroactive causation (timeline category error): before awarding any causal credit, verify that every technology, framework, study, or institutional form invoked could plausibly have existed at the era being argued about. Two graduated penalties apply:
 −3  The postdating item is treated as a necessary condition or causal prerequisite — the argument cannot stand without it. (Example: arguing that social media was required for 19th-century political revolutions — social media is a 21st-century technology and cannot be a prerequisite for 19th-century events.)
 −1  The postdating item is used as supporting evidence, a contributing factor, or an illustrative analogy, but is not strictly necessary — the argument leans on it but could in principle survive without it. (Example: invoking modern regression analysis as evidence of a claim about pre-statistical-era economic behaviour.) The argument receives partial causal credit for what the period-appropriate elements actually establish.
-When citing either violation in logic_delta, name the technology/concept and note that it clearly postdates the phenomenon.
+When citing either violation in logic_delta, name the technology/concept and note that it clearly postdates the phenomenon. This graduated −3/−1 treatment applies to the pairwise scoring rubric; the legacy per-turn scoring prompt used by analyzeTurn() intentionally retains only the −3 "necessary condition" penalty to keep adaptive pressure conservative.
 
 EXCEPTIONS: Do not penalize thought experiments or illustrative hypotheticals as "unverified facts." Judge the mechanism, not the historical precision.
 
