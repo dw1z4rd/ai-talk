@@ -31,7 +31,7 @@ export function flyInFromTop(
   };
 }
 
-export function flyToBottom(
+export function flyOutToBottom(
   node: Element,
   { duration = 1000, delay = 0, easing = expoOut } = {},
 ) {
