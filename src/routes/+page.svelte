@@ -842,8 +842,8 @@
 {#if showWinnerModal}
   <div
     class="fixed inset-0 z-50 flex items-center justify-center"
-    in:flyInFromTop={{ duration: 2000 }}
-    out:flyOutToBottom={{ duration: 1500, delay: 500 }}
+    in:flyInFromTop
+    out:flyOutToBottom
   >
     <!-- Confetti canvas (sits behind modal content) -->
     <canvas
@@ -857,8 +857,8 @@
     <!-- Content -->
     <div
       class="relative z-10 flex flex-col items-center gap-6 text-center px-8"
-      in:flyInFromTop={{ duration: 2000 }}
-      out:flyOutToBottom={{ duration: 1500, delay: 500 }}
+      in:flyInFromTop
+      out:flyOutToBottom
     >
       <!-- Glow + name -->
       <div class="relative">
@@ -1562,8 +1562,8 @@
     <div
       id="live-judge-panel"
       class="flex flex-col gap-4 judge-panel"
-      in:flyInFromTop={{ duration: 2000 }}
-      out:flyOutToBottom={{ duration: 1500, delay: 500 }}
+      in:flyInFromTop
+      out:flyOutToBottom
     >
       <!-- Section header -->
       <div class="flex items-center gap-3 mt-2 judge-header">
@@ -1582,8 +1582,8 @@
           style="border-color: {narrativeVerdict.agreesWithScorecard
             ? '#7c6af740'
             : '#f59e0b40'}; animation-delay: 150ms"
-          in:flyInFromTop={{ duration: 2000 }}
-          out:flyOutToBottom={{ duration: 1500, delay: 500 }}
+          in:flyInFromTop
+          out:flyOutToBottom
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
@@ -1691,8 +1691,8 @@
         <div
           class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
           style="border-color: #7c6af740; animation-delay: 250ms"
-          in:flyInFromTop={{ duration: 2000 }}
-          out:flyOutToBottom={{ duration: 1500, delay: 500 }}
+          in:flyInFromTop
+          out:flyOutToBottom
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
@@ -1780,8 +1780,8 @@
         <div
           class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
           style="border-color: #7c6af740; animation-delay: 350ms"
-          in:flyInFromTop={{ duration: 2000 }}
-          out:flyOutToBottom={{ duration: 1500, delay: 500 }}
+          in:flyInFromTop
+          out:flyOutToBottom
         >
           <div class="px-4 py-3 flex items-center gap-3">
             <div
@@ -1810,8 +1810,8 @@
         <div
           class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
           style="animation-delay: 0ms"
-          in:flyInFromTop={{ duration: 2000 }}
-          out:flyOutToBottom={{ duration: 1500, delay: 500 }}
+          in:flyInFromTop
+          out:flyOutToBottom
         >
           {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
         </div>
@@ -1836,8 +1836,8 @@
               <div
                 class="rounded-xl border bg-[--color-panel] p-3 judge-card"
                 style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-                in:flyInFromTop={{ duration: 2000 }}
-                out:flyOutToBottom={{ duration: 1500, delay: 500 }}
+                in:flyInFromTop
+                out:flyOutToBottom
               >
                 <!-- Round header -->
                 <div class="flex items-center gap-2 mb-3 min-w-0">
@@ -1942,8 +1942,8 @@
                   class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
                   style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i *
                     100}ms"
-                  in:flyInFromTop={{ duration: 2000, }}
-      out:flyOutToBottom={{ duration: 1500, delay: 500 }}
+                  in:flyInFromTop
+      out:flyOutToBottom
                 >
                   <span class="text-[--color-muted] text-[11px]"
                     >T{r.turnNumber}</span
