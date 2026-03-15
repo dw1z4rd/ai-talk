@@ -5,12 +5,6 @@
       group: "Ollama — Cloud",
       options: [
         {
-          id: "deepseek-v3.1:671b-cloud",
-          name: "DeepSeek V3.1",
-          color: "#4B8BF5",
-        },
-        { id: "deepseek-v3.2-cloud", name: "DeepSeek V3.2", color: "#3B7BFF" },
-        {
           id: "devstral-small-2:24b-cloud",
           name: "Devstral Small 2",
           color: "#FF7000",
@@ -64,7 +58,7 @@
   let abortController = $state<AbortController | null>(null);
 
   let agentA = $state("devstral-small-2:24b-cloud");
-  let agentB = $state("deepseek-v3.2-cloud");
+  let agentB = $state("gpt-oss:120b-cloud");
   let agentC = $state("gpt-oss:120b-cloud");
 
   let typingAgentName = $state("");

@@ -14,12 +14,6 @@
       group: "Ollama — Cloud",
       options: [
         {
-          id: "deepseek-v3.1:671b-cloud",
-          name: "DeepSeek V3.1",
-          color: "#4B8BF5",
-        },
-        { id: "deepseek-v3.2-cloud", name: "DeepSeek V3.2", color: "#3B7BFF" },
-        {
           id: "devstral-small-2:24b-cloud",
           name: "Devstral Small 2",
           color: "#FF7000",
@@ -82,7 +76,7 @@
   let chatEl = $state<HTMLElement | null>(null);
   let abortController = $state<AbortController | null>(null);
   let agentA = $state("kimi-k2:1t-cloud");
-  let agentB = $state("deepseek-v3.2-cloud");
+  let agentB = $state("devstral-small-2:24b-cloud");
   let leftAgentId = $state("kimi-k2:1t-cloud");
   let typingAgentName = $state("");
   let typingAgentColor = $state("");

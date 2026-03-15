@@ -74,26 +74,6 @@ interface ModelDef {
 
 export const MODEL_CATALOG: Record<string, ModelDef> = {
   // Ollama — Cloud
-  "deepseek-v3.1:671b-cloud": {
-    name: "DeepSeek V3.1",
-    color: "#4B8BF5",
-    makeProvider: () =>
-      createOllamaProvider({
-        baseUrl: OLLAMA_CLOUD_URL,
-        apiKey: OLLAMA_CLOUD_API_KEY || undefined,
-        model: "deepseek-v3.1:671b-cloud",
-      }),
-  },
-  "deepseek-v3.2-cloud": {
-    name: "DeepSeek V3.2",
-    color: "#3B7BFF",
-    makeProvider: () =>
-      createOllamaProvider({
-        baseUrl: OLLAMA_CLOUD_URL,
-        apiKey: OLLAMA_CLOUD_API_KEY || undefined,
-        model: "deepseek-v3.2-cloud",
-      }),
-  },
   "devstral-small-2:24b-cloud": {
     name: "Devstral Small 2",
     color: "#FF7000",
@@ -465,9 +445,9 @@ export function buildAgents(
   personalityA?: string,
   personalityB?: string,
 ): Agent[] {
-  const defA =
-    MODEL_CATALOG[agentAId] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
-  const defB = MODEL_CATALOG[agentBId] ?? MODEL_CATALOG["deepseek-v3.2-cloud"];
+  const defA = MODEL_CATALOG[agentAId] ?? MODEL_CATALOG["kimi-k2:1t-cloud"];
+  const defB =
+    MODEL_CATALOG[agentBId] ?? MODEL_CATALOG["devstral-small-2:24b-cloud"];
 
   // Available personality archetypes
   const archetypes = Object.keys(PERSONALITY_ARCHETYPES);
@@ -633,7 +613,7 @@ const STORY_FINAL_SYSTEM_PROMPT = `You are a collaborative fiction writer writin
 
 export function buildStoryAgents(agentIds: string[]): Agent[] {
   return agentIds.map((id) => {
-    const def = MODEL_CATALOG[id] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
+    const def = MODEL_CATALOG[id] ?? MODEL_CATALOG["kimi-k2:1t-cloud"];
     return {
       id,
       name: def.name,
@@ -880,9 +860,9 @@ export function buildAdaptiveAgents(
     ? [agentBId, agentAId]
     : [agentAId, agentBId];
 
-  const defA =
-    MODEL_CATALOG[firstId] ?? MODEL_CATALOG["deepseek-v3.1:671b-cloud"];
-  const defB = MODEL_CATALOG[secondId] ?? MODEL_CATALOG["deepseek-v3.2-cloud"];
+  const defA = MODEL_CATALOG[firstId] ?? MODEL_CATALOG["kimi-k2:1t-cloud"];
+  const defB =
+    MODEL_CATALOG[secondId] ?? MODEL_CATALOG["devstral-small-2:24b-cloud"];
 
   const archetypes = Object.keys(PERSONALITY_ARCHETYPES);
   const archetypeA =
