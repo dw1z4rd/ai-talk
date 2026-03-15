@@ -1517,7 +1517,7 @@
   {#if showLiveJudgePanel}
     <div
       id="live-judge-panel"
-      class="flex flex-col gap-4 judge-panel"
+      class="flex flex-col gap-4 judge-panel judge-wide"
       out:shrinkFade={{ duration: 250 }}
     >
       <!-- Section header -->
@@ -1531,13 +1531,8 @@
         <div class="flex-1 h-px bg-[--color-border]"></div>
       </div>
 
-      <!-- 2-col grid: Scorecard/Fallback (left) + Recent Rounds (right) -->
-      <div
-        class="grid gap-4 items-start"
-        style="grid-template-columns: {currentLeader && pairwiseRounds.length > 0
-          ? 'minmax(0, 1.5fr) minmax(0, 1fr)'
-          : '1fr'}; transition: grid-template-columns 0.4s cubic-bezier(0.25, 1, 0.5, 1)"
-      >
+      <!-- Responsive main grid: left = scorecard, right = rounds + scores -->
+      <div class="judge-main-grid">
         <!-- Left column: Scorecard or Fallback + Language warning -->
         <div class="flex flex-col gap-3">
           <!-- Scorecard — win tallies -->
@@ -1624,90 +1619,95 @@
           {/if}
         </div>
 
-        <!-- Right column: Recent pairwise rounds -->
-        {#if pairwiseRounds.length > 0}
-          <div class="flex flex-col gap-3">
-            <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
-              Recent Rounds
-            </h3>
-            {#each pairwiseRounds.slice(-3).reverse() as round, i (round.roundNumber)}
-              {@const logicWinnerInfo = getModelInfo(round.logicWinner)}
-              {@const tacticsWinnerInfo = getModelInfo(round.tacticsWinner)}
-              {@const rhetoricWinnerInfo = getModelInfo(round.rhetoricWinner)}
-              <div
-                class="rounded-xl border bg-[--color-panel] p-3 judge-card"
-                style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-                out:shrinkFade={{ duration: 180 }}
-              >
-                <!-- Round header -->
-                <div class="flex items-center gap-2 mb-3">
-                  <span class="text-[10px] font-bold uppercase tracking-widest text-[--color-muted]">Round {round.roundNumber}</span>
-                  <span class="text-[10px] text-[--color-muted]">·</span>
-                  <span class="text-[10px] text-[--color-muted]">T{round.prevTurn.turnNumber} ({round.prevTurn.agentName}) vs T{round.curTurn.turnNumber} ({round.curTurn.agentName})</span>
-                  {#if round.isFallback}
-                    <span class="ml-auto text-[10px] text-yellow-500">fallback</span>
-                  {/if}
-                </div>
+        <!-- Right column: Recent Rounds + Turn Scores -->
+        {#if pairwiseRounds.length > 0 || liveJudgeResults.some(r => r.absoluteScores)}
+          <div class="flex flex-col gap-4">
+            <!-- Recent pairwise rounds -->
+            {#if pairwiseRounds.length > 0}
+              <div class="flex flex-col gap-3">
+                <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
+                  Recent Rounds
+                </h3>
+                {#each pairwiseRounds.slice(-3).reverse() as round, i (round.roundNumber)}
+                  {@const logicWinnerInfo = getModelInfo(round.logicWinner)}
+                  {@const tacticsWinnerInfo = getModelInfo(round.tacticsWinner)}
+                  {@const rhetoricWinnerInfo = getModelInfo(round.rhetoricWinner)}
+                  <div
+                    class="rounded-xl border bg-[--color-panel] p-3 judge-card"
+                    style="border-color: #7c6af720; animation-delay: {i * 70}ms"
+                    out:shrinkFade={{ duration: 180 }}
+                  >
+                    <!-- Round header -->
+                    <div class="flex items-center gap-2 mb-3 min-w-0">
+                      <span class="text-[10px] font-bold uppercase tracking-widest text-[--color-muted] shrink-0">Round {round.roundNumber}</span>
+                      <span class="text-[10px] text-[--color-muted] shrink-0">·</span>
+                      <span class="text-[10px] text-[--color-muted] min-w-0 truncate">T{round.prevTurn.turnNumber} ({round.prevTurn.agentName}) vs T{round.curTurn.turnNumber} ({round.curTurn.agentName})</span>
+                      {#if round.isFallback}
+                        <span class="ml-auto shrink-0 text-[10px] text-yellow-500">fallback</span>
+                      {/if}
+                    </div>
 
-                <!-- Winner chips -->
-                <div class="grid grid-cols-3 gap-2 mb-3">
-                  <div class="flex flex-col gap-1">
-                    <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Logic</span>
-                    <span class="text-xs font-semibold truncate" style="color: {logicWinnerInfo.color}">{logicWinnerInfo.name}</span>
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Tactics</span>
-                    <span class="text-xs font-semibold truncate" style="color: {tacticsWinnerInfo.color}">{tacticsWinnerInfo.name}</span>
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Rhetoric</span>
-                    <span class="text-xs font-semibold truncate" style="color: {rhetoricWinnerInfo.color}">{rhetoricWinnerInfo.name}</span>
-                  </div>
-                </div>
+                    <!-- Winner chips -->
+                    <div class="grid grid-cols-3 gap-2 mb-3">
+                      <div class="flex flex-col gap-1">
+                        <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Logic</span>
+                        <span class="text-xs font-semibold truncate" style="color: {logicWinnerInfo.color}">{logicWinnerInfo.name}</span>
+                      </div>
+                      <div class="flex flex-col gap-1">
+                        <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Tactics</span>
+                        <span class="text-xs font-semibold truncate" style="color: {tacticsWinnerInfo.color}">{tacticsWinnerInfo.name}</span>
+                      </div>
+                      <div class="flex flex-col gap-1">
+                        <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Rhetoric</span>
+                        <span class="text-xs font-semibold truncate" style="color: {rhetoricWinnerInfo.color}">{rhetoricWinnerInfo.name}</span>
+                      </div>
+                    </div>
 
-                <!-- Logic delta (2-3 sentences) -->
-                <div class="pt-2 border-t border-[--color-border]">
-                  <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.logicDelta}</p>
+                    <!-- Logic delta (2-3 sentences) -->
+                    <div class="pt-2 border-t border-[--color-border]">
+                      <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.logicDelta}</p>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+
+            <!-- Per-turn absolute scores -->
+            {#if liveJudgeResults.some(r => r.absoluteScores)}
+              {@const scoredTurns = liveJudgeResults.filter(r => r.absoluteScores)}
+              <div class="flex flex-col gap-2">
+                <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">Turn Scores</h3>
+                <div class="rounded-xl border bg-[--color-panel] overflow-hidden" style="border-color: #7c6af720">
+                  <div class="grid text-[10px] font-semibold uppercase tracking-wide text-[--color-muted] px-3 py-2 border-b border-[--color-border]" style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem">
+                    <span>Turn</span>
+                    <span>Agent</span>
+                    <span class="text-center">Logic</span>
+                    <span class="text-center">Rhet.</span>
+                    <span class="text-center">Tact.</span>
+                    <span class="text-center">Score</span>
+                  </div>
+                  {#each scoredTurns as r, i (r.turnNumber)}
+                    {@const info = getModelInfo(r.agentId)}
+                    {@const s = r.absoluteScores}
+                    <div
+                      class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
+                      style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i * 40}ms"
+                      out:shrinkFade={{ duration: 100 }}
+                    >
+                      <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
+                      <span class="font-medium truncate" style="color: {info.color}">{info.name}</span>
+                      <span class="text-center font-mono text-[11px]" title="Logic: {s.logicalCoherence}/40">{s.logicalCoherence}<span class="text-[--color-muted]">/40</span></span>
+                      <span class="text-center font-mono text-[11px]" title="Rhetoric: {s.rhetoricalForce}/30">{s.rhetoricalForce}<span class="text-[--color-muted]">/30</span></span>
+                      <span class="text-center font-mono text-[11px]" title="Tactics: {s.tacticalEffectiveness}/30">{s.tacticalEffectiveness}<span class="text-[--color-muted]">/30</span></span>
+                      <span class="text-center font-mono text-[11px] font-semibold" style="color: {info.color}">{s.overallScore}</span>
+                    </div>
+                  {/each}
                 </div>
               </div>
-            {/each}
+            {/if}
           </div>
         {/if}
       </div>
-
-      <!-- Per-turn absolute scores -->
-      {#if liveJudgeResults.some(r => r.absoluteScores)}
-        {@const scoredTurns = liveJudgeResults.filter(r => r.absoluteScores)}
-        <div class="flex flex-col gap-2">
-          <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">Turn Scores</h3>
-          <div class="rounded-xl border bg-[--color-panel] overflow-hidden" style="border-color: #7c6af720">
-            <div class="grid text-[10px] font-semibold uppercase tracking-wide text-[--color-muted] px-3 py-2 border-b border-[--color-border]" style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem">
-              <span>Turn</span>
-              <span>Agent</span>
-              <span class="text-center">Logic</span>
-              <span class="text-center">Rhet.</span>
-              <span class="text-center">Tact.</span>
-              <span class="text-center">Score</span>
-            </div>
-            {#each scoredTurns as r, i (r.turnNumber)}
-              {@const info = getModelInfo(r.agentId)}
-              {@const s = r.absoluteScores}
-              <div
-                class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
-                style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i * 40}ms"
-                out:shrinkFade={{ duration: 100 }}
-              >
-                <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
-                <span class="font-medium truncate" style="color: {info.color}">{info.name}</span>
-                <span class="text-center font-mono text-[11px]" title="Logic: {s.logicalCoherence}/40">{s.logicalCoherence}<span class="text-[--color-muted]">/40</span></span>
-                <span class="text-center font-mono text-[11px]" title="Rhetoric: {s.rhetoricalForce}/30">{s.rhetoricalForce}<span class="text-[--color-muted]">/30</span></span>
-                <span class="text-center font-mono text-[11px]" title="Tactics: {s.tacticalEffectiveness}/30">{s.tacticalEffectiveness}<span class="text-[--color-muted]">/30</span></span>
-                <span class="text-center font-mono text-[11px] font-semibold" style="color: {info.color}">{s.overallScore}</span>
-              </div>
-            {/each}
-          </div>
-        </div>
-      {/if}
 
       <!-- Narrative verdict (shown after debate completes) -->
       {#if narrativeVerdict}
@@ -1856,6 +1856,33 @@
   .judge-header {
     animation: judgeHeaderReveal 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
     animation-delay: 80ms;
+  }
+
+  /* Viewport breakout: 75vw on wide screens, full-width on mobile */
+  .judge-wide {
+    width: 100%;
+  }
+  @media (min-width: 860px) {
+    .judge-wide {
+      --jw: min(75vw, 1100px);
+      width: var(--jw);
+      margin-left: calc((100% - var(--jw)) / 2);
+    }
+  }
+
+  /* Responsive 2-col grid: stacks on mobile, side-by-side on 860px+ */
+  .judge-main-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  @media (min-width: 860px) {
+    .judge-main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+      align-items: start;
+      gap: 1.25rem;
+    }
   }
 
   .message-content :global(p) {
