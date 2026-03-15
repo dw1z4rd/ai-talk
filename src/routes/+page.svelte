@@ -1528,7 +1528,8 @@
         <div
           class="rounded-2xl border overflow-hidden bg-[--color-panel]"
           style="border-color: #7c6af740"
-          in:fly={{ y: 350, duration: 1000, easing: expoInOut }}
+          in:fly={{ y: 350, duration: 800, easing: expoInOut }}
+          out:fly={{ y: -350, duration: 800, easing: expoInOut }}
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
@@ -1579,7 +1580,8 @@
         <div
           class="rounded-2xl border overflow-hidden bg-[--color-panel]"
           style="border-color: #7c6af740"
-          in:fly={{ y: 350, duration: 1000, easing: expoInOut }}
+          in:fly={{ y: 350, duration: 800, easing: expoInOut }}
+          out:fly={{ y: -350, duration: 800, easing: expoInOut }}
         >
           <div class="px-4 py-3 flex items-center gap-3">
             <div
@@ -1614,7 +1616,8 @@
             <div
               class="rounded-xl border bg-[--color-panel] p-3"
               style="border-color: #7c6af720"
-              in:fly={{ y: 350, duration: 500, easing: expoInOut }}
+              in:fly={{ y: 350, duration: 800, easing: expoInOut }}
+          out:fly={{ y: -350, duration: 800, easing: expoInOut }}
             >
               <!-- Round header -->
               <div class="flex items-center gap-2 mb-3">
@@ -1668,7 +1671,8 @@
             {#each scoredTurns as r (r.turnNumber)}
               {@const info = getModelInfo(r.agentId)}
               {@const s = r.absoluteScores}
-              <div class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1" style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem" in:fly={{ y: 250, duration: 500, easing: expoInOut }}>
+              <div class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1" style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem" in:fly={{ y: 350, duration: 800, easing: expoInOut }} 
+          out:fly={{ y: -350, duration: 800, easing: expoInOut }}>
                 <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
                 <span class="font-medium truncate" style="color: {info.color}">{info.name}</span>
                 <span class="text-center font-mono text-[11px]" title="Logic: {s.logicalCoherence}/40">{s.logicalCoherence}<span class="text-[--color-muted]">/40</span></span>
@@ -1687,6 +1691,7 @@
           class="rounded-2xl border overflow-hidden bg-[--color-panel]"
           style="border-color: {narrativeVerdict.agreesWithScorecard ? '#7c6af740' : '#f59e0b40'}"
           in:fly={{ y: 350, duration: 800, easing: expoInOut }}
+          out:fly={{ y: -350, duration: 800, easing: expoInOut }}
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
