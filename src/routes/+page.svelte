@@ -2,7 +2,7 @@
   import Nav from "$lib/Nav.svelte";
   import { fade } from "svelte/transition";
   import { tick } from "svelte";
-  import { cubicInOut } from "svelte/easing";
+  import { cubicOut, cubicInOut } from "svelte/easing";
 
   function scaleFade(
   node: Element,
@@ -16,6 +16,28 @@
       `opacity: ${t}; transform: scale(${0.5 + 0.5 * t});`,
   };
 }
+
+function flyFade(
+    node: Element,
+    { duration = 500, delay = 0, easing = cubicOut, x = '100vw' } = {}
+  ) {
+    return {
+      delay,
+      duration,
+      easing,
+      css: (t: number) => {
+        // Opacity: Goes from 0 (invisible) to 1 (solid)
+
+        // X Offset: We want it to go from `x` to `0`.
+        // We use `(1 - t) * x` to calculate the current position.
+        // t=0 (hidden): (1 - 0) * 100vw = 100vw offset (off-screen right)
+        // t=1 (rendered): (1 - 1) * 100vw = 0 offset (its final position)
+        const xOffset = typeof x === 'number' ? `${(1 - t) * x}px` : `calc(${1 - t} * ${x})`;
+
+        return `opacity: ${t}; transform: translateX(${xOffset});`;
+      },
+    };
+  }
 
   const MODEL_OPTIONS = [
     {
@@ -856,7 +878,7 @@
 {#if showWinnerModal}
   <div
     class="fixed inset-0 z-50 flex items-center justify-center"
-    transition:scaleFade={{ duration: 500 }}
+    transition:flyFade={{ duration: 500 }}
   >
     <!-- Confetti canvas (sits behind modal content) -->
     <canvas
@@ -870,7 +892,7 @@
     <!-- Content -->
     <div
       class="relative z-10 flex flex-col items-center gap-6 text-center px-8"
-      transition:scaleFade={{ duration: 500 }}
+      transition:flyFade={{ duration: 500 }}
     >
       <!-- Glow + name -->
       <div class="relative">
@@ -1574,7 +1596,7 @@
     <div
       id="live-judge-panel"
       class="flex flex-col gap-4 judge-panel"
-      transition:scaleFade={{ duration: 500 }}
+      transition:flyFade={{ duration: 500 }}
     >
       <!-- Section header -->
       <div class="flex items-center gap-3 mt-2 judge-header">
@@ -1597,7 +1619,7 @@
             <div
               class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
               style="border-color: #7c6af740; animation-delay: 120ms"
-              transition:scaleFade={{ duration: 500 }}
+              transition:flyFade={{ duration: 500 }}
             >
               <div
                 class="flex items-center gap-3 px-4 py-3 border-b"
@@ -1698,7 +1720,7 @@
             <div
               class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
               style="border-color: #7c6af740; animation-delay: 120ms"
-              transition:scaleFade={{ duration: 500 }}
+              transition:flyFade={{ duration: 500 }}
             >
               <div class="px-4 py-3 flex items-center gap-3">
                 <div
@@ -1727,7 +1749,7 @@
             <div
               class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
               style="animation-delay: 0ms"
-              transition:scaleFade={{ duration: 500 }}
+              transition:flyFade={{ duration: 500 }}
             >
               {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
             </div>
@@ -1754,7 +1776,7 @@
                   <div
                     class="rounded-xl border bg-[--color-panel] p-3 judge-card"
                     style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-                    transition:scaleFade={{ duration: 500 }}
+                    transition:flyFade={{ duration: 500 }}
                   >
                     <!-- Round header -->
                     <div class="flex items-center gap-2 mb-3 min-w-0">
@@ -1860,7 +1882,7 @@
                       class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
                       style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i *
                         40}ms"
-                      transition:scaleFade={{ duration: 500 }}
+                      transition:flyFade={{ duration: 500 }}
                     >
                       <span class="text-[--color-muted] text-[11px]"
                         >T{r.turnNumber}</span
@@ -1910,7 +1932,7 @@
           style="border-color: {narrativeVerdict.agreesWithScorecard
             ? '#7c6af740'
             : '#f59e0b40'}; animation-delay: 150ms"
-          transition:scaleFade={{ duration: 500 }}
+          transition:flyFade={{ duration: 500 }}
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
