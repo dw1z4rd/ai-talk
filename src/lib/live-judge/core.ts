@@ -22,6 +22,7 @@ import {
   updateScorecard,
   synthScoresFromPairwise,
   generateNarrativeVerdictText,
+  generateConflictResolution,
 } from './analysis';
 import { generateAdaptivePressure } from './pressure';
 import { MODEL_CATALOG } from '$lib/agents';
@@ -173,6 +174,15 @@ export class LiveJudgeSystem {
         message
       };
 
+      const lastRound = this.panel.scorecard.rounds.length > 0
+        ? this.panel.scorecard.rounds[this.panel.scorecard.rounds.length - 1]
+        : undefined;
+
+      const previousLogicDelta =
+        lastRound && !lastRound.isFallback && lastRound.logicWeakerTurn === 'prev'
+          ? lastRound.logicDelta
+          : undefined;
+
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => {
@@ -187,7 +197,7 @@ export class LiveJudgeSystem {
             judge,
             prevAgentId, prevAgentName, prevMessage, prevTurnNumber,
             agent.id, agent.name, message, turnNumber,
-            topic, roundNumber, controller.signal
+            topic, roundNumber, controller.signal, previousLogicDelta
           ),
           analyzeTurn(
             judge, agent, message, opponent, opponentMessage,
@@ -293,7 +303,7 @@ export class LiveJudgeSystem {
         controller.abort();
       }, VERDICT_TIMEOUT_MS);
 
-      return await generateNarrativeVerdictText(
+      const verdict = await generateNarrativeVerdictText(
         judge,
         fullTranscript,
         agentA.id, agentA.name,
@@ -302,6 +312,38 @@ export class LiveJudgeSystem {
         this.panel.scorecard,
         controller.signal
       ).finally(() => clearTimeout(timer));
+
+      // When scorecard and narrative disagree, generate a conflict resolution adjudication.
+      if (!verdict.agreesWithScorecard && verdict.favouredAgentId) {
+        try {
+          const scorecardSummary = [agentA.id, agentB.id]
+            .map(id => {
+              const t = this.panel.scorecard.winTallies[id];
+              return t ? `${t.agentName}: Logic ${t.logic}, Tactics ${t.tactics}, Rhetoric ${t.rhetoric} (${t.total} total)` : '';
+            })
+            .filter(Boolean)
+            .join(' | ');
+          const scorecardWinnerName = this.panel.scorecard.overallWinner
+            ? (this.panel.scorecard.winTallies[this.panel.scorecard.overallWinner]?.agentName || 'Unknown')
+            : 'Draw';
+          const narrativeFavouredName = verdict.favouredAgentId === agentA.id ? agentA.name : agentB.name;
+
+          const adjController = new AbortController();
+          const adjTimer = setTimeout(() => adjController.abort(), 20_000);
+          const conflictResolutionText = await generateConflictResolution(
+            judge, scorecardWinnerName, narrativeFavouredName,
+            scorecardSummary, verdict.text, adjController.signal
+          ).finally(() => clearTimeout(adjTimer));
+          const trimmedConflictResolution = conflictResolutionText.trim();
+          if (trimmedConflictResolution.length > 0) {
+            verdict.conflictResolution = trimmedConflictResolution;
+          }
+        } catch {
+          // Adjudication failed — non-critical
+        }
+      }
+
+      return verdict;
     } catch (error) {
       console.error('[Narrative Judge] generateNarrativeVerdict threw:', error);
       return null;

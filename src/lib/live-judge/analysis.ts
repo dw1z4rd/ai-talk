@@ -112,7 +112,8 @@ export async function compareTurns(
   curTurnNumber: number,
   topic: string,
   roundNumber: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  previousLogicDelta?: string
 ): Promise<PairwiseRound> {
   const langCheck = detectLanguageMismatch(prevMessage, curMessage);
   if (!langCheck.isConsistent) {
@@ -124,7 +125,7 @@ export async function compareTurns(
   const prompt = generatePairwisePrompt(
     prevAgentName, prevMessage, prevTurnNumber,
     curAgentName, curMessage, curTurnNumber,
-    topic, isOpeningRound
+    topic, isOpeningRound, previousLogicDelta
   );
 
   const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
@@ -164,7 +165,7 @@ export function generatePairwiseSystemPrompt(nameA: string, nameB: string, domai
   return `You are a comparative debate judge. Read two consecutive turns and pick the stronger one on three dimensions. No draws — you must choose one winner per dimension. Respond with a single JSON object only — no preamble, no markdown.
 
 Required format (use exact agent names as shown):
-{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn — e.g. 'Asserted X without explaining mechanism Y' or 'Strawmanned the relational view by conflating Z with W.' Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn landed harder and why."}
+{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn — e.g. 'Asserted X without explaining mechanism Y' or 'Strawmanned the relational view by conflating Z with W.' Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn was more persuasive across all four components and why."}
 
 --- LOGIC (forced choice) ---
 Start each turn from 8. Apply deductions:
@@ -179,36 +180,55 @@ Winner = higher remaining score. If equal, award the turn whose core claim still
 
 EXCEPTIONS: Do not penalize thought experiments or illustrative hypotheticals as "unverified facts." Judge the mechanism, not the historical precision.
 
+Argumentative stagnation: if a turn restates a prior claim without new evidence, mechanism, or development (see PREVIOUS ROUND NOTE if provided), treat it as a failed advance: −1.
+Thesis drift: if a turn introduces a position that contradicts the debater's earlier stance (visible from PREVIOUS ROUND NOTE), penalize −1 for incoherence.
+
+Strong analogy: a well-constructed analogy that draws a precise structural distinction — where the mapping between domains is explicit and the resulting insight is novel — earns a +1 LOGIC bonus if the structural mapping is valid. A decorative analogy used for rhetorical effect (no structural insight, no new distinction) earns nothing in LOGIC; evaluate it under RHETORIC.
+
+Claim types: distinguish before applying evidentiary standards:
+- Conceptual/definitional claims: assess on internal coherence. Penalizing for lack of empirical evidence is a scoring error.
+- Empirical claims: assess on evidentiary grounding and mechanism.
+- Normative claims: assess on consistency with the stated normative framework.
+
 --- TACTICS (forced choice) ---
 Which turn controlled the exchange? Did it target the opponent's strongest point, expose a real weakness, or redirect to better ground?
 OPENING TURN (no previous opponent to rebut): Judge on framing quality — does it stake a defensible position and anticipate the strongest counterargument? Minimum is competitive framing.
 
+Undefined comparative/superlative: if the motion contains an undefined superlative (e.g., "most X", "best Y") and a turn argues toward that superlative without first establishing a measurement standard, it has a foundational framing gap: −1 tactics. A turn that defines the evaluation metric earns a +1 framing bonus.
+
 --- RHETORIC (forced choice) ---
-Which turn was more memorable and persuasive? Evaluate on four components:
-1. Vividness — concrete and specific beats vague and academic; short and punchy beats padded and hedged. This is ONE component, not the whole rubric.
+Which turn was more persuasive and intellectually resonant? Evaluate on four equally-weighted components:
+1. Expression quality — concrete and specific beats vague and academic; appropriate brevity beats padding. ONE component, not the whole rubric: do NOT let stylistic punchiness dominate. A structurally clear, plainly-expressed turn can outscore a vivid but weakly-structured one.
 2. Structural clarity — is the argument easy to follow? Clear signposting beats rambling.
-3. Audience awareness — does the turn speak to the stakes and frame things in terms the audience cares about?
+3. Audience awareness — does the turn speak to the stakes in terms the audience cares about?
 4. Framing quality — does the turn define or reframe the central question to its own advantage?
-Winner = the turn that is stronger across these four components in aggregate.
+Winner = the turn that is stronger across all four in aggregate.
+ANTI-PUNCHINESS: Expression quality carries ONE vote out of four. Framing discipline and structural clarity are equally weighted. A vivid delivery style does not compensate for weak structure or poor framing.
 
 --- DOMAIN CONTEXT ---
 ${domainNote}
 
 --- ANTI-BIAS ---
 Tone ≠ Logic. Academic register does not indicate sound reasoning. Confidence does not substitute for evidence. Apply identical evidentiary standards to both turns.
-Citation ≠ Correctness. Cited precision that is mechanistically hollow is not stronger than uncited reasoning with a complete causal chain.`;
+Citation ≠ Correctness. Cited precision that is mechanistically hollow is not stronger than uncited reasoning with a complete causal chain.
+Style ≠ Rhetoric. Punchiness and brevity alone do not constitute superior rhetoric. Framing quality and structural clarity carry equal weight.`;
 }
 
 export function generatePairwisePrompt(
   nameA: string, messageA: string, turnA: number,
   nameB: string, messageB: string, turnB: number,
-  topic: string, isOpeningRound: boolean
+  topic: string, isOpeningRound: boolean,
+  previousLogicDelta?: string
 ): string {
   const openingNote = isOpeningRound
     ? `\n[NOTE: Turn ${turnA} is the OPENING statement — ${nameA} spoke first with no opponent yet. Apply OPENING TURN rules to their turn.]`
     : '';
 
-  return `DEBATE TOPIC: ${topic}${openingNote}
+  const prevDeltaNote = previousLogicDelta
+    ? `\n[PREVIOUS ROUND JUDGE NOTE: "${previousLogicDelta}" — use this to detect argumentative stagnation or thesis drift in the current turns.]`
+    : '';
+
+  return `DEBATE TOPIC: ${topic}${openingNote}${prevDeltaNote}
 
 TURN ${turnA} — ${nameA}:
 "${messageA}"
@@ -508,6 +528,51 @@ function parseNarrativeVerdict(
   return { text: displayText, favouredAgentId, agreesWithScorecard };
 }
 
+/**
+ * Generate a 2-3 sentence adjudication when the narrative verdict disagrees with
+ * the round-by-round scorecard. Explains why they diverged and which is better supported.
+ */
+export async function generateConflictResolution(
+  judge: LiveJudge,
+  scorecardWinnerName: string,
+  narrativeFavouredName: string,
+  scorecardSummary: string,
+  narrativeText: string,
+  signal?: AbortSignal
+): Promise<string> {
+  const systemPrompt = `You are a meta-analyst adjudicating a conflict between two debate judging systems. Write exactly 3 sentences: (1) Why they diverged — identify the structural difference between turn-by-turn logic assessment and arc-level coherence. (2) Which verdict better reflects overall debate quality and why. (3) What the losing verdict got right despite picking the wrong winner. Be specific. Do not hedge.`;
+
+  const prompt = `SCORECARD WINNER: ${scorecardWinnerName}
+NARRATIVE VERDICT FAVOURS: ${narrativeFavouredName}
+
+SCORECARD SUMMARY:
+${scorecardSummary}
+
+NARRATIVE VERDICT (excerpt):
+${narrativeText.slice(0, 500)}
+
+Write your adjudication:`;
+
+  const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
+  try {
+    const text = await judgeProvider.generateText(prompt, {
+      systemPrompt,
+      temperature: 0.4,
+      maxTokens: 220,
+      signal
+    });
+
+    // Strip thinking blocks
+    const cleaned = (text || '')
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .trim();
+    return cleaned;
+  } catch {
+    return '';
+  }
+}
+
 // ── Legacy per-turn analysis (used only for adaptive pressure) ────────────────
 
 /**
@@ -588,24 +653,28 @@ SCORING PHILOSOPHY: A competent-but-unremarkable argument scores 5–6. Reserve 
 Start at 8. -1 unsupported assumption, -2 significant leap, -3 logical error, -4 multiple errors. +1 if every claim has explicit causal chain.
 Hollow specificity is penalizable: a specific number, percentage, or named study without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account.
 Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
+Strong analogy: a well-constructed analogy mapping a precise structural distinction earns +1 if the mapping is valid and the insight is novel. A decorative analogy earns nothing here.
+Claim types: conceptual/definitional claims assessed on internal coherence (not empirical evidence); empirical claims need mechanism; normative claims need framework consistency.
 
 --- RHETORIC (1–10) ---
-Evaluate on four components in aggregate:
-1. Vividness — 9–10: punchy and memorable; 5–6: flat or over-hedged; 3–4: dry or relies on mockery. This is ONE component, not the whole rubric.
+Evaluate on four equally-weighted components in aggregate:
+1. Expression quality — 9–10: clear, concrete, appropriately concise; 5–6: flat or over-hedged; 3–4: dry or padded. ONE component, not the whole rubric: do NOT let punchiness dominate.
 2. Structural clarity — is the argument easy to follow? Clear signposting beats rambling.
 3. Audience awareness — does it speak to the stakes in terms the audience cares about?
 4. Framing quality — does it define or reframe the central question to its advantage?
+ANTI-PUNCHINESS: Expression quality carries ONE vote out of four. Do not reward stylistic energy as a proxy for persuasive quality.
 
 --- TACTICS (1–10) ---
 Opening turn: score on framing quality, min 5. Other turns: 9–10 targets a specific gap with a named move; 5–6 mostly restates position; 1–2 ignores opponent.
+Undefined comparative/superlative: if the motion has an undefined superlative and this turn argues toward it without establishing a metric, −1 tactics.
 
 --- DOMAIN CONTEXT ---
 ${domainNote}
 
-ANTI-BIAS: Tone ≠ Logic. Academic phrasing ≠ rigorous reasoning. Citation ≠ Correctness.`;
+ANTI-BIAS: Tone ≠ Logic. Academic phrasing ≠ rigorous reasoning. Citation ≠ Correctness. Style ≠ Rhetoric.`;
 }
 
-function parseJudgeAnalysis(
+export function parseJudgeAnalysis(
   analysisText: string | null, judge: LiveJudge, agent: Agent, opponent: Agent,
   turnNumber: number, message: string, opponentMessage: string, context: string
 ): TurnAnalysis {

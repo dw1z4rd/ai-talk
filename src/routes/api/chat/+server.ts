@@ -124,6 +124,7 @@ export const POST: RequestHandler = async ({ request }) => {
 								text: narrativeVerdict.text,
 								favouredAgentId: narrativeVerdict.favouredAgentId,
 								agreesWithScorecard: narrativeVerdict.agreesWithScorecard,
+								conflictResolution: narrativeVerdict.conflictResolution ?? null,
 							});
 						}
 					} catch (err) {

@@ -9,6 +9,7 @@ import {
   generatePairwiseSystemPrompt,
   classifyDebateDomain,
   createFallbackAnalysis,
+  parseJudgeAnalysis,
 } from './analysis';
 import type { DebateScorecard, PairwiseRound, MomentumTracker, FrameControlTracker, LiveJudge } from './types';
 import { JUDGE_SPECIALIZATION_CONFIGS } from './types';
@@ -379,7 +380,7 @@ describe('opener penalty verification', () => {
 
   it('system prompt contains four-component rhetoric rubric', () => {
     const sp = generatePairwiseSystemPrompt('Alice', 'Bob');
-    expect(sp).toContain('Vividness');
+    expect(sp).toContain('Expression quality');
     expect(sp).toContain('Structural clarity');
     expect(sp).toContain('Audience awareness');
     expect(sp).toContain('Framing quality');
@@ -437,5 +438,88 @@ describe('createFallbackAnalysis score ranges', () => {
     expect(result.scores.tacticalEffectiveness).toBeLessThanOrEqual(30);
     expect(result.scores.overallScore).toBeGreaterThanOrEqual(10);
     expect(result.scores.overallScore).toBeLessThanOrEqual(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseJudgeAnalysis bounds (Issue 9 regression guard)
+// ---------------------------------------------------------------------------
+
+describe('parseJudgeAnalysis bounds', () => {
+  const config = JUDGE_SPECIALIZATION_CONFIGS['balance'];
+  const mockJudge: LiveJudge = {
+    id: 'j', name: 'Test Judge', modelId: 'gpt-oss:120b-cloud',
+    specialization: 'balance',
+    scoringWeights: config.scoringWeights,
+    biasProfile: config.typicalBias,
+    lastAnalysis: null,
+    analysisCount: 0
+  };
+  const mockAgent = { id: 'a', name: 'Agent A' } as any;
+  const mockOpponent = { id: 'b', name: 'Agent B' } as any;
+
+  it('model returning 10/10/10 maps to exactly 40/30/30 (ceiling enforced)', () => {
+    const result = parseJudgeAnalysis(
+      '{"logic_score":10,"rhetoric_score":10,"tactics_score":10,"analysis":"Perfect turn."}',
+      mockJudge, mockAgent, mockOpponent, 1, 'msg', 'opp', 'ctx'
+    );
+    expect(result.scores.logicalCoherence).toBe(40);
+    expect(result.scores.rhetoricalForce).toBe(30);
+    expect(result.scores.tacticalEffectiveness).toBe(30);
+    expect(result.scores.overallScore).toBe(100);
+  });
+
+  it('model returning 1/1/1 maps to 4/3/3', () => {
+    const result = parseJudgeAnalysis(
+      '{"logic_score":1,"rhetoric_score":1,"tactics_score":1,"analysis":"Weak turn."}',
+      mockJudge, mockAgent, mockOpponent, 1, 'msg', 'opp', 'ctx'
+    );
+    expect(result.scores.logicalCoherence).toBe(4);
+    expect(result.scores.rhetoricalForce).toBe(3);
+    expect(result.scores.tacticalEffectiveness).toBe(3);
+  });
+
+  it('returns fallback scores for invalid JSON', () => {
+    const result = parseJudgeAnalysis(
+      'not valid json at all',
+      mockJudge, mockAgent, mockOpponent, 1, 'msg', 'opp', 'ctx'
+    );
+    expect(result.scores.logicalCoherence).toBe(20);
+    expect(result.scores.rhetoricalForce).toBe(15);
+    expect(result.scores.tacticalEffectiveness).toBe(15);
+  });
+
+  it('returns fallback for null input', () => {
+    const result = parseJudgeAnalysis(
+      null,
+      mockJudge, mockAgent, mockOpponent, 1, 'msg', 'opp', 'ctx'
+    );
+    expect(result.scores.logicalCoherence).toBe(20);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generatePairwisePrompt with previousLogicDelta
+// ---------------------------------------------------------------------------
+
+describe('generatePairwisePrompt previousLogicDelta injection', () => {
+  it('injects PREVIOUS ROUND JUDGE NOTE when previousLogicDelta is provided', () => {
+    const prompt = generatePairwisePrompt(
+      'Alice', 'Argument A', 3,
+      'Bob', 'Argument B', 4,
+      'Is AI conscious?', false,
+      'Alice failed to address the hard problem of consciousness.'
+    );
+    expect(prompt).toContain('PREVIOUS ROUND JUDGE NOTE');
+    expect(prompt).toContain('Alice failed to address the hard problem');
+  });
+
+  it('does NOT inject PREVIOUS ROUND JUDGE NOTE when previousLogicDelta is omitted', () => {
+    const prompt = generatePairwisePrompt(
+      'Alice', 'Argument A', 3,
+      'Bob', 'Argument B', 4,
+      'Is AI conscious?', false
+    );
+    expect(prompt).not.toContain('PREVIOUS ROUND JUDGE NOTE');
   });
 });

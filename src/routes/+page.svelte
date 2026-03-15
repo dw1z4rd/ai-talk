@@ -413,14 +413,28 @@
       }
 
       if (narrativeVerdict?.text) {
-        content += "\n\n---\n\n## Narrative Verdict\n\n";
+        content += "\n\n---\n\n## Narrative Verdict\n_Arc-level: rewards cumulative thesis coherence_\n\n";
         content += narrativeVerdict.text + "\n";
         if (narrativeVerdict.favouredAgentId) {
           content += `\n**Verdict: ${getModelInfo(narrativeVerdict.favouredAgentId).name}**\n`;
         }
         if (!narrativeVerdict.agreesWithScorecard) {
           content += `\n> ⚡ Narrative verdict disagrees with the round-by-round scorecard.\n`;
+          if (narrativeVerdict.conflictResolution) {
+            content += `\n> **Why they diverged:** ${narrativeVerdict.conflictResolution}\n`;
+          }
         }
+      }
+
+      const scoredResults = liveJudgeResults.filter((r: any) => r.absoluteScores);
+      if (scoredResults.length > 0) {
+        content += "\n\n---\n\n## Per-Turn Absolute Scores\n_Turn-by-turn: Logic/40 · Rhetoric/30 · Tactics/30_\n\n";
+        content += "| Turn | Agent | Logic/40 | Rhetoric/30 | Tactics/30 | Score |\n";
+        content += "|------|-------|----------|-------------|------------|-------|\n";
+        scoredResults.forEach((r: any) => {
+          const s = r.absoluteScores;
+          content += `| T${r.turnNumber} | ${getModelInfo(r.agentId).name} | ${s.logicalCoherence} | ${s.rhetoricalForce} | ${s.tacticalEffectiveness} | ${s.overallScore} |\n`;
+        });
       }
 
       mime = "text/markdown";
@@ -457,6 +471,16 @@
         if (narrativeVerdict.favouredAgentId) {
           content += `\nVerdict: ${getModelInfo(narrativeVerdict.favouredAgentId).name}\n`;
         }
+        content += "\n";
+      }
+
+      const scoredResultsTxt = liveJudgeResults.filter((r: any) => r.absoluteScores);
+      if (scoredResultsTxt.length > 0) {
+        content += `${"═".repeat(40)}\nPER-TURN SCORES\n\n`;
+        scoredResultsTxt.forEach((r: any) => {
+          const s = r.absoluteScores;
+          content += `T${r.turnNumber}  ${getModelInfo(r.agentId).name}  Logic:${s.logicalCoherence}/40  Rhetoric:${s.rhetoricalForce}/30  Tactics:${s.tacticalEffectiveness}/30  Score:${s.overallScore}\n`;
+        });
         content += "\n";
       }
 
@@ -714,7 +738,8 @@
             narrativeVerdict = {
               text: data.text,
               favouredAgentId: data.favouredAgentId,
-              agreesWithScorecard: data.agreesWithScorecard
+              agreesWithScorecard: data.agreesWithScorecard,
+              conflictResolution: data.conflictResolution ?? null,
             };
 
           } else if (data.type === "finalScorecard") {
@@ -1507,7 +1532,7 @@
             style="border-color: #7c6af725; background: #7c6af708"
           >
             <span class="text-sm font-bold" style="color: #c084fc">Scorecard</span>
-            <span class="text-[10px] text-[--color-muted] ml-1">round wins — boxing scorecard</span>
+            <span class="text-[10px] text-[--color-muted] ml-1">turn-by-turn · per-round argument quality</span>
           </div>
           <div class="px-4 py-3 flex flex-col gap-2">
             {#each Object.entries(tallies) as [agentId, tally]}
@@ -1664,9 +1689,12 @@
             class="flex items-center gap-3 px-4 py-3 border-b"
             style="border-color: {narrativeVerdict.agreesWithScorecard ? '#7c6af725' : '#f59e0b25'}; background: {narrativeVerdict.agreesWithScorecard ? '#7c6af708' : '#f59e0b08'}"
           >
-            <span class="text-sm font-bold" style="color: {narrativeVerdict.agreesWithScorecard ? '#c084fc' : '#fbbf24'}">
-              {narrativeVerdict.agreesWithScorecard ? 'Narrative Verdict' : '⚡ Narrative Disagrees with Scorecard'}
-            </span>
+            <div class="flex flex-col">
+              <span class="text-sm font-bold" style="color: {narrativeVerdict.agreesWithScorecard ? '#c084fc' : '#fbbf24'}">
+                {narrativeVerdict.agreesWithScorecard ? 'Narrative Verdict' : '⚡ Narrative Disagrees with Scorecard'}
+              </span>
+              <span class="text-[10px] text-[--color-muted]">arc-level · cumulative thesis coherence</span>
+            </div>
             {#if narrativeVerdict.favouredAgentId}
               {@const favouredInfo = getModelInfo(narrativeVerdict.favouredAgentId)}
               <span class="ml-auto text-xs font-semibold" style="color: {favouredInfo.color}">→ {favouredInfo.name}</span>
@@ -1675,6 +1703,14 @@
           <div class="px-4 py-4">
             <p class="text-sm text-[--color-muted-fg] leading-relaxed whitespace-pre-line">{narrativeVerdict.text}</p>
           </div>
+          {#if narrativeVerdict.conflictResolution}
+            <div class="px-4 pb-4 pt-0">
+              <div class="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
+                <p class="text-[11px] font-semibold text-amber-400 mb-1">Why they diverged</p>
+                <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{narrativeVerdict.conflictResolution}</p>
+              </div>
+            </div>
+          {/if}
         </div>
       {/if}
 
