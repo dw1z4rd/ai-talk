@@ -1828,6 +1828,7 @@
             <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
               Recent Rounds
             </h3>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
             {#each pairwiseRounds
               .slice(-3)
               .reverse() as round, i (round.roundNumber)}
@@ -1910,6 +1911,7 @@
                 </div>
               </div>
             {/each}
+            </div>
           </div>
         {/if}
 
@@ -2092,14 +2094,6 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-  }
-  @media (min-width: 860px) {
-    .judge-main-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
-      align-items: start;
-      gap: 1.25rem;
-    }
   }
 
   .message-content :global(p) {
