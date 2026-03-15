@@ -14,6 +14,7 @@ import {
   generateRubricHarmonization,
   computeHarmonizationFlags,
   detectPositionalConvergence,
+  generateNarrativeVerdictText,
 } from "./analysis";
 import type {
   DebateScorecard,
@@ -1710,5 +1711,137 @@ describe("detectPositionalConvergence", () => {
       "topic",
     );
     expect(result.motionViability).toBe("inconclusive");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseNarrativeVerdict — last-VERDICT-wins regression (false-positive bug)
+// ---------------------------------------------------------------------------
+
+describe("generateNarrativeVerdictText — VERDICT extraction uses last match", () => {
+  const config = JUDGE_SPECIALIZATION_CONFIGS["balance"];
+  const narrativeJudge: LiveJudge = {
+    id: "j",
+    name: "Test Judge",
+    modelId: "gpt-oss:120b-cloud",
+    specialization: "balance",
+    scoringWeights: config.scoringWeights,
+    biasProfile: config.typicalBias,
+    lastAnalysis: null,
+    analysisCount: 0,
+  };
+
+  function makeMinimalScorecard(
+    agentAId: string,
+    agentAName: string,
+    agentBId: string,
+    agentBName: string,
+    winner: string,
+  ): DebateScorecard {
+    return {
+      rounds: [
+        makeRound(
+          agentAId,
+          agentAName,
+          agentBId,
+          agentBName,
+          winner,
+          winner,
+          winner,
+        ),
+      ],
+      winTallies: {
+        [agentAId]: {
+          agentId: agentAId,
+          agentName: agentAName,
+          logic: agentAId === winner ? 1 : 0,
+          tactics: agentAId === winner ? 1 : 0,
+          rhetoric: agentAId === winner ? 1 : 0,
+          total: agentAId === winner ? 3 : 0,
+        },
+        [agentBId]: {
+          agentId: agentBId,
+          agentName: agentBName,
+          logic: agentBId === winner ? 1 : 0,
+          tactics: agentBId === winner ? 1 : 0,
+          rhetoric: agentBId === winner ? 1 : 0,
+          total: agentBId === winner ? 3 : 0,
+        },
+      },
+      overallWinner: winner,
+    };
+  }
+
+  beforeEach(() => {
+    mockGenerateText.mockClear();
+  });
+
+  it("picks the terminal VERDICT line when an earlier mid-prose mention names a different agent", async () => {
+    // The LLM writes "VERDICT: GLM-4.6 had more round wins" in body prose,
+    // then the true terminal line says "VERDICT: GPT-OSS 120B".
+    mockGenerateText.mockResolvedValue(
+      `GLM-4.6 constructed a coherent opening but faltered in later exchanges.\n` +
+        `GPT-OSS 120B pressed the functional-competence gap effectively.\n` +
+        `Despite the scorecard suggesting VERDICT: GLM-4.6 had more wins, the arc-level reading favours the other side.\n` +
+        `VERDICT: GPT-OSS 120B`,
+    );
+
+    const transcript: Message[] = [
+      { agentId: "a", agentName: "GLM-4.6", text: "Opening argument." },
+      { agentId: "b", agentName: "GPT-OSS 120B", text: "Counter argument." },
+    ];
+    const scorecard = makeMinimalScorecard(
+      "a",
+      "GLM-4.6",
+      "b",
+      "GPT-OSS 120B",
+      "a",
+    );
+
+    const result = await generateNarrativeVerdictText(
+      narrativeJudge,
+      transcript,
+      "a",
+      "GLM-4.6",
+      "b",
+      "GPT-OSS 120B",
+      "topic",
+      scorecard,
+    );
+
+    expect(result.favouredAgentId).toBe("b"); // terminal VERDICT: GPT-OSS 120B
+    // Display text must not contain any raw VERDICT: token
+    expect(result.text).not.toMatch(/^VERDICT:/im);
+  });
+
+  it("correctly identifies the winner when there is only one VERDICT line at the end", async () => {
+    mockGenerateText.mockResolvedValue(
+      `Both debaters engaged the core tension.\nGLM-4.6 held position better across the arc.\nVERDICT: GLM-4.6`,
+    );
+    const transcript: Message[] = [
+      { agentId: "a", agentName: "GLM-4.6", text: "Arg." },
+      { agentId: "b", agentName: "GPT-OSS 120B", text: "Counter." },
+    ];
+    const scorecard = makeMinimalScorecard(
+      "a",
+      "GLM-4.6",
+      "b",
+      "GPT-OSS 120B",
+      "a",
+    );
+
+    const result = await generateNarrativeVerdictText(
+      narrativeJudge,
+      transcript,
+      "a",
+      "GLM-4.6",
+      "b",
+      "GPT-OSS 120B",
+      "topic",
+      scorecard,
+    );
+
+    expect(result.favouredAgentId).toBe("a");
+    expect(result.text).not.toMatch(/^VERDICT:/im);
   });
 });

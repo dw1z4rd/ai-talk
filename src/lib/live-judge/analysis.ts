@@ -887,12 +887,15 @@ function parseNarrativeVerdict(
     .replace(/<think>[\s\S]*?<\/think>/gi, "")
     .trim();
 
-  // Extract VERDICT line
-  const verdictMatch = cleaned.match(/VERDICT:\s*(.+?)(?:\n|$)/i);
+  // Extract VERDICT line — the system prompt instructs the LLM to place it at the
+  // very end, but LLMs sometimes write "VERDICT: X because..." in body prose first.
+  // Take the LAST match to avoid false positives from mid-prose mentions.
+  const allVerdictMatches = [...cleaned.matchAll(/^VERDICT:\s*(.+?)$/gim)];
   let favouredAgentId: string | null = null;
 
-  if (verdictMatch) {
-    const verdictName = verdictMatch[1].trim();
+  if (allVerdictMatches.length > 0) {
+    const verdictName =
+      allVerdictMatches[allVerdictMatches.length - 1][1].trim();
     if (verdictName.toLowerCase().includes(agentAName.toLowerCase())) {
       favouredAgentId = agentAId;
     } else if (verdictName.toLowerCase().includes(agentBName.toLowerCase())) {
@@ -902,8 +905,12 @@ function parseNarrativeVerdict(
 
   const agreesWithScorecard =
     favouredAgentId !== null && favouredAgentId === scorecard.overallWinner;
-  // Remove the VERDICT line from display text
-  const displayText = cleaned.replace(/VERDICT:\s*.+?(?:\n|$)/i, "").trim();
+  // Remove all VERDICT lines from display text (covers both the terminal line and
+  // any mid-prose mentions the LLM may have written).
+  const displayText = cleaned
+    .replace(/^VERDICT:\s*.+?$/gim, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   return { text: displayText, favouredAgentId, agreesWithScorecard };
 }
@@ -1491,7 +1498,12 @@ export async function detectPositionalConvergence(
   const lateB = agentBTurns.slice(-2);
 
   // Require at least 2 early and 2 late turns per agent to make a meaningful comparison.
-  if (earlyA.length < 2 || lateA.length < 2 || earlyB.length < 2 || lateB.length < 2) {
+  if (
+    earlyA.length < 2 ||
+    lateA.length < 2 ||
+    earlyB.length < 2 ||
+    lateB.length < 2
+  ) {
     return fallback;
   }
 
