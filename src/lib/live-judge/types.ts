@@ -100,7 +100,7 @@ export interface NarrativeVerdict {
   text: string;
   favouredAgentId: string | null;
   agreesWithScorecard: boolean;
-  /** 2-3 sentence adjudication explaining why scorecard and narrative diverged, populated only when agreesWithScorecard is false. */
+  /** Exactly 3 sentence adjudication explaining why scorecard and narrative diverged, populated only when agreesWithScorecard is false. */
   conflictResolution?: string;
 }
 
