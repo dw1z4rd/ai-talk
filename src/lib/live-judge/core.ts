@@ -24,6 +24,7 @@ import {
   synthScoresFromPairwise,
   generateNarrativeVerdictText,
   generateConflictResolution,
+  generateScorecardSplitNote,
   generateRubricHarmonization,
   computeHarmonizationFlags,
   detectPositionalConvergence,
@@ -480,18 +481,50 @@ export class LiveJudgeSystem {
         controller.signal,
       ).finally(() => clearTimeout(timer));
 
+      // Compute scorecard internal consistency unconditionally — the round-count leader
+      // (overallWinner) and cumulative-points leader may differ even when the narrative
+      // agrees with the round-count winner. Both splits must always be surfaced.
+      const tallies = Object.values(this.panel.scorecard.winTallies);
+      const maxWins =
+        tallies.length >= 2 ? Math.max(...tallies.map((t) => t.total)) : -1;
+      const winCountLeaders = tallies.filter((t) => t.total === maxWins);
+      // In a tie there is no single win-count leader; skip the consistency check.
+      const winCountLeader =
+        winCountLeaders.length === 1 ? winCountLeaders[0].agentName : null;
+
+      const pointsTotals = Object.entries(this.panel.currentScores)
+        .map(([id, s]) => ({
+          id,
+          agentName: s.agentName,
+          total: s.totalScore,
+        }))
+        .sort((a, b) => b.total - a.total);
+      const maxPoints = pointsTotals[0]?.total ?? -Infinity;
+      // In a points tie there is also no single leader; skip the consistency check.
+      const pointsLeaderName =
+        pointsTotals.filter((p) => p.total === maxPoints).length === 1
+          ? (pointsTotals[0]?.agentName ?? null)
+          : null;
+
+      const scorecardInternallyConsistent =
+        winCountLeader !== null &&
+        pointsLeaderName !== null &&
+        winCountLeader === pointsLeaderName;
+      verdict.scorecardInternallyConsistent = scorecardInternallyConsistent;
+
+      const scorecardSummary = [agentA.id, agentB.id]
+        .map((id) => {
+          const t = this.panel.scorecard.winTallies[id];
+          return t
+            ? `${t.agentName}: Logic ${t.logic}, Tactics ${t.tactics}, Rhetoric ${t.rhetoric} (${t.total} total)`
+            : "";
+        })
+        .filter(Boolean)
+        .join(" | ");
+
       // When scorecard and narrative disagree, generate a conflict resolution adjudication.
       if (!verdict.agreesWithScorecard && verdict.favouredAgentId) {
         try {
-          const scorecardSummary = [agentA.id, agentB.id]
-            .map((id) => {
-              const t = this.panel.scorecard.winTallies[id];
-              return t
-                ? `${t.agentName}: Logic ${t.logic}, Tactics ${t.tactics}, Rhetoric ${t.rhetoric} (${t.total} total)`
-                : "";
-            })
-            .filter(Boolean)
-            .join(" | ");
           const scorecardWinnerName = this.panel.scorecard.overallWinner
             ? this.panel.scorecard.winTallies[
                 this.panel.scorecard.overallWinner
@@ -499,35 +532,6 @@ export class LiveJudgeSystem {
             : "Draw";
           const narrativeFavouredName =
             verdict.favouredAgentId === agentA.id ? agentA.name : agentB.name;
-
-          // Determine whether the scorecard is internally self-consistent:
-          // do the win-count leader and the cumulative-points leader agree?
-          const tallies = Object.values(this.panel.scorecard.winTallies);
-          const maxWins = tallies.length >= 2 ? Math.max(...tallies.map((t) => t.total)) : -1;
-          const winCountLeaders = tallies.filter((t) => t.total === maxWins);
-          // In a tie there is no single win-count leader; skip the consistency check.
-          const winCountLeader =
-            winCountLeaders.length === 1 ? winCountLeaders[0].agentName : null;
-
-          const pointsTotals = Object.entries(this.panel.currentScores)
-            .map(([id, s]) => ({
-              id,
-              agentName: s.agentName,
-              total: s.totalScore,
-            }))
-            .sort((a, b) => b.total - a.total);
-          const maxPoints = pointsTotals[0]?.total ?? -Infinity;
-          // In a points tie there is also no single leader; skip the consistency check.
-          const pointsLeaderName =
-            pointsTotals.filter((p) => p.total === maxPoints).length === 1
-              ? (pointsTotals[0]?.agentName ?? null)
-              : null;
-
-          const scorecardInternallyConsistent =
-            winCountLeader !== null &&
-            pointsLeaderName !== null &&
-            winCountLeader === pointsLeaderName;
-          verdict.scorecardInternallyConsistent = scorecardInternallyConsistent;
 
           const adjController = new AbortController();
           const adjTimer = setTimeout(() => adjController.abort(), 20_000);
@@ -546,6 +550,31 @@ export class LiveJudgeSystem {
           }
         } catch {
           // Adjudication failed — non-critical
+        }
+      } else if (
+        !scorecardInternallyConsistent &&
+        winCountLeader !== null &&
+        pointsLeaderName !== null
+      ) {
+        // Narrative agrees with the round-count leader, but cumulative absolute points
+        // favour a different agent — the "won exchanges vs. won arc" diagnostic split.
+        // Surface a dedicated note so this discrepancy is never silently dropped.
+        try {
+          const adjController = new AbortController();
+          const adjTimer = setTimeout(() => adjController.abort(), 20_000);
+          const splitNoteText = await generateScorecardSplitNote(
+            judge,
+            winCountLeader,
+            pointsLeaderName,
+            scorecardSummary,
+            adjController.signal,
+          ).finally(() => clearTimeout(adjTimer));
+          const trimmedSplitNote = splitNoteText.trim();
+          if (trimmedSplitNote.length > 0) {
+            verdict.conflictResolution = trimmedSplitNote;
+          }
+        } catch {
+          // Split note failed — non-critical
         }
       }
 

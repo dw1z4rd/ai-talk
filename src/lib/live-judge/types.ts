@@ -150,9 +150,11 @@ export interface NarrativeVerdict {
   /**
    * Whether the win-count leader and the cumulative-points leader are the same agent.
    * False means the two ways of reading the scorecard disagree — diagnostic of a
-   * "won exchanges but lost arc" pattern. Only populated when `agreesWithScorecard` is
-   * false and a single favoured agent is identified; `undefined` in all other cases
-   * (agreement, draw, or a tie in either win-count or points totals).
+   * "won exchanges but lost arc" pattern. Populated whenever a single leader can be
+   * identified in both dimensions (i.e., no tie in either round-count or points totals);
+   * `undefined` only when there is a tie in one or both dimensions.
+   * Independent of `agreesWithScorecard` — the split can exist even when the narrative
+   * agrees with the round-count winner.
    */
   scorecardInternallyConsistent?: boolean;
   /** Exactly 3 sentence adjudication explaining why scorecard and narrative diverged, populated only when agreesWithScorecard is false. */

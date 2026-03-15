@@ -261,7 +261,7 @@ Required format (use exact agent names as shown):
 --- LOGIC (forced choice) ---
 Start each turn from 8. Apply deductions:
 -1  One unsupported assumption (empirical OR philosophical — asserting "X implies Y" as fact without defending why is as penalizable as a bare statistics claim)
-    Hollow specificity is penalizable: a specific number, percentage, or named study without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account.
+    Hollow specificity is penalizable: a specific number, percentage, named study, or allusion to unnamed research findings (e.g., "recent work shows...", "studies have found...", "it has been shown that...", "experiments demonstrate...") without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account. This penalty applies symmetrically regardless of which debater makes the claim — prior scoring history and positional advantage confer no leniency.
 -2  Significant unsupported leap
 -3  Clear logical error: category error, circular reasoning, strawman, or analogy whose structural mapping breaks down
 -4  Multiple errors or incoherent structure
@@ -316,6 +316,7 @@ ${domainNote}
 --- ANTI-BIAS ---
 Tone ≠ Logic. Academic register does not indicate sound reasoning. Confidence does not substitute for evidence. Apply identical evidentiary standards to both turns.
 Citation ≠ Correctness. Cited precision that is mechanistically hollow is not stronger than uncited reasoning with a complete causal chain.
+Confident specificity is not self-validating. An agent that has been winning rounds is not entitled to leniency on hollow empirical assertions. A gesture toward "recent work" or "studies show" without naming the source or supplying a mechanism receives the same −1 hollow specificity penalty regardless of which debater makes it.
 Style ≠ Rhetoric. Punchiness and brevity alone do not constitute superior rhetoric. Framing quality and structural clarity carry equal weight.
 
 --- COUNTERFACTUAL ---
@@ -916,6 +917,48 @@ function parseNarrativeVerdict(
 }
 
 /**
+ * Generate a 3-sentence diagnostic note when the round-count leader and the
+ * cumulative-points leader are different agents, even though the narrative agrees
+ * with the round-count winner. Surfaces the "won exchanges vs. won arc" split
+ * so it is never silently discarded.
+ */
+export async function generateScorecardSplitNote(
+  judge: LiveJudge,
+  roundCountWinnerName: string,
+  pointsLeaderName: string,
+  scorecardSummary: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const systemPrompt = `You are a meta-analyst reporting a scorecard split in a debate result. Write exactly 3 sentences: (1) State the split precisely — name who won by round count and who leads in cumulative absolute points, and note that the narrative agrees with the round-count winner. (2) Interpret the pattern: did the round-count winner win more exchanges by narrow margins while the points leader won fewer but more decisively, or did one agent dominate specific dimensions while the other maintained breadth? Name the structural pattern. (3) Assess whether the points leader has a credible substantive claim to the stronger overall performance, or whether the round-count win reflects consistent superiority across all dimensions that makes the points gap an artifact of margin variance. Be specific and direct. Do not hedge.`;
+
+  const prompt = `SCORECARD SUMMARY:
+${scorecardSummary}
+
+ROUND-COUNT WINNER (narrative agrees): ${roundCountWinnerName}
+CUMULATIVE POINTS LEADER: ${pointsLeaderName}
+
+Write your split analysis:`;
+
+  const judgeProvider = createJudgeProvider(
+    judge.modelId || "gpt-oss:120b-cloud",
+  );
+  try {
+    const text = await judgeProvider.generateText(prompt, {
+      systemPrompt,
+      temperature: 0.4,
+      maxTokens: 180,
+      signal,
+    });
+    return (text || "")
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .trim();
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Generate a 2-3 sentence adjudication when the narrative verdict disagrees with
  * the round-by-round scorecard. Explains why they diverged and which is better supported.
  */
@@ -1150,7 +1193,7 @@ INDEPENDENCE: Score this turn entirely on its own merits. Do not anchor to or at
 
 --- LOGIC (1–10) ---
 Start at 8. -1 unsupported assumption, -2 significant leap, -3 logical error, -4 multiple errors. +1 if every claim has explicit causal chain.
-Hollow specificity is penalizable: a specific number, percentage, or named study without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account.
+Hollow specificity is penalizable: a specific number, percentage, named study, or allusion to unnamed research findings (e.g., "recent work shows...", "studies have found...", "experiments demonstrate...") without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account. Apply this symmetrically — no leniency based on prior-turn scoring or positional advantage.
 +1 Grounded precision (symmetric counterpart): a claim that names a specific, verifiable datum AND supplies a mechanism chain linking it to the turn's core argument earns +1. Hollow = specificity without mechanism (−1); Grounded = specificity with mechanism (+1). Both bonuses can coexist on the same turn.
 Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
 Causal mechanism requirement: for each major causal leap, the argument must supply a mechanism sentence of the form "[how X produces Y] → [why that mechanism operates under these conditions] → [measurable consequence]." A causal leap missing any element of this template is penalized −1 as an unsupported assumption.
