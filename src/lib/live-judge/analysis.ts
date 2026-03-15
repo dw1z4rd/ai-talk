@@ -7,13 +7,13 @@ import {
   type PairwiseRound,
   type DebateScorecard,
   type NarrativeVerdict,
-} from './types';
-import type { Agent, Message } from '$lib/agents';
-import { MODEL_CATALOG } from '$lib/agents';
+} from "./types";
+import type { Agent, Message } from "$lib/agents";
+import { MODEL_CATALOG } from "$lib/agents";
 
 // ── Debate domain classification ─────────────────────────────────────────────
 
-export type DebateDomain = 'empirical' | 'philosophical' | 'policy' | 'mixed';
+export type DebateDomain = "empirical" | "philosophical" | "policy" | "mixed";
 
 /**
  * Classify the debate topic into a domain category using keyword heuristics.
@@ -23,42 +23,94 @@ export function classifyDebateDomain(topic: string): DebateDomain {
   const t = topic.toLowerCase();
 
   const philosophicalKeywords = [
-    'consciousness', 'free will', 'morality', 'ethics', 'justice', 'identity',
-    'metaphysics', 'qualia', 'knowledge', 'beauty', 'god', 'soul', 'meaning',
-    'existence', 'epistemology', 'truth', 'mind', 'subjective', 'objective reality',
-    'free will', 'determinism', 'moral'
+    "consciousness",
+    "free will",
+    "morality",
+    "ethics",
+    "justice",
+    "identity",
+    "metaphysics",
+    "qualia",
+    "knowledge",
+    "beauty",
+    "god",
+    "soul",
+    "meaning",
+    "existence",
+    "epistemology",
+    "truth",
+    "mind",
+    "subjective",
+    "objective reality",
+    "free will",
+    "determinism",
+    "moral",
   ];
   const empiricalKeywords = [
-    'climate', 'vaccine', 'health', 'economic', 'data', 'study', 'research',
-    'science', 'statistic', 'evidence', 'correlation', 'causation', 'experiment',
-    'trial', 'survey', 'measurement', 'empirical'
+    "climate",
+    "vaccine",
+    "health",
+    "economic",
+    "data",
+    "study",
+    "research",
+    "science",
+    "statistic",
+    "evidence",
+    "correlation",
+    "causation",
+    "experiment",
+    "trial",
+    "survey",
+    "measurement",
+    "empirical",
   ];
   const policyKeywords = [
-    'policy', 'law', 'regulation', 'government', 'ban', 'tax', 'reform',
-    'should ', 'ought', 'legislation', 'rights', 'democratic', 'governance',
-    'nuclear', 'military', 'ai safety', 'censorship'
+    "policy",
+    "law",
+    "regulation",
+    "government",
+    "ban",
+    "tax",
+    "reform",
+    "should ",
+    "ought",
+    "legislation",
+    "rights",
+    "democratic",
+    "governance",
+    "nuclear",
+    "military",
+    "ai safety",
+    "censorship",
   ];
 
-  const philoScore = philosophicalKeywords.filter(k => t.includes(k)).length;
-  const empiricalScore = empiricalKeywords.filter(k => t.includes(k)).length;
-  const policyScore = policyKeywords.filter(k => t.includes(k)).length;
+  const philoScore = philosophicalKeywords.filter((k) => t.includes(k)).length;
+  const empiricalScore = empiricalKeywords.filter((k) => t.includes(k)).length;
+  const policyScore = policyKeywords.filter((k) => t.includes(k)).length;
 
   const total = philoScore + empiricalScore + policyScore;
-  if (total === 0) return 'mixed';
+  if (total === 0) return "mixed";
 
-  if (philoScore >= empiricalScore && philoScore >= policyScore && philoScore > 0) return 'philosophical';
-  if (empiricalScore > philoScore && empiricalScore >= policyScore) return 'empirical';
-  if (policyScore > 0) return 'policy';
-  return 'mixed';
+  if (
+    philoScore >= empiricalScore &&
+    philoScore >= policyScore &&
+    philoScore > 0
+  )
+    return "philosophical";
+  if (empiricalScore > philoScore && empiricalScore >= policyScore)
+    return "empirical";
+  if (policyScore > 0) return "policy";
+  return "mixed";
 }
 
 function buildDomainNote(domain: DebateDomain): string {
   switch (domain) {
-    case 'philosophical':
+    case "philosophical":
       return `NOTE — DOMAIN: PHILOSOPHICAL. Thought experiments, conceptual analysis, and intuition pumps ARE valid evidence in this debate. Do NOT penalize a turn for lacking empirical citations. Evaluate logical coherence of arguments on their own terms. Definitional assumptions still require defense if contested.`;
-    case 'empirical':
+    case "empirical":
       return `NOTE — DOMAIN: EMPIRICAL. Precision claims (statistics, named studies, causal mechanisms) require plausible grounding. A bare assertion of a specific number without a mechanism explanation is penalizable (−1). A fully explained mechanism earns +1 even without a citation.`;
-    case 'policy':
+    case "policy":
       return `NOTE — DOMAIN: POLICY. Both normative frameworks and empirical evidence are valid. Consistent normative reasoning (deontological, consequentialist, etc.) earns the +1 causal chain bonus even without empirical citation. Mixed normative+empirical arguments are judged on the strength of their weakest link.`;
     default:
       return `NOTE — DOMAIN: MIXED. Apply calibrated standards: penalize hollow specificity in empirical claims, tolerate thought experiments in philosophical sub-claims, reward consistent normative reasoning in policy sub-claims.`;
@@ -73,9 +125,10 @@ function buildDomainNote(domain: DebateDomain): string {
  */
 export function detectLanguageMismatch(
   messageA: string,
-  messageB: string
+  messageB: string,
 ): { isConsistent: boolean; warning?: string } {
-  const cjkRegex = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]/g;
+  const cjkRegex =
+    /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]/g;
   const cjkA = (messageA.match(cjkRegex) || []).length;
   const cjkB = (messageB.match(cjkRegex) || []).length;
   const ratioA = messageA.length > 0 ? cjkA / messageA.length : 0;
@@ -88,7 +141,7 @@ export function detectLanguageMismatch(
   if (aIsNonLatin !== bIsNonLatin) {
     return {
       isConsistent: false,
-      warning: `⚠ LANGUAGE MISMATCH: One turn appears to be in a non-English language. Comparison scores may be unreliable. Check debater system prompts for language enforcement.`
+      warning: `⚠ LANGUAGE MISMATCH: One turn appears to be in a non-English language. Comparison scores may be unreliable. Check debater system prompts for language enforcement.`,
     };
   }
   return { isConsistent: true };
@@ -113,7 +166,7 @@ export async function compareTurns(
   topic: string,
   roundNumber: number,
   signal?: AbortSignal,
-  previousLogicDelta?: string
+  previousLogicDelta?: string,
 ): Promise<PairwiseRound> {
   const langCheck = detectLanguageMismatch(prevMessage, curMessage);
   if (!langCheck.isConsistent) {
@@ -123,49 +176,86 @@ export async function compareTurns(
   const isOpeningRound = prevTurnNumber === 1;
   const domainNote = buildDomainNote(classifyDebateDomain(topic));
   const prompt = generatePairwisePrompt(
-    prevAgentName, prevMessage, prevTurnNumber,
-    curAgentName, curMessage, curTurnNumber,
-    topic, isOpeningRound, previousLogicDelta
+    prevAgentName,
+    prevMessage,
+    prevTurnNumber,
+    curAgentName,
+    curMessage,
+    curTurnNumber,
+    topic,
+    isOpeningRound,
+    previousLogicDelta,
   );
 
-  const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
+  const judgeProvider = createJudgeProvider(
+    judge.modelId || "gpt-oss:120b-cloud",
+  );
   const start = Date.now();
 
   try {
     const responseText = await judgeProvider.generateText(prompt, {
-      systemPrompt: generatePairwiseSystemPrompt(prevAgentName, curAgentName, domainNote),
+      systemPrompt: generatePairwiseSystemPrompt(
+        prevAgentName,
+        curAgentName,
+        domainNote,
+      ),
       temperature: 0.3,
       maxTokens: 700,
-      signal
+      signal,
     });
 
-    console.log(`[Pairwise Judge] Round ${roundNumber} completed in ${Date.now() - start}ms`);
+    console.log(
+      `[Pairwise Judge] Round ${roundNumber} completed in ${Date.now() - start}ms`,
+    );
     return parsePairwiseResponse(
       responseText,
-      prevAgentId, prevAgentName, prevMessage, prevTurnNumber,
-      curAgentId, curAgentName, curMessage, curTurnNumber,
-      roundNumber, langCheck.warning
+      prevAgentId,
+      prevAgentName,
+      prevMessage,
+      prevTurnNumber,
+      curAgentId,
+      curAgentName,
+      curMessage,
+      curTurnNumber,
+      roundNumber,
+      langCheck.warning,
     );
   } catch (error: any) {
     const elapsed = Date.now() - start;
-    if (error?.name === 'AbortError') {
-      console.warn(`[Pairwise Judge] Round ${roundNumber} aborted after ${elapsed}ms`);
+    if (error?.name === "AbortError") {
+      console.warn(
+        `[Pairwise Judge] Round ${roundNumber} aborted after ${elapsed}ms`,
+      );
     } else {
-      console.error(`[Pairwise Judge] Round ${roundNumber} failed after ${elapsed}ms:`, error);
+      console.error(
+        `[Pairwise Judge] Round ${roundNumber} failed after ${elapsed}ms:`,
+        error,
+      );
     }
     return createFallbackPairwiseRound(
-      prevAgentId, prevAgentName, prevMessage, prevTurnNumber,
-      curAgentId, curAgentName, curMessage, curTurnNumber,
-      roundNumber, langCheck.warning
+      prevAgentId,
+      prevAgentName,
+      prevMessage,
+      prevTurnNumber,
+      curAgentId,
+      curAgentName,
+      curMessage,
+      curTurnNumber,
+      roundNumber,
+      langCheck.warning,
     );
   }
 }
 
-export function generatePairwiseSystemPrompt(nameA: string, nameB: string, domainNote: string = ''): string {
+export function generatePairwiseSystemPrompt(
+  nameA: string,
+  nameB: string,
+  domainNote: string = "",
+): string {
   return `You are a comparative debate judge. Read two consecutive turns and pick the stronger one on three dimensions. No draws — you must choose one winner per dimension. Respond with a single JSON object only — no preamble, no markdown.
 
 Required format (use exact agent names as shown):
-{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn — e.g. 'Asserted X without explaining mechanism Y' or 'Strawmanned the relational view by conflating Z with W.' Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn was more persuasive across all four components and why."}
+{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn. For missing causal mechanisms, name which element was absent — e.g. 'stated how X produces Y but omitted why the mechanism holds under competitive markets' or 'gave mechanism but no measurable consequence.' For timeline violations, name the technology/concept and note it clearly postdates the phenomenon. Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn was more persuasive across all four components and why."}
 
 --- LOGIC (forced choice) ---
 Start each turn from 8. Apply deductions:
@@ -177,6 +267,9 @@ Start each turn from 8. Apply deductions:
 +1  Every major claim defended with an explicit causal chain
     Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
 Winner = higher remaining score. If equal, award the turn whose core claim still stands despite errors.
+
+Causal mechanism requirement: for each major causal leap, the argument must supply a mechanism sentence of the form "[how X produces Y] → [why that mechanism operates under these conditions] → [measurable consequence]." A causal leap missing any element of this template is penalized −1 as an unsupported assumption.
+Retroactive necessary condition fallacy: if an argument treats a technology, concept, or practice that postdates the phenomenon being explained as a necessary condition for it, penalize −3. Later developments cannot be used as causal prerequisites for earlier effects. (Example: arguing that social media platforms were required for 19th-century political revolutions — social media is a 21st-century technology, not a prerequisite for 19th-century events.) When citing this violation in logic_delta, name the technology/concept and note that it clearly postdates the phenomenon.
 
 EXCEPTIONS: Do not penalize thought experiments or illustrative hypotheticals as "unverified facts." Judge the mechanism, not the historical precision.
 
@@ -215,18 +308,23 @@ Style ≠ Rhetoric. Punchiness and brevity alone do not constitute superior rhet
 }
 
 export function generatePairwisePrompt(
-  nameA: string, messageA: string, turnA: number,
-  nameB: string, messageB: string, turnB: number,
-  topic: string, isOpeningRound: boolean,
-  previousLogicDelta?: string
+  nameA: string,
+  messageA: string,
+  turnA: number,
+  nameB: string,
+  messageB: string,
+  turnB: number,
+  topic: string,
+  isOpeningRound: boolean,
+  previousLogicDelta?: string,
 ): string {
   const openingNote = isOpeningRound
     ? `\n[NOTE: Turn ${turnA} is the OPENING statement — ${nameA} spoke first with no opponent yet. Apply OPENING TURN rules to their turn.]`
-    : '';
+    : "";
 
   const prevDeltaNote = previousLogicDelta
     ? `\n[PREVIOUS ROUND JUDGE NOTE: "${previousLogicDelta}" — use this to detect argumentative stagnation or thesis drift in the current turns.]`
-    : '';
+    : "";
 
   return `DEBATE TOPIC: ${topic}${openingNote}${prevDeltaNote}
 
@@ -241,28 +339,60 @@ Respond with JSON only:`;
 
 function parsePairwiseResponse(
   responseText: string | null,
-  prevAgentId: string, prevAgentName: string, prevMessage: string, prevTurnNumber: number,
-  curAgentId: string, curAgentName: string, curMessage: string, curTurnNumber: number,
+  prevAgentId: string,
+  prevAgentName: string,
+  prevMessage: string,
+  prevTurnNumber: number,
+  curAgentId: string,
+  curAgentName: string,
+  curMessage: string,
+  curTurnNumber: number,
   roundNumber: number,
-  languageWarning?: string
+  languageWarning?: string,
 ): PairwiseRound {
   try {
     if (!responseText?.trim()) {
-      console.warn(`[Pairwise Judge] Round ${roundNumber}: null/empty response`);
-      return createFallbackPairwiseRound(prevAgentId, prevAgentName, prevMessage, prevTurnNumber, curAgentId, curAgentName, curMessage, curTurnNumber, roundNumber, languageWarning);
+      console.warn(
+        `[Pairwise Judge] Round ${roundNumber}: null/empty response`,
+      );
+      return createFallbackPairwiseRound(
+        prevAgentId,
+        prevAgentName,
+        prevMessage,
+        prevTurnNumber,
+        curAgentId,
+        curAgentName,
+        curMessage,
+        curTurnNumber,
+        roundNumber,
+        languageWarning,
+      );
     }
 
     let jsonString = responseText
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-      .replace(/<think>[\s\S]*?<\/think>/gi, '')
-      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
       .trim();
 
-    const firstBrace = jsonString.indexOf('{');
-    const lastBrace = jsonString.lastIndexOf('}');
+    const firstBrace = jsonString.indexOf("{");
+    const lastBrace = jsonString.lastIndexOf("}");
     if (firstBrace === -1 || lastBrace <= firstBrace) {
-      console.warn(`[Pairwise Judge] Round ${roundNumber}: no JSON found. Raw: ${responseText.slice(0, 200)}`);
-      return createFallbackPairwiseRound(prevAgentId, prevAgentName, prevMessage, prevTurnNumber, curAgentId, curAgentName, curMessage, curTurnNumber, roundNumber, languageWarning);
+      console.warn(
+        `[Pairwise Judge] Round ${roundNumber}: no JSON found. Raw: ${responseText.slice(0, 200)}`,
+      );
+      return createFallbackPairwiseRound(
+        prevAgentId,
+        prevAgentName,
+        prevMessage,
+        prevTurnNumber,
+        curAgentId,
+        curAgentName,
+        curMessage,
+        curTurnNumber,
+        roundNumber,
+        languageWarning,
+      );
     }
     jsonString = jsonString.substring(firstBrace, lastBrace + 1);
 
@@ -273,61 +403,122 @@ function parsePairwiseResponse(
       const openBraces = (jsonString.match(/\{/g) || []).length;
       const closeBraces = (jsonString.match(/\}/g) || []).length;
       let fixed = jsonString;
-      for (let i = 0; i < openBraces - closeBraces; i++) fixed += '}';
+      for (let i = 0; i < openBraces - closeBraces; i++) fixed += "}";
       try {
         data = JSON.parse(fixed);
       } catch {
-        console.warn(`[Pairwise Judge] Round ${roundNumber}: JSON repair failed`);
-        return createFallbackPairwiseRound(prevAgentId, prevAgentName, prevMessage, prevTurnNumber, curAgentId, curAgentName, curMessage, curTurnNumber, roundNumber, languageWarning);
+        console.warn(
+          `[Pairwise Judge] Round ${roundNumber}: JSON repair failed`,
+        );
+        return createFallbackPairwiseRound(
+          prevAgentId,
+          prevAgentName,
+          prevMessage,
+          prevTurnNumber,
+          curAgentId,
+          curAgentName,
+          curMessage,
+          curTurnNumber,
+          roundNumber,
+          languageWarning,
+        );
       }
     }
 
     const resolveWinner = (winnerField: string): string => {
-      const lower = (winnerField || '').toLowerCase();
+      const lower = (winnerField || "").toLowerCase();
       if (lower.includes(prevAgentName.toLowerCase())) return prevAgentId;
       if (lower.includes(curAgentName.toLowerCase())) return curAgentId;
       // Fallback: if we can't parse, give current turn the benefit of the doubt
-      console.warn(`[Pairwise Judge] Round ${roundNumber}: could not resolve winner "${winnerField}" to agent ID`);
+      console.warn(
+        `[Pairwise Judge] Round ${roundNumber}: could not resolve winner "${winnerField}" to agent ID`,
+      );
       return curAgentId;
     };
 
     return {
       roundNumber,
-      prevTurn: { turnNumber: prevTurnNumber, agentId: prevAgentId, agentName: prevAgentName, message: prevMessage },
-      curTurn: { turnNumber: curTurnNumber, agentId: curAgentId, agentName: curAgentName, message: curMessage },
+      prevTurn: {
+        turnNumber: prevTurnNumber,
+        agentId: prevAgentId,
+        agentName: prevAgentName,
+        message: prevMessage,
+      },
+      curTurn: {
+        turnNumber: curTurnNumber,
+        agentId: curAgentId,
+        agentName: curAgentName,
+        message: curMessage,
+      },
       logicWinner: resolveWinner(data.logic_winner),
       tacticsWinner: resolveWinner(data.tactics_winner),
       rhetoricWinner: resolveWinner(data.rhetoric_winner),
-      logicDelta: typeof data.logic_delta === 'string' ? data.logic_delta.trim() : 'No analysis provided.',
-      tacticsDelta: typeof data.tactics_delta === 'string' ? data.tactics_delta.trim() : 'No analysis provided.',
-      rhetoricDelta: typeof data.rhetoric_delta === 'string' ? data.rhetoric_delta.trim() : 'No analysis provided.',
+      logicDelta:
+        typeof data.logic_delta === "string"
+          ? data.logic_delta.trim()
+          : "No analysis provided.",
+      tacticsDelta:
+        typeof data.tactics_delta === "string"
+          ? data.tactics_delta.trim()
+          : "No analysis provided.",
+      rhetoricDelta:
+        typeof data.rhetoric_delta === "string"
+          ? data.rhetoric_delta.trim()
+          : "No analysis provided.",
       languageWarning,
-      isFallback: false
+      isFallback: false,
     };
   } catch (error) {
-    console.error('[Pairwise Judge] parsePairwiseResponse threw:', error);
-    return createFallbackPairwiseRound(prevAgentId, prevAgentName, prevMessage, prevTurnNumber, curAgentId, curAgentName, curMessage, curTurnNumber, roundNumber, languageWarning);
+    console.error("[Pairwise Judge] parsePairwiseResponse threw:", error);
+    return createFallbackPairwiseRound(
+      prevAgentId,
+      prevAgentName,
+      prevMessage,
+      prevTurnNumber,
+      curAgentId,
+      curAgentName,
+      curMessage,
+      curTurnNumber,
+      roundNumber,
+      languageWarning,
+    );
   }
 }
 
 function createFallbackPairwiseRound(
-  prevAgentId: string, prevAgentName: string, prevMessage: string, prevTurnNumber: number,
-  curAgentId: string, curAgentName: string, curMessage: string, curTurnNumber: number,
+  prevAgentId: string,
+  prevAgentName: string,
+  prevMessage: string,
+  prevTurnNumber: number,
+  curAgentId: string,
+  curAgentName: string,
+  curMessage: string,
+  curTurnNumber: number,
   roundNumber: number,
-  languageWarning?: string
+  languageWarning?: string,
 ): PairwiseRound {
   return {
     roundNumber,
-    prevTurn: { turnNumber: prevTurnNumber, agentId: prevAgentId, agentName: prevAgentName, message: prevMessage },
-    curTurn: { turnNumber: curTurnNumber, agentId: curAgentId, agentName: curAgentName, message: curMessage },
+    prevTurn: {
+      turnNumber: prevTurnNumber,
+      agentId: prevAgentId,
+      agentName: prevAgentName,
+      message: prevMessage,
+    },
+    curTurn: {
+      turnNumber: curTurnNumber,
+      agentId: curAgentId,
+      agentName: curAgentName,
+      message: curMessage,
+    },
     logicWinner: prevAgentId,
     tacticsWinner: prevAgentId,
     rhetoricWinner: prevAgentId,
-    logicDelta: 'Fallback — judge analysis unavailable for this round.',
-    tacticsDelta: 'Fallback — judge analysis unavailable for this round.',
-    rhetoricDelta: 'Fallback — judge analysis unavailable for this round.',
+    logicDelta: "Fallback — judge analysis unavailable for this round.",
+    tacticsDelta: "Fallback — judge analysis unavailable for this round.",
+    rhetoricDelta: "Fallback — judge analysis unavailable for this round.",
     languageWarning,
-    isFallback: true
+    isFallback: true,
   };
 }
 
@@ -339,29 +530,46 @@ function createFallbackPairwiseRound(
 export function updateScorecard(
   scorecard: DebateScorecard,
   round: PairwiseRound,
-  agentAId: string, agentAName: string,
-  agentBId: string, agentBName: string
+  agentAId: string,
+  agentAName: string,
+  agentBId: string,
+  agentBName: string,
 ): DebateScorecard {
   const updated: DebateScorecard = {
     rounds: [...scorecard.rounds, round],
     winTallies: {
-      [agentAId]: scorecard.winTallies[agentAId] ?? { agentName: agentAName, logic: 0, tactics: 0, rhetoric: 0, total: 0 },
-      [agentBId]: scorecard.winTallies[agentBId] ?? { agentName: agentBName, logic: 0, tactics: 0, rhetoric: 0, total: 0 },
+      [agentAId]: scorecard.winTallies[agentAId] ?? {
+        agentName: agentAName,
+        logic: 0,
+        tactics: 0,
+        rhetoric: 0,
+        total: 0,
+      },
+      [agentBId]: scorecard.winTallies[agentBId] ?? {
+        agentName: agentBName,
+        logic: 0,
+        tactics: 0,
+        rhetoric: 0,
+        total: 0,
+      },
     },
-    overallWinner: null
+    overallWinner: null,
   };
 
   // Tally wins
-  const tallyWin = (agentId: string, dimension: 'logic' | 'tactics' | 'rhetoric') => {
+  const tallyWin = (
+    agentId: string,
+    dimension: "logic" | "tactics" | "rhetoric",
+  ) => {
     if (updated.winTallies[agentId]) {
       updated.winTallies[agentId][dimension]++;
       updated.winTallies[agentId].total++;
     }
   };
 
-  tallyWin(round.logicWinner, 'logic');
-  tallyWin(round.tacticsWinner, 'tactics');
-  tallyWin(round.rhetoricWinner, 'rhetoric');
+  tallyWin(round.logicWinner, "logic");
+  tallyWin(round.tacticsWinner, "tactics");
+  tallyWin(round.rhetoricWinner, "rhetoric");
 
   // Determine overall winner
   const tallies = Object.entries(updated.winTallies);
@@ -381,7 +589,10 @@ export function updateScorecard(
  * pressure system. Maps binary wins to values that sit above/below the pressure
  * thresholds defined in pressure.ts.
  */
-export function synthScoresFromPairwise(round: PairwiseRound, forAgentId: string): JudgeScores {
+export function synthScoresFromPairwise(
+  round: PairwiseRound,
+  forAgentId: string,
+): JudgeScores {
   const logicWon = round.logicWinner === forAgentId;
   const tacticsWon = round.tacticsWinner === forAgentId;
   const rhetoricWon = round.rhetoricWinner === forAgentId;
@@ -394,7 +605,8 @@ export function synthScoresFromPairwise(round: PairwiseRound, forAgentId: string
   const rhetoricScore = rhetoricWon ? 24 : 10;
   const tacticsScore = tacticsWon ? 24 : 10;
 
-  const wins = (logicWon ? 1 : 0) + (tacticsWon ? 1 : 0) + (rhetoricWon ? 1 : 0);
+  const wins =
+    (logicWon ? 1 : 0) + (tacticsWon ? 1 : 0) + (rhetoricWon ? 1 : 0);
   // Map 0-3 wins to overall scores that trigger appropriate pressure levels:
   //   0 wins → 30 (<40 = PRIORITY OVERRIDE)
   //   1 win  → 45 (mild)
@@ -408,7 +620,7 @@ export function synthScoresFromPairwise(round: PairwiseRound, forAgentId: string
     frameControl: overallScore,
     credibilityScore: overallScore,
     tacticalEffectiveness: tacticsScore,
-    overallScore
+    overallScore,
   };
 }
 
@@ -421,23 +633,27 @@ export function synthScoresFromPairwise(round: PairwiseRound, forAgentId: string
 export async function generateNarrativeVerdictText(
   judge: LiveJudge,
   fullTranscript: Message[],
-  agentAId: string, agentAName: string,
-  agentBId: string, agentBName: string,
+  agentAId: string,
+  agentAName: string,
+  agentBId: string,
+  agentBName: string,
   topic: string,
   scorecard: DebateScorecard,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<NarrativeVerdict> {
   const transcriptText = fullTranscript
     .map((m, i) => `Turn ${i + 1} — ${m.agentName}:\n${m.text}`)
-    .join('\n\n');
+    .join("\n\n");
 
   const scorecardSummary = [agentAId, agentBId]
-    .map(id => {
+    .map((id) => {
       const t = scorecard.winTallies[id];
-      return t ? `${t.agentName}: Logic ${t.logic}, Tactics ${t.tactics}, Rhetoric ${t.rhetoric} (${t.total} total wins)` : '';
+      return t
+        ? `${t.agentName}: Logic ${t.logic}, Tactics ${t.tactics}, Rhetoric ${t.rhetoric} (${t.total} total wins)`
+        : "";
     })
     .filter(Boolean)
-    .join(' | ');
+    .join(" | ");
 
   const prompt = `DEBATE TOPIC: "${topic}"
 
@@ -449,7 +665,9 @@ ${transcriptText}
 
 Write your verdict now:`;
 
-  const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
+  const judgeProvider = createJudgeProvider(
+    judge.modelId || "gpt-oss:120b-cloud",
+  );
   const start = Date.now();
 
   try {
@@ -457,21 +675,30 @@ Write your verdict now:`;
       systemPrompt: generateNarrativeSystemPrompt(agentAName, agentBName),
       temperature: 0.7,
       maxTokens: 1200,
-      signal
+      signal,
     });
-    console.log(`[Narrative Judge] Verdict completed in ${Date.now() - start}ms`);
-    return parseNarrativeVerdict(text, agentAId, agentAName, agentBId, agentBName, scorecard);
+    console.log(
+      `[Narrative Judge] Verdict completed in ${Date.now() - start}ms`,
+    );
+    return parseNarrativeVerdict(
+      text,
+      agentAId,
+      agentAName,
+      agentBId,
+      agentBName,
+      scorecard,
+    );
   } catch (error: any) {
     const elapsed = Date.now() - start;
-    if (error?.name === 'AbortError') {
+    if (error?.name === "AbortError") {
       console.warn(`[Narrative Judge] Aborted after ${elapsed}ms`);
     } else {
       console.error(`[Narrative Judge] Failed after ${elapsed}ms:`, error);
     }
     return {
-      text: 'Narrative verdict unavailable — judge analysis failed.',
+      text: "Narrative verdict unavailable — judge analysis failed.",
       favouredAgentId: scorecard.overallWinner,
-      agreesWithScorecard: true
+      agreesWithScorecard: true,
     };
   }
 }
@@ -494,18 +721,24 @@ Rules:
 
 function parseNarrativeVerdict(
   text: string | null,
-  agentAId: string, agentAName: string,
-  agentBId: string, agentBName: string,
-  scorecard: DebateScorecard
+  agentAId: string,
+  agentAName: string,
+  agentBId: string,
+  agentBName: string,
+  scorecard: DebateScorecard,
 ): NarrativeVerdict {
   if (!text?.trim()) {
-    return { text: 'Verdict unavailable.', favouredAgentId: null, agreesWithScorecard: false };
+    return {
+      text: "Verdict unavailable.",
+      favouredAgentId: null,
+      agreesWithScorecard: false,
+    };
   }
 
   // Strip thinking blocks
   let cleaned = text
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
     .trim();
 
   // Extract VERDICT line
@@ -521,9 +754,10 @@ function parseNarrativeVerdict(
     }
   }
 
-  const agreesWithScorecard = favouredAgentId !== null && favouredAgentId === scorecard.overallWinner;
+  const agreesWithScorecard =
+    favouredAgentId !== null && favouredAgentId === scorecard.overallWinner;
   // Remove the VERDICT line from display text
-  const displayText = cleaned.replace(/VERDICT:\s*.+?(?:\n|$)/i, '').trim();
+  const displayText = cleaned.replace(/VERDICT:\s*.+?(?:\n|$)/i, "").trim();
 
   return { text: displayText, favouredAgentId, agreesWithScorecard };
 }
@@ -538,7 +772,7 @@ export async function generateConflictResolution(
   narrativeFavouredName: string,
   scorecardSummary: string,
   narrativeText: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<string> {
   const systemPrompt = `You are a meta-analyst adjudicating a conflict between two debate judging systems. Write exactly 3 sentences: (1) Why they diverged — identify the structural difference between turn-by-turn logic assessment and arc-level coherence. (2) Which verdict better reflects overall debate quality and why. (3) What the losing verdict got right despite picking the wrong winner. Be specific. Do not hedge.`;
 
@@ -553,23 +787,89 @@ ${narrativeText.slice(0, 500)}
 
 Write your adjudication:`;
 
-  const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
+  const judgeProvider = createJudgeProvider(
+    judge.modelId || "gpt-oss:120b-cloud",
+  );
   try {
     const text = await judgeProvider.generateText(prompt, {
       systemPrompt,
       temperature: 0.4,
       maxTokens: 220,
-      signal
+      signal,
     });
 
     // Strip thinking blocks
-    const cleaned = (text || '')
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    const cleaned = (text || "")
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
       .trim();
     return cleaned;
   } catch {
-    return '';
+    return "";
+  }
+}
+
+/**
+ * Meta-judge pass: review the logic analyses from all pairwise rounds and flag
+ * rubric drift — cases where the same type of argument was scored differently
+ * across rounds, or where winner assignments appear inconsistent with the stated
+ * reasoning. Returns a 2-3 sentence consistency report.
+ */
+export async function generateRubricHarmonization(
+  judge: LiveJudge,
+  rounds: import("./types").PairwiseRound[],
+  agentAName: string,
+  agentBName: string,
+  narrativeVerdictText?: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  if (rounds.length < 3) return "";
+
+  // Use the last 8 non-fallback rounds to keep the prompt focused
+  const analysisRounds = rounds.filter((r) => !r.isFallback).slice(-8);
+  if (analysisRounds.length < 3) return "";
+
+  const roundSummaries = analysisRounds
+    .map(
+      (r) =>
+        `Round ${r.roundNumber} (T${r.prevTurn.turnNumber}:${r.prevTurn.agentName} vs T${r.curTurn.turnNumber}:${r.curTurn.agentName}): ` +
+        `Logic→${r.logicWinner === r.prevTurn.agentId ? r.prevTurn.agentName : r.curTurn.agentName} | ` +
+        `Tactics→${r.tacticsWinner === r.prevTurn.agentId ? r.prevTurn.agentName : r.curTurn.agentName} | ` +
+        `Rhetoric→${r.rhetoricWinner === r.prevTurn.agentId ? r.prevTurn.agentName : r.curTurn.agentName}\n` +
+        `Logic: "${r.logicDelta}" | Tactics: "${r.tacticsDelta}" | Rhetoric: "${r.rhetoricDelta}"`,
+    )
+    .join("\n\n");
+
+  const narrativeBlock = narrativeVerdictText
+    ? `\n\nNARRATIVE VERDICT (excerpt):\n${narrativeVerdictText.slice(0, 400)}`
+    : "";
+
+  const systemPrompt = `You are a meta-judge auditing scoring consistency across debate rounds. Review all round analyses plus the narrative verdict if provided. Produce exactly 3 sentences: (1) Per-round rubric consistency — were the same evidentiary, causal, and timeline standards applied uniformly across rounds? Cite specific round numbers if not. (2) Arc reconciliation — does the per-round win distribution across all three dimensions match the narrative verdict's favoured debater? If they diverge, name who the rounds favour vs. who the narrative favours and the most plausible reason. (3) Drift flag — the most significant rubric inconsistency with specific rounds named, or "No significant drift detected." Be specific and concise. Do not hedge.`;
+
+  const prompt = `DEBATERS: ${agentAName} vs ${agentBName}
+
+ROUND ANALYSES:
+${roundSummaries}${narrativeBlock}
+
+Write your consistency report:`;
+
+  const judgeProvider = createJudgeProvider(
+    judge.modelId || "gpt-oss:120b-cloud",
+  );
+  try {
+    const text = await judgeProvider.generateText(prompt, {
+      systemPrompt,
+      temperature: 0.3,
+      maxTokens: 200,
+      signal,
+    });
+    const cleaned = (text || "")
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .trim();
+    return cleaned;
+  } catch {
+    return "";
   }
 }
 
@@ -590,14 +890,24 @@ export async function analyzeTurn(
   topic: string,
   referenceContext: string,
   messageHistory: Message[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<TurnAnalysis> {
   const judgePrompt = generateJudgePrompt(
-    judge, agent, message, opponent, opponentMessage, turnNumber, topic, referenceContext, messageHistory
+    judge,
+    agent,
+    message,
+    opponent,
+    opponentMessage,
+    turnNumber,
+    topic,
+    referenceContext,
+    messageHistory,
   );
   const domainNote = buildDomainNote(classifyDebateDomain(topic));
 
-  const judgeProvider = createJudgeProvider(judge.modelId || 'gpt-oss:120b-cloud');
+  const judgeProvider = createJudgeProvider(
+    judge.modelId || "gpt-oss:120b-cloud",
+  );
   const start = Date.now();
 
   try {
@@ -605,32 +915,62 @@ export async function analyzeTurn(
       systemPrompt: generateJudgeSystemPrompt(domainNote),
       temperature: 0.3,
       maxTokens: 600,
-      signal
+      signal,
     });
-    console.log(`[Adaptive Judge] ${judge.name} completed in ${Date.now() - start}ms`);
-    return parseJudgeAnalysis(analysisText, judge, agent, opponent, turnNumber, message, opponentMessage, referenceContext);
+    console.log(
+      `[Adaptive Judge] ${judge.name} completed in ${Date.now() - start}ms`,
+    );
+    return parseJudgeAnalysis(
+      analysisText,
+      judge,
+      agent,
+      opponent,
+      turnNumber,
+      message,
+      opponentMessage,
+      referenceContext,
+    );
   } catch (error: any) {
     const elapsed = Date.now() - start;
-    if (error?.name === 'AbortError') {
+    if (error?.name === "AbortError") {
       console.warn(`[Adaptive Judge] ${judge.name} aborted after ${elapsed}ms`);
     } else {
-      console.error(`[Adaptive Judge] ${judge.name} failed after ${elapsed}ms:`, error);
+      console.error(
+        `[Adaptive Judge] ${judge.name} failed after ${elapsed}ms:`,
+        error,
+      );
     }
-    return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, referenceContext);
+    return createFallbackAnalysis(
+      judge,
+      agent,
+      opponent,
+      turnNumber,
+      message,
+      opponentMessage,
+      referenceContext,
+    );
   }
 }
 
 function generateJudgePrompt(
-  judge: LiveJudge, agent: Agent, message: string, opponent: Agent,
-  opponentMessage: string, turnNumber: number, topic: string,
-  referenceContext: string, messageHistory: Message[]
+  judge: LiveJudge,
+  agent: Agent,
+  message: string,
+  opponent: Agent,
+  opponentMessage: string,
+  turnNumber: number,
+  topic: string,
+  referenceContext: string,
+  messageHistory: Message[],
 ): string {
-  const contextBlock = referenceContext ? `\nREFERENCE MATERIAL: ${referenceContext}\n` : '';
+  const contextBlock = referenceContext
+    ? `\nREFERENCE MATERIAL: ${referenceContext}\n`
+    : "";
   const isOpening = !opponentMessage.trim();
   const opponentBlock = isOpening
     ? `[OPENING TURN — ${agent.name} speaks first. No opponent argument exists yet.]`
     : `OPPONENT (${opponent.name}) just said: "${opponentMessage}"`;
-  return `DEBATE TOPIC: ${topic || 'General debate'}
+  return `DEBATE TOPIC: ${topic || "General debate"}
 TURN: ${turnNumber}${contextBlock}
 ${opponentBlock}
 
@@ -653,6 +993,8 @@ SCORING PHILOSOPHY: A competent-but-unremarkable argument scores 5–6. Reserve 
 Start at 8. -1 unsupported assumption, -2 significant leap, -3 logical error, -4 multiple errors. +1 if every claim has explicit causal chain.
 Hollow specificity is penalizable: a specific number, percentage, or named study without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account.
 Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
+Causal mechanism requirement: for each major causal leap, the argument must supply a mechanism sentence of the form "[how X produces Y] → [why that mechanism operates under these conditions] → [measurable consequence]." A causal leap missing any element of this template is penalized −1 as an unsupported assumption.
+Retroactive necessary condition fallacy: if an argument treats a technology, concept, or practice that postdates the phenomenon being explained as a necessary condition for it, penalize −3. Later developments cannot be used as causal prerequisites for earlier effects.
 Strong analogy: a well-constructed analogy mapping a precise structural distinction earns +1 if the mapping is valid and the insight is novel. A decorative analogy earns nothing here.
 Claim types: conceptual/definitional claims assessed on internal coherence (not empirical evidence); empirical claims need mechanism; normative claims need framework consistency.
 
@@ -675,24 +1017,46 @@ ANTI-BIAS: Tone ≠ Logic. Academic phrasing ≠ rigorous reasoning. Citation �
 }
 
 export function parseJudgeAnalysis(
-  analysisText: string | null, judge: LiveJudge, agent: Agent, opponent: Agent,
-  turnNumber: number, message: string, opponentMessage: string, context: string
+  analysisText: string | null,
+  judge: LiveJudge,
+  agent: Agent,
+  opponent: Agent,
+  turnNumber: number,
+  message: string,
+  opponentMessage: string,
+  context: string,
 ): TurnAnalysis {
   try {
     if (!analysisText?.trim()) {
-      return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
+      return createFallbackAnalysis(
+        judge,
+        agent,
+        opponent,
+        turnNumber,
+        message,
+        opponentMessage,
+        context,
+      );
     }
 
     let jsonString = analysisText
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-      .replace(/<think>[\s\S]*?<\/think>/gi, '')
-      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
       .trim();
 
-    const firstBrace = jsonString.indexOf('{');
-    const lastBrace = jsonString.lastIndexOf('}');
+    const firstBrace = jsonString.indexOf("{");
+    const lastBrace = jsonString.lastIndexOf("}");
     if (firstBrace === -1 || lastBrace <= firstBrace) {
-      return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
+      return createFallbackAnalysis(
+        judge,
+        agent,
+        opponent,
+        turnNumber,
+        message,
+        opponentMessage,
+        context,
+      );
     }
     jsonString = jsonString.substring(firstBrace, lastBrace + 1);
 
@@ -703,21 +1067,43 @@ export function parseJudgeAnalysis(
       const openBraces = (jsonString.match(/\{/g) || []).length;
       const closeBraces = (jsonString.match(/\}/g) || []).length;
       let fixed = jsonString;
-      for (let i = 0; i < openBraces - closeBraces; i++) fixed += '}';
-      try { data = JSON.parse(fixed); } catch {
-        return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
+      for (let i = 0; i < openBraces - closeBraces; i++) fixed += "}";
+      try {
+        data = JSON.parse(fixed);
+      } catch {
+        return createFallbackAnalysis(
+          judge,
+          agent,
+          opponent,
+          turnNumber,
+          message,
+          opponentMessage,
+          context,
+        );
       }
     }
 
-    const logicRaw = Math.max(1, Math.min(10, Math.round(Number(data.logic_score)) || 5));
-    const rhetoricRaw = Math.max(1, Math.min(10, Math.round(Number(data.rhetoric_score)) || 5));
-    const tacticsRaw = Math.max(1, Math.min(10, Math.round(Number(data.tactics_score)) || 5));
+    const logicRaw = Math.max(
+      1,
+      Math.min(10, Math.round(Number(data.logic_score)) || 5),
+    );
+    const rhetoricRaw = Math.max(
+      1,
+      Math.min(10, Math.round(Number(data.rhetoric_score)) || 5),
+    );
+    const tacticsRaw = Math.max(
+      1,
+      Math.min(10, Math.round(Number(data.tactics_score)) || 5),
+    );
 
     const logicScore = Math.min(40, logicRaw * 4);
     const rhetoricScore = Math.min(30, rhetoricRaw * 3);
     const tacticsScore = Math.min(30, tacticsRaw * 3);
     const totalScore = logicScore + rhetoricScore + tacticsScore;
-    const analysis = typeof data.analysis === 'string' ? data.analysis : 'No analysis provided';
+    const analysis =
+      typeof data.analysis === "string"
+        ? data.analysis
+        : "No analysis provided";
 
     const scores: JudgeScores = {
       logicalCoherence: logicScore,
@@ -725,51 +1111,111 @@ export function parseJudgeAnalysis(
       frameControl: totalScore,
       credibilityScore: totalScore,
       tacticalEffectiveness: tacticsScore,
-      overallScore: totalScore
+      overallScore: totalScore,
     };
 
     return {
-      turnNumber, agentId: agent.id, agentName: agent.name,
-      opponentId: opponent.id, opponentName: opponent.name,
-      message, opponentMessage, context, scores,
-      usedTactics: [], effectivenessMap: {},
-      momentumShift: 0, frameControlShift: 0,
-      exposedWeaknesses: [], tacticalInsights: [],
-      judgeId: judge.id, judgeSpecialization: judge.specialization, reasoning: analysis
+      turnNumber,
+      agentId: agent.id,
+      agentName: agent.name,
+      opponentId: opponent.id,
+      opponentName: opponent.name,
+      message,
+      opponentMessage,
+      context,
+      scores,
+      usedTactics: [],
+      effectivenessMap: {},
+      momentumShift: 0,
+      frameControlShift: 0,
+      exposedWeaknesses: [],
+      tacticalInsights: [],
+      judgeId: judge.id,
+      judgeSpecialization: judge.specialization,
+      reasoning: analysis,
     };
   } catch (error) {
-    console.error('[Adaptive Judge] parseJudgeAnalysis threw:', error);
-    return createFallbackAnalysis(judge, agent, opponent, turnNumber, message, opponentMessage, context);
+    console.error("[Adaptive Judge] parseJudgeAnalysis threw:", error);
+    return createFallbackAnalysis(
+      judge,
+      agent,
+      opponent,
+      turnNumber,
+      message,
+      opponentMessage,
+      context,
+    );
   }
 }
 
 export function createFallbackAnalysis(
-  judge: LiveJudge, agent: Agent, opponent: Agent,
-  turnNumber: number, message: string, opponentMessage: string, context: string
+  judge: LiveJudge,
+  agent: Agent,
+  opponent: Agent,
+  turnNumber: number,
+  message: string,
+  opponentMessage: string,
+  context: string,
 ): TurnAnalysis {
   const defaultScores: JudgeScores = {
-    logicalCoherence: 20, rhetoricalForce: 15, frameControl: 50,
-    credibilityScore: 50, tacticalEffectiveness: 15, overallScore: 50
+    logicalCoherence: 20,
+    rhetoricalForce: 15,
+    frameControl: 50,
+    credibilityScore: 50,
+    tacticalEffectiveness: 15,
+    overallScore: 50,
   };
   return {
-    turnNumber, agentId: agent.id, agentName: agent.name,
-    opponentId: opponent.id, opponentName: opponent.name,
-    message, opponentMessage, context, scores: defaultScores,
-    usedTactics: [{ tactic: 'fallback_default', effectiveness: 50, confidence: 30, context: 'Fallback' }],
+    turnNumber,
+    agentId: agent.id,
+    agentName: agent.name,
+    opponentId: opponent.id,
+    opponentName: opponent.name,
+    message,
+    opponentMessage,
+    context,
+    scores: defaultScores,
+    usedTactics: [
+      {
+        tactic: "fallback_default",
+        effectiveness: 50,
+        confidence: 30,
+        context: "Fallback",
+      },
+    ],
     effectivenessMap: { fallback_default: 50 },
-    momentumShift: 0, frameControlShift: 0,
-    exposedWeaknesses: ['Unable to analyze'], tacticalInsights: ['Fallback analysis'],
-    judgeId: judge.id, judgeSpecialization: judge.specialization,
-    reasoning: 'Fallback analysis — using default scores'
+    momentumShift: 0,
+    frameControlShift: 0,
+    exposedWeaknesses: ["Unable to analyze"],
+    tacticalInsights: ["Fallback analysis"],
+    judgeId: judge.id,
+    judgeSpecialization: judge.specialization,
+    reasoning: "Fallback analysis — using default scores",
   };
 }
 
-export function aggregateJudgeScores(judgeAnalyses: TurnAnalysis[]): JudgeScores {
+export function aggregateJudgeScores(
+  judgeAnalyses: TurnAnalysis[],
+): JudgeScores {
   if (judgeAnalyses.length === 0) {
-    return { logicalCoherence: 0, rhetoricalForce: 0, frameControl: 0, credibilityScore: 0, tacticalEffectiveness: 0, overallScore: 0 };
+    return {
+      logicalCoherence: 0,
+      rhetoricalForce: 0,
+      frameControl: 0,
+      credibilityScore: 0,
+      tacticalEffectiveness: 0,
+      overallScore: 0,
+    };
   }
-  const agg: JudgeScores = { logicalCoherence: 0, rhetoricalForce: 0, frameControl: 0, credibilityScore: 0, tacticalEffectiveness: 0, overallScore: 0 };
-  judgeAnalyses.forEach(a => {
+  const agg: JudgeScores = {
+    logicalCoherence: 0,
+    rhetoricalForce: 0,
+    frameControl: 0,
+    credibilityScore: 0,
+    tacticalEffectiveness: 0,
+    overallScore: 0,
+  };
+  judgeAnalyses.forEach((a) => {
     agg.logicalCoherence += a.scores.logicalCoherence;
     agg.rhetoricalForce += a.scores.rhetoricalForce;
     agg.frameControl += a.scores.frameControl;
@@ -784,26 +1230,44 @@ export function aggregateJudgeScores(judgeAnalyses: TurnAnalysis[]): JudgeScores
     frameControl: Math.round(agg.frameControl / d),
     credibilityScore: Math.round(agg.credibilityScore / d),
     tacticalEffectiveness: Math.round(agg.tacticalEffectiveness / d),
-    overallScore: Math.round(agg.overallScore / d)
+    overallScore: Math.round(agg.overallScore / d),
   };
 }
 
-export function calculateMomentumShift(scores: JudgeScores, momentumTracker: MomentumTracker, agentId: string): number {
+export function calculateMomentumShift(
+  scores: JudgeScores,
+  momentumTracker: MomentumTracker,
+  agentId: string,
+): number {
   const baseMomentum = (scores.overallScore - 50) * 0.4;
   const tacticalBonus = (scores.tacticalEffectiveness - 15) * 0.3;
   const credibilityPenalty = (50 - scores.credibilityScore) * 0.2;
   const currentMomentum = momentumTracker.currentMomentum[agentId] || 0;
   const inertiaFactor = currentMomentum * 0.1;
-  return Math.max(-25, Math.min(25, baseMomentum + tacticalBonus - credibilityPenalty + inertiaFactor));
+  return Math.max(
+    -25,
+    Math.min(
+      25,
+      baseMomentum + tacticalBonus - credibilityPenalty + inertiaFactor,
+    ),
+  );
 }
 
-export function calculateFrameControlShift(scores: JudgeScores, frameControlTracker: FrameControlTracker, agentId: string): number {
+export function calculateFrameControlShift(
+  scores: JudgeScores,
+  frameControlTracker: FrameControlTracker,
+  agentId: string,
+): number {
   // 17.5 = midpoint of avg(logicalCoherence 0–40, rhetoricalForce 0–30) = (20 + 15) / 2
-  const baseControl = (scores.logicalCoherence + scores.rhetoricalForce) / 2 - 17.5;
+  const baseControl =
+    (scores.logicalCoherence + scores.rhetoricalForce) / 2 - 17.5;
   const tacticalModifier = (scores.tacticalEffectiveness - 15) * 0.3;
   const currentControl = frameControlTracker.currentControl[agentId] || 0;
   const inertiaFactor = currentControl * 0.15;
-  return Math.max(-20, Math.min(20, (baseControl + tacticalModifier + inertiaFactor) * 0.4));
+  return Math.max(
+    -20,
+    Math.min(20, (baseControl + tacticalModifier + inertiaFactor) * 0.4),
+  );
 }
 
 function createJudgeProvider(modelId: string) {
