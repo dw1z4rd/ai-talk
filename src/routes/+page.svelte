@@ -2090,7 +2090,7 @@
   /* Responsive 2-col grid: stacks on mobile, side-by-side on 860px+ */
   .judge-main-grid {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 1rem;
   }
   @media (min-width: 860px) {
