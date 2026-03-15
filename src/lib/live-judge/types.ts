@@ -100,7 +100,7 @@ export interface DebateScorecard {
   winTallies: { [agentId: string]: AgentWinTally };
   overallWinner: string | null; // agentId, or null if draw
   /** Tracks which agents have submitted at least one qualifying counterfactual. */
-  counterfactualTrack: { [agentId: string]: boolean };
+  counterfactualTrack?: { [agentId: string]: boolean };
 }
 
 /**
