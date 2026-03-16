@@ -276,6 +276,21 @@ export class LiveJudgeSystem {
         // Derive synthetic adaptive scores from pairwise result
         aggregatedScores = synthScoresFromPairwise(pairwiseRound, agent.id);
 
+        // Replace the binary floor/ceiling rhetoric and tactics values with the
+        // continuous absolute scores when available. synthScoresFromPairwise
+        // maps win→24 / loss→10 for these dimensions, which produces the
+        // floor-clustering problem observed in long debates. absoluteScores
+        // uses the 1–10 model signal mapped to 3–30, giving proper spread.
+        // logicalCoherence stays binary (14/30 validated) and overallScore
+        // stays win-count-mapped (30/45/65/82) to keep momentum calibration intact.
+        if (absoluteScores) {
+          aggregatedScores = {
+            ...aggregatedScores,
+            rhetoricalForce: absoluteScores.rhetoricalForce,
+            tacticalEffectiveness: absoluteScores.tacticalEffectiveness,
+          };
+        }
+
         // Also create a synthetic TurnAnalysis for pressure.ts compatibility
         judgeAnalyses = [
           this.synthTurnAnalysis(

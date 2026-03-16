@@ -301,7 +301,9 @@ export interface JudgeAnalysisResult {
    *  1–10 model scale mapped to 4–40 / 3–30 / 3–30, making them comparable across debates.
    *  frameControl and credibilityScore are on the same 0–100 scale as JudgeScores, and
    *  overallScore is the corresponding weighted composite of these absolute per-turn scores.
-   *  Does not drive the adaptive pressure pipeline — use aggregatedScores for that. */
+   *  rhetoricalForce and tacticalEffectiveness from absoluteScores are merged into
+   *  aggregatedScores (replacing the binary floor/ceiling from synthScoresFromPairwise)
+   *  so they do feed the display and pressure pipeline for those two dimensions. */
   absoluteScores?: JudgeScores;
   /** Rounds where pairwise winner assignment diverged significantly from absolute per-turn scores. */
   harmonizationFlags?: HarmonizationFlag[];
