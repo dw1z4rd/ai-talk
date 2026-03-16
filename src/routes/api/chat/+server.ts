@@ -69,11 +69,16 @@ export const POST: RequestHandler = async ({ request }) => {
 
         let turn = aiMessagesCount;
 
-        // Per-agent pending judge: maps agentId → { promise, turnNumber }.
-        // The judge for turn N runs concurrently with the next agent's generation.
-        // We await it (and emit its result) at the start of the SAME agent's next
-        // turn (turn N+2), guaranteeing hiddenDirective is applied in time.
-        type PendingJudge = { promise: Promise<any>; turnNumber: number };
+        // Per-agent pending judge: maps agentId → { promise, turnNumber, emitted }.
+        // Results are emitted as soon as the promise resolves via .then() so the
+        // UI gets them immediately rather than waiting until the flush point.
+        // The flush (at the start of the same agent's next turn, N+2) still awaits
+        // the promise to guarantee hiddenDirective is applied before the next reply.
+        type PendingJudge = {
+          promise: Promise<any>;
+          turnNumber: number;
+          emitted: boolean;
+        };
         const pendingJudges = new Map<string, PendingJudge>();
 
         const emitJudgeResult = (jr: any) => {
@@ -117,12 +122,14 @@ export const POST: RequestHandler = async ({ request }) => {
           const opponentAgent = agents[(turn + 1) % agents.length];
           const turnNumber = turn + 1;
 
-          // Flush this agent's previous judge before they speak again.
-          // By this point it has had a full turn's generation time to complete.
+          // Await this agent's previous judge before they speak again,
+          // ensuring the hiddenDirective is ready for their next reply.
+          // The actual SSE emit already happened in the .then() callback below.
           const myPending = pendingJudges.get(agent.id);
           if (myPending) {
             const jr = await myPending.promise;
-            if (jr) {
+            if (jr && !myPending.emitted) {
+              myPending.emitted = true;
               emitJudgeResult(jr);
               emitScoreUpdates(jr);
             }
@@ -168,16 +175,36 @@ export const POST: RequestHandler = async ({ request }) => {
 
           // Judge is now running in background. Signal the UI and pipeline it.
           send({ type: "judgeStatus", status: "scoring", turnNumber });
-          pendingJudges.set(agent.id, { promise: judgePromise, turnNumber });
+          const pendingEntry: PendingJudge = {
+            promise: judgePromise,
+            turnNumber,
+            emitted: false,
+          };
+          // Emit the result immediately when the promise resolves so the client
+          // sees each score as soon as it's ready rather than waiting for the flush.
+          judgePromise
+            .then((jr) => {
+              if (jr && !pendingEntry.emitted) {
+                pendingEntry.emitted = true;
+                emitJudgeResult(jr);
+                emitScoreUpdates(jr);
+              }
+            })
+            .catch(() => {
+              /* errors surfaced at the await below */
+            });
+          pendingJudges.set(agent.id, pendingEntry);
 
           turn++;
           await new Promise((r) => setTimeout(r, 250));
         }
 
-        // Flush any remaining pending judges (last 1–2 turns) before the verdict.
+        // Await any remaining pending judges (last 1–2 turns) before the verdict.
+        // Results were already emitted via .then(); this just ensures completion.
         for (const [, pending] of pendingJudges) {
           const jr = await pending.promise;
-          if (jr) {
+          if (jr && !pending.emitted) {
+            pending.emitted = true;
             emitJudgeResult(jr);
             emitScoreUpdates(jr);
           }
