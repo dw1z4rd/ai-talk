@@ -41,7 +41,7 @@
   <!-- Sticky progress bar -->
   {#if running || (done && messages.length > 0)}
     <div
-      class="flex items-center gap-3 px-6 py-3 border-b border-[--color-border-subtle] bg-[--color-panel]/80 backdrop-blur-sm sticky top-0 z-10"
+      class="flex items-center gap-3 px-6 py-1 border-b border-[--color-border-subtle] bg-[--color-panel]/80 backdrop-blur-sm sticky top-0 z-10"
     >
       <div
         class="flex-1 h-1 bg-[--color-border] rounded-full overflow-hidden"
