@@ -106,8 +106,19 @@
         if (!narrativeVerdict.agreesWithScorecard) {
           content += `\n> ⚡ Narrative verdict disagrees with the round-by-round scorecard.\n`;
           if (narrativeVerdict.conflictResolution) {
-            content += `\n> **Why they diverged:** ${narrativeVerdict.conflictResolution}\n`;
+            const splitHeader = narrativeVerdict.scorecardInternallyConsistent === false
+              ? "Why they diverged · scorecard internally split"
+              : "Why they diverged";
+            content += `\n> **${splitHeader}:** ${narrativeVerdict.conflictResolution}\n`;
           }
+        }
+        if (narrativeVerdict.convergence?.detected) {
+          const conv = narrativeVerdict.convergence;
+          content += `\n> ⚠ **Positional convergence detected**`;
+          if (conv.convergenceTurnRange) content += ` · ${conv.convergenceTurnRange}`;
+          content += `\n`;
+          if (conv.positionalGapDescription) content += `\n> ${conv.positionalGapDescription}\n`;
+          content += `\n> Remaining disagreement: ${conv.remainingDisagreementType} · Motion viability: ${conv.motionViability === "degenerate_convergence" ? "degenerate — opposition collapsed" : conv.motionViability}\n`;
         }
       }
 
@@ -175,9 +186,24 @@
       }
 
       if (narrativeVerdict?.text) {
-        content += `${"═".repeat(40)}\nNARRATIVE VERDICT\n\n${narrativeVerdict.text}\n`;
+        const arcLabel = narrativeVerdict.agreesWithScorecard ? "NARRATIVE VERDICT" : "NARRATIVE VERDICT  ⚡ ARC DIVERGES";
+        content += `${"═".repeat(40)}\n${arcLabel}\n\n${narrativeVerdict.text}\n`;
         if (narrativeVerdict.favouredAgentId) {
           content += `\nVerdict: ${getModelInfo(narrativeVerdict.favouredAgentId).name}\n`;
+        }
+        if (!narrativeVerdict.agreesWithScorecard && narrativeVerdict.conflictResolution) {
+          const splitHeader = narrativeVerdict.scorecardInternallyConsistent === false
+            ? "Why they diverged (scorecard internally split)"
+            : "Why they diverged";
+          content += `\n${splitHeader}:\n${narrativeVerdict.conflictResolution}\n`;
+        }
+        if (narrativeVerdict.convergence?.detected) {
+          const conv = narrativeVerdict.convergence;
+          content += `\n⚠ Positional convergence detected`;
+          if (conv.convergenceTurnRange) content += ` · ${conv.convergenceTurnRange}`;
+          content += `\n`;
+          if (conv.positionalGapDescription) content += `${conv.positionalGapDescription}\n`;
+          content += `Remaining disagreement: ${conv.remainingDisagreementType} · Motion viability: ${conv.motionViability === "degenerate_convergence" ? "degenerate — opposition collapsed" : conv.motionViability}\n`;
         }
         content += "\n";
       }
@@ -273,11 +299,29 @@
     let verdictHtml = "";
     if (narrativeVerdict?.text) {
       verdictHtml += `<hr style="margin:2rem 0;border:none;border-top:1px solid #ddd">`;
-      verdictHtml += `<h2 style="font-size:1rem;font-weight:700;margin-bottom:0.5rem">Narrative Verdict</h2>`;
-      verdictHtml += `<p style="font-size:0.82rem;color:#444;font-style:italic;margin-bottom:0.5rem">Arc-level: rewards cumulative thesis coherence</p>`;
+      const arcDiverges = !narrativeVerdict.agreesWithScorecard;
+      const verdictAccent = arcDiverges ? "#d97706" : "#7c3aed";
+      verdictHtml += `<h2 style="font-size:1rem;font-weight:700;margin-bottom:0.25rem;color:${verdictAccent}">${arcDiverges ? "⚡ Narrative Arc Diverges" : "Narrative Verdict"}</h2>`;
+      verdictHtml += `<p style="font-size:0.75rem;color:#888;font-style:italic;margin-bottom:0.75rem">Arc-level · cumulative thesis coherence</p>`;
+      if (narrativeVerdict.convergence?.detected) {
+        const conv = narrativeVerdict.convergence;
+        verdictHtml += `<div style="margin-bottom:0.75rem;padding:0.6rem 0.8rem;background:#eff6ff;border-left:3px solid #38bdf8;border-radius:4px;font-size:0.8rem">`;
+        verdictHtml += `<strong style="color:#0369a1">⚠ Positional convergence detected${conv.convergenceTurnRange ? ` · ${escapeHtml(conv.convergenceTurnRange)}` : ""}</strong>`;
+        if (conv.positionalGapDescription) verdictHtml += `<br>${escapeHtml(conv.positionalGapDescription)}`;
+        verdictHtml += `<br><span style="color:#555">Remaining disagreement: ${escapeHtml(conv.remainingDisagreementType)} · Motion viability: ${escapeHtml(conv.motionViability === "degenerate_convergence" ? "degenerate — opposition collapsed" : conv.motionViability)}</span>`;
+        verdictHtml += `</div>`;
+      }
       verdictHtml += `<div style="font-size:0.88rem;line-height:1.65">${formatMessage(narrativeVerdict.text)}</div>`;
       if (narrativeVerdict.favouredAgentId) {
         verdictHtml += `<p style="margin-top:0.75rem;font-weight:700">Verdict: ${escapeHtml(getModelInfo(narrativeVerdict.favouredAgentId).name)}</p>`;
+      }
+      if (arcDiverges && narrativeVerdict.conflictResolution) {
+        const splitLabel = narrativeVerdict.scorecardInternallyConsistent === false
+          ? "Why they diverged · scorecard internally split"
+          : "Why they diverged";
+        verdictHtml += `<div style="margin-top:0.75rem;padding:0.6rem 0.8rem;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:4px;font-size:0.8rem">`;
+        verdictHtml += `<strong style="color:#92400e">${escapeHtml(splitLabel)}</strong><br>${escapeHtml(narrativeVerdict.conflictResolution)}`;
+        verdictHtml += `</div>`;
       }
     }
 
