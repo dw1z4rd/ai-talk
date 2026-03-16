@@ -1076,9 +1076,24 @@ Write your split analysis:`;
   }
 }
 
+/** Extract the override pattern name (COHERENCE COLLAPSE, RECOVERY ARC, or ASYMMETRIC DEPTH)
+ * that the narrative explicitly invoked, if any. Returns null when none is found.
+ */
+export function extractClaimedOverridePattern(
+  narrativeText: string,
+): "COHERENCE COLLAPSE" | "RECOVERY ARC" | "ASYMMETRIC DEPTH" | null {
+  const t = narrativeText.toUpperCase();
+  if (t.includes("COHERENCE COLLAPSE")) return "COHERENCE COLLAPSE";
+  if (t.includes("RECOVERY ARC")) return "RECOVERY ARC";
+  if (t.includes("ASYMMETRIC DEPTH")) return "ASYMMETRIC DEPTH";
+  return null;
+}
+
 /**
- * Generate a 2-3 sentence adjudication when the narrative verdict disagrees with
- * the round-by-round scorecard. Explains why they diverged and which is better supported.
+ * Generate a 3-sentence adjudication when the narrative verdict disagrees with
+ * the round-by-round scorecard. When the narrative has already invoked a named
+ * override pattern, the meta-analyst validates or refutes that specific pattern
+ * rather than searching for one from scratch.
  */
 export async function generateConflictResolution(
   judge: LiveJudge,
@@ -1087,13 +1102,33 @@ export async function generateConflictResolution(
   scorecardSummary: string,
   narrativeText: string,
   scorecardInternallyConsistent: boolean,
+  claimedOverridePattern:
+    | "COHERENCE COLLAPSE"
+    | "RECOVERY ARC"
+    | "ASYMMETRIC DEPTH"
+    | null,
   signal?: AbortSignal,
 ): Promise<string> {
   const internalSplitNote = scorecardInternallyConsistent
     ? ""
     : `\nNOTE: The scorecard itself is internally split — the dimension-win leader and the cumulative-points leader are different agents. This usually means one agent won individual exchanges while the other held position better across the arc. Factor this diagnostic into your assessment.`;
 
-  const systemPrompt = `You are a meta-analyst adjudicating a conflict between two debate judging systems. The pairwise scorecard is the primary authoritative record of systematic turn-by-turn assessment. The narrative verdict may override it only when a specific arc-level pattern is present. Write exactly 3 sentences: (1) Identify which of the three valid override patterns applies — COHERENCE COLLAPSE (winner accumulated contradictions), RECOVERY ARC (loser drove a late decisive reframe), or ASYMMETRIC DEPTH (wins were concentrated in a single dimension misaligned with the motion) — or state that none is present. (2) Which verdict is better supported: if a named override pattern is present, the narrative verdict may stand; if none is present, the scorecard winner should stand. (3) What the losing verdict captured correctly despite picking the wrong winner. Be specific. Do not hedge.`;
+  const patternDefinitions: Record<string, string> = {
+    "COHERENCE COLLAPSE":
+      "the scorecard winner accumulated contradictions that hollow out their position across the arc",
+    "RECOVERY ARC":
+      "the scorecard loser drove a late decisive reframe that resolved the debate's core tension",
+    "ASYMMETRIC DEPTH":
+      "one debater's wins were concentrated in logic while the other's were purely tactical or rhetorical, and the debate's motion rewards depth over tactical breadth",
+  };
+
+  let systemPrompt: string;
+  if (claimedOverridePattern) {
+    const def = patternDefinitions[claimedOverridePattern];
+    systemPrompt = `You are a meta-analyst adjudicating a conflict between two debate judging systems. The narrative verdict has invoked the ${claimedOverridePattern} override pattern to favour ${narrativeFavouredName} over the scorecard result. Your task is to assess whether that specific pattern is genuinely present. Write exactly 3 sentences: (1) Assess whether ${claimedOverridePattern} is actually evidenced in this debate — ${def}. State clearly whether the evidence supports or refutes this specific claim. (2) Which verdict is better supported given your assessment: if ${claimedOverridePattern} is confirmed, the narrative verdict stands; if it is not substantiated by the scorecard evidence, the scorecard result should stand. (3) What the losing verdict captured correctly despite the disagreement. Be specific. Do not hedge.`;
+  } else {
+    systemPrompt = `You are a meta-analyst adjudicating a conflict between two debate judging systems. The pairwise scorecard is the primary authoritative record of systematic turn-by-turn assessment. The narrative verdict may override it only when a specific arc-level pattern is present. Write exactly 3 sentences: (1) Identify which of the three valid override patterns applies — COHERENCE COLLAPSE (winner accumulated contradictions), RECOVERY ARC (loser drove a late decisive reframe), or ASYMMETRIC DEPTH (wins were concentrated in a single dimension misaligned with the motion) — or state that none is present. (2) Which verdict is better supported: if a named override pattern is present, the narrative verdict may stand; if none is present, the scorecard winner should stand. (3) What the losing verdict captured correctly despite picking the wrong winner. Be specific. Do not hedge.`;
+  }
 
   const prompt = `SCORECARD WINNER: ${scorecardWinnerName}
 NARRATIVE VERDICT FAVOURS: ${narrativeFavouredName}${internalSplitNote}
@@ -1101,8 +1136,8 @@ NARRATIVE VERDICT FAVOURS: ${narrativeFavouredName}${internalSplitNote}
 SCORECARD SUMMARY:
 ${scorecardSummary}
 
-NARRATIVE VERDICT (excerpt):
-${narrativeText.slice(0, 500)}
+NARRATIVE VERDICT:
+${narrativeText.slice(0, 1500)}
 
 Write your adjudication:`;
 

@@ -24,6 +24,7 @@ import {
   synthScoresFromPairwise,
   generateNarrativeVerdictText,
   generateConflictResolution,
+  extractClaimedOverridePattern,
   generateScorecardSplitNote,
   generateRubricHarmonization,
   computeHarmonizationFlags,
@@ -531,6 +532,9 @@ export class LiveJudgeSystem {
 
           const adjController = new AbortController();
           const adjTimer = setTimeout(() => adjController.abort(), 20_000);
+          const claimedOverridePattern = extractClaimedOverridePattern(
+            verdict.text,
+          );
           const conflictResolutionText = await generateConflictResolution(
             judge,
             scorecardWinnerName,
@@ -538,6 +542,7 @@ export class LiveJudgeSystem {
             scorecardSummary,
             verdict.text,
             scorecardInternallyConsistent,
+            claimedOverridePattern,
             adjController.signal,
           ).finally(() => clearTimeout(adjTimer));
           const trimmedConflictResolution = conflictResolutionText.trim();
