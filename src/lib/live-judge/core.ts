@@ -248,6 +248,7 @@ export class LiveJudgeSystem {
         // Any claim attributed to the prevTurn agent that hasn't already been
         // registered gets added as an unresolved flag for future rounds to evaluate.
         if (pairwiseResult.suspectClaims && !pairwiseResult.isFallback) {
+          let newFlagsSeeded = 0;
           for (const entry of pairwiseResult.suspectClaims) {
             // Format: "AgentName: claim text"
             const colonIdx = entry.indexOf(":");
@@ -280,15 +281,29 @@ export class LiveJudgeSystem {
                   claim: claimText,
                   status: "unresolved",
                 });
+                newFlagsSeeded++;
               }
             }
           }
+          console.log(
+            `[Claim Flags] Round ${roundNumber} seeded ${newFlagsSeeded}/${pairwiseResult.suspectClaims.length} new flag(s) for ${prevAgentName} T${prevTurnNumber}` +
+              (pairwiseResult.suspectClaims.length > 0
+                ? ` — claims: ${pairwiseResult.suspectClaims.map((c) => `"${c.slice(0, 60)}${c.length > 60 ? "…" : ""}"`).join(", ")}`
+                : ""),
+          );
+        } else if (!pairwiseResult.isFallback) {
+          console.log(
+            `[Claim Flags] Round ${roundNumber}: pairwise judge returned no suspect_claims for ${prevAgentName} T${prevTurnNumber}`,
+          );
         }
 
         // ── Apply retroactive score corrections from flag_updates ─────────────
         // The judge issues UPDATE instructions for prevTurn's absolute score.
         // We apply them to retroactiveDeltas; the SSE layer emits scoreUpdate events.
         if (pairwiseResult.flagUpdates && !pairwiseResult.isFallback) {
+          console.log(
+            `[Claim Flags] Round ${roundNumber}: ${pairwiseResult.flagUpdates.length} flag_update(s) received`,
+          );
           for (const update of pairwiseResult.flagUpdates) {
             const { flagId, targetTurn, deltaRaw, updateType } = update;
 
@@ -323,6 +338,9 @@ export class LiveJudgeSystem {
               flag.status =
                 updateType === "partial_restore" ? "resolved" : "penalized";
             }
+            console.log(
+              `[Claim Flags] ${updateType} on ${flagId} → T${targetTurn} logicalCoherence ${effectiveDelta > 0 ? "+" : ""}${effectiveDelta * 4} (scaled)`,
+            );
           }
         }
 
