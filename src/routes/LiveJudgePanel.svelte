@@ -13,9 +13,10 @@
     narrativeVerdict: any;
     currentLeader: any;
     judgeStatus?: 'scoring' | 'writing_verdict' | null;
+    scoreDeltas?: Record<number, number>;
   }
 
-  let { liveJudgeResults, pairwiseRounds, narrativeVerdict, currentLeader, judgeStatus = null }: Props = $props();
+  let { liveJudgeResults, pairwiseRounds, narrativeVerdict, currentLeader, judgeStatus = null, scoreDeltas = {} }: Props = $props();
 </script>
 
 <div id="live-judge-panel" class="flex flex-col gap-4 judge-panel">
@@ -83,10 +84,17 @@
             >
             <span
               class="flex flex-col items-center leading-tight"
-              title="Logic: {s.logicalCoherence}/40"
+              title="Logic: {s.logicalCoherence}/40{scoreDeltas[r.turnNumber] ? ' (retroactively adjusted: ' + (scoreDeltas[r.turnNumber] > 0 ? '+' : '') + scoreDeltas[r.turnNumber] + ')' : ''}"
             >
               <span class="font-mono text-[12px]">{s.logicalCoherence}</span>
               <span class="text-[9px] text-[--color-muted]">/40</span>
+              {#if scoreDeltas[r.turnNumber]}
+                {@const d = scoreDeltas[r.turnNumber]}
+                <span
+                  class="font-mono text-[9px] font-bold mt-0.5 px-1 rounded"
+                  style="color: {d < 0 ? '#f87171' : '#34d399'}; background: {d < 0 ? '#f8717118' : '#34d39918'}"
+                >{d > 0 ? '+' : ''}{d}</span>
+              {/if}
             </span>
             <span
               class="flex flex-col items-center leading-tight"

@@ -14,6 +14,7 @@
     currentLeader: any;
     narrativeVerdict: any;
     liveJudgeResults: any[];
+    scoreDeltas?: Record<number, number>;
     onreset: () => void;
   }
 
@@ -28,6 +29,7 @@
     currentLeader,
     narrativeVerdict,
     liveJudgeResults,
+    scoreDeltas = {},
     onreset,
   }: Props = $props();
 
@@ -136,7 +138,11 @@
           const s = r.absoluteScores;
           // Use the live sum so any retroactive logicalCoherence patches are reflected.
           const liveTotal = s.logicalCoherence + s.rhetoricalForce + s.tacticalEffectiveness;
-          content += `| T${r.turnNumber} | ${getModelInfo(r.agentId).name} | ${s.logicalCoherence} | ${s.rhetoricalForce} | ${s.tacticalEffectiveness} | ${liveTotal} |\n`;
+          const delta = scoreDeltas[r.turnNumber];
+          const logicCell = delta
+            ? `${s.logicalCoherence} _(${delta > 0 ? '+' : ''}${delta})_`
+            : `${s.logicalCoherence}`;
+          content += `| T${r.turnNumber} | ${getModelInfo(r.agentId).name} | ${logicCell} | ${s.rhetoricalForce} | ${s.tacticalEffectiveness} | ${liveTotal} |\n`;
         });
       }
 

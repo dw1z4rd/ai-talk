@@ -40,6 +40,8 @@
   let showLiveJudgePanel = $state(false);
 
   let liveJudgeResults = $state<any[]>([]);
+  // Cumulative retroactive logic deltas per turn number (from flag_updates)
+  let scoreDeltas = $state<Record<number, number>>({});
   let pairwiseRounds = $state<any[]>([]);
   let finalScorecard = $state<any>(null);
   let narrativeVerdict = $state<any>(null);
@@ -194,6 +196,7 @@
       winner = null;
       winnerScore = 0;
       showWinnerModal = false;
+      scoreDeltas = {};
     }
     done = false;
     isPaused = false;
@@ -393,6 +396,11 @@
               };
               liveJudgeResults = [...liveJudgeResults];
             }
+            // Accumulate delta for the badge display in the score table
+            scoreDeltas = {
+              ...scoreDeltas,
+              [data.targetTurn]: (scoreDeltas[data.targetTurn] ?? 0) + data.deltaLogic,
+            };
             const notifId = crypto.randomUUID();
             scoreUpdateNotifications = [
               ...scoreUpdateNotifications,
@@ -501,6 +509,7 @@
           {narrativeVerdict}
           {currentLeader}
           {judgeStatus}
+          {scoreDeltas}
         />
       </div>
     {/if}
@@ -565,6 +574,7 @@
     {currentLeader}
     {narrativeVerdict}
     {liveJudgeResults}
+    {scoreDeltas}
     onreset={resetConversation}
   />
 {/if}
