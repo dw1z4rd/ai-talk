@@ -1177,7 +1177,7 @@ export async function analyzeTurn(
   try {
     const analysisText = await judgeProvider.generateText(judgePrompt, {
       systemPrompt: generateJudgeSystemPrompt(domainNote),
-      temperature: 0.3,
+      temperature: 0.5,
       maxTokens: 600,
       signal,
     });
@@ -1255,7 +1255,7 @@ SCORING PHILOSOPHY: A competent-but-unremarkable argument scores 5–6. Reserve 
 INDEPENDENCE: Score this turn entirely on its own merits. Do not anchor to or attempt consistency with previous turns. Each turn recalibrates to zero — smooth score trajectories across turns are a sign of anchoring bias, not analytical accuracy.
 
 --- LOGIC (1–10) ---
-Start at 8. -1 unsupported assumption, -2 significant leap, -3 logical error, -4 multiple errors. +1 if every claim has explicit causal chain.
+Start at 6. -1 unsupported assumption, -2 significant leap, -3 logical error, -4 multiple errors. +1 if every claim has explicit causal chain. A score ≥7 must be actively earned — identify what the argument did right; absence of penalties alone justifies at most 6.
 Hollow specificity is penalizable: a specific number, percentage, named study, or allusion to unnamed research findings (e.g., "recent work shows...", "studies have found...", "experiments demonstrate...") without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account. Apply this symmetrically — no leniency based on prior-turn scoring or positional advantage.
 +1 Grounded precision (symmetric counterpart): a claim that names a specific, verifiable datum AND supplies a mechanism chain linking it to the turn's core argument earns +1. Hollow = specificity without mechanism (−1); Grounded = specificity with mechanism (+1). Both bonuses can coexist on the same turn.
 Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
@@ -1269,11 +1269,12 @@ Claim types — classify before applying standards. Applying empirical requireme
 - Phenomenological: claims about how a phenomenon is experienced or operates in practice. Assess whether the argument's model of the phenomenon maps accurately onto observed behavior. Incorrect phenomenological mapping (e.g., claiming people consciously maximize expected utility across all options) = −1 unsupported assumption. No empirical citation required, but accurate phenomenon modeling is.
 
 --- LOGIC CALIBRATION ANCHORS ---
-HIGH (36–40): Mechanism fully present (cause→process→measurable consequence), directly addresses the opponent's weakest load-bearing assumption, claim is falsifiable. E.g. — Phenomenological: "The attention economy erodes autonomous preference formation because the design goal is maximal engagement rather than accurate belief — meaning the mechanism specifically targets and degrades the epistemic substrate preferences require. Consequence: preferences formed under attentional capture systematically reflect the platform's optimisation target, not the agent's considered values." Scores HIGH because: mechanism identifies a specific adversarial process, consequence is measurable and distinct from the cause, directly attacks the autonomy premise. E.g. — Empirical/social science: "Trade liberalisation raises aggregate welfare but increases within-country inequality because it shifts returns toward mobile capital and skilled labour — the mechanism is factor-price equalisation operating on an already unequal endowment distribution. Measurable consequence: the Gini coefficient rises even as GDP per capita improves." Scores HIGH because: identifies the specific distributional mechanism, names the causal channel (factor-price equalisation), arrives at a falsifiable prediction that differs from the aggregate trend.
-MID (24–28): Correct claim, some mechanism, but missing the consequence step or not engaging the opponent's strongest point. E.g.: "Trade liberalisation creates winners and losers because comparative advantage determines who benefits." Scores MID because: correct mechanism concept, but no consequence step (what measurable thing diverges?), and doesn't address the inequality objection.
-LOW (16–20): Assert-only, no mechanism, no consequence, or logical error. E.g.: "Trade liberalisation is good for growth" with no mechanism. Scores LOW because: bare assertion, no causal chain, no consequence.
+HIGH (9–10): Mechanism fully present (cause→process→measurable consequence), directly addresses the opponent's weakest load-bearing assumption, claim is falsifiable. E.g. — Phenomenological: "The attention economy erodes autonomous preference formation because the design goal is maximal engagement rather than accurate belief — meaning the mechanism specifically targets and degrades the epistemic substrate preferences require. Consequence: preferences formed under attentional capture systematically reflect the platform's optimisation target, not the agent's considered values." Scores HIGH because: mechanism identifies a specific adversarial process, consequence is measurable and distinct from the cause, directly attacks the autonomy premise. E.g. — Empirical/social science: "Trade liberalisation raises aggregate welfare but increases within-country inequality because it shifts returns toward mobile capital and skilled labour — the mechanism is factor-price equalisation operating on an already unequal endowment distribution. Measurable consequence: the Gini coefficient rises even as GDP per capita improves." Scores HIGH because: identifies the specific distributional mechanism, names the causal channel (factor-price equalisation), arrives at a falsifiable prediction that differs from the aggregate trend.
+MID (6–7): Correct claim, some mechanism, but missing the consequence step or not engaging the opponent's strongest point. E.g.: "Trade liberalisation creates winners and losers because comparative advantage determines who benefits." Scores MID because: correct mechanism concept, but no consequence step (what measurable thing diverges?), and doesn't address the inequality objection.
+LOW (4–5): Assert-only, no mechanism, no consequence, or logical error. E.g.: "Trade liberalisation is good for growth" with no mechanism. Scores LOW because: bare assertion, no causal chain, no consequence.
 
 --- RHETORIC (1–10) ---
+Start at 5. Earn +1 for each component that is clearly above average. A score of 8–9 requires at least 3 of the 4 components to be genuinely strong; 10 requires all four. If you find yourself defaulting to 7, identify which specific components earned the two points above the baseline.
 Evaluate on four equally-weighted components in aggregate:
 1. Expression quality — 9–10: clear, concrete, appropriately concise; 5–6: flat or over-hedged; 3–4: dry or padded. ONE component, not the whole rubric: do NOT let punchiness dominate.
 2. Structural clarity — is the argument easy to follow? Clear signposting beats rambling.
@@ -1286,6 +1287,8 @@ EXPRESSION CAP: If Expression quality alone (Component 1) would push the score a
 --- TACTICS (1–10) ---
 Opening turn: score on framing quality, min 5. Other turns: 9–10 targets a specific gap with a named move; 5–6 mostly restates position; 1–2 ignores opponent.
 Undefined comparative/superlative: if the motion has an undefined superlative and this turn argues toward it without establishing a metric, −1 tactics.
+
+COMPRESSION AUDIT: Before outputting scores, run this self-check. (1) Are all three scores within 1 point of each other (e.g. 7/7/7 or 7/8/7)? Logic, rhetoric, and tactics measure orthogonal qualities — a turn with tight reasoning but weak framing should show a gap, not a cluster. (2) Is every score 7 or higher? A competent-but-unremarkable argument scores 5–6 on each dimension; no score below 6 across a full turn is a strong sign of inflation. (3) Is this argument's score near-identical to the previous turn despite being from a different agent on different substance? Independent evaluation rarely converges that tightly — if it does, explain why in the analysis field.
 
 --- DOMAIN CONTEXT ---
 ${domainNote}

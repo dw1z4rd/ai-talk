@@ -1514,15 +1514,15 @@ describe("generateJudgeSystemPrompt — prompt content", () => {
   });
 
   it("contains HIGH calibration anchor with score range", () => {
-    expect(generateJudgeSystemPrompt("")).toContain("HIGH (36–40)");
+    expect(generateJudgeSystemPrompt("")).toContain("HIGH (9–10)");
   });
 
   it("contains MID calibration anchor", () => {
-    expect(generateJudgeSystemPrompt("")).toContain("MID (24–28)");
+    expect(generateJudgeSystemPrompt("")).toContain("MID (6–7)");
   });
 
   it("contains LOW calibration anchor", () => {
-    expect(generateJudgeSystemPrompt("")).toContain("LOW (16–20)");
+    expect(generateJudgeSystemPrompt("")).toContain("LOW (4–5)");
   });
 
   it("contains SERVICE TEST instruction for rhetoric", () => {
