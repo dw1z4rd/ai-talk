@@ -502,6 +502,24 @@ export class LiveJudgeSystem {
                   rhetoricWinner: updatedRound.rhetoricWinner,
                 };
               }
+
+              // Re-compute harmonization flags using post-penalty absolute scores
+              // and the (possibly reconciled) pairwise winners. Flags computed at
+              // round-processing time used pre-penalty lastAbsoluteScores and
+              // become stale when retroactive penalties or restores mutate
+              // absoluteScoreHistory — causing the export to show a flag whose
+              // absolute-score leader disagrees with the current score table.
+              const postPenaltyRound = this.panel.scorecard.rounds[ri];
+              const recomputedFlags = computeHarmonizationFlags(
+                postPenaltyRound,
+                curAbs,
+                prevAbs,
+              );
+              this.panel.scorecard.rounds[ri] = {
+                ...postPenaltyRound,
+                harmonizationFlags:
+                  recomputedFlags.length > 0 ? recomputedFlags : undefined,
+              };
             }
 
             // Recompute overallWinner after tally adjustments

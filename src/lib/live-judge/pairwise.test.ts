@@ -604,6 +604,34 @@ describe("computeHarmonizationFlags", () => {
     expect(dims).toContain("tactics");
     expect(dims).toContain("overall");
   });
+
+  it("re-computation with post-penalty scores clears a stale pre-penalty flag", () => {
+    // Scenario: at round-processing time, prev agent ('a') had absolute logic=30
+    // and cur agent ('b') had absolute logic=22. Pairwise awarded 'b' the win.
+    // A flag fires: 'a' leads absolutely (gap 8), diverging from the pairwise result.
+    //
+    // Later, a retroactive penalty reduces 'a's stored score from 30→22 AND a
+    // retroactive restore raises 'b's score from 22→30. The re-reconciliation loop
+    // calls computeHarmonizationFlags again with the updated scores. The flag
+    // should now be cleared: post-penalty 'b' (cur) leads absolutely (30 > 22),
+    // which matches the pairwise winner — no discrepancy.
+    const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "b");
+
+    // Pre-penalty scores: 'a' (prev) leads on logic
+    const prePenaltyPrev = makeAbsScores({ logicalCoherence: 30, overallScore: 60 });
+    const prePenaltyCur = makeAbsScores({ logicalCoherence: 22, overallScore: 52 });
+    const prePenaltyFlags = computeHarmonizationFlags(round, prePenaltyCur, prePenaltyPrev);
+    const prePenaltyLogicFlag = prePenaltyFlags.find((f) => f.dimension === "logic");
+    expect(prePenaltyLogicFlag).toBeDefined();
+    expect(prePenaltyLogicFlag?.absoluteScoreLeader).toBe("a"); // 'a' led before penalty
+
+    // Post-penalty scores: 'b' (cur) now leads on logic
+    const postPenaltyPrev = makeAbsScores({ logicalCoherence: 22, overallScore: 52 });
+    const postPenaltyCur = makeAbsScores({ logicalCoherence: 30, overallScore: 60 });
+    const postPenaltyFlags = computeHarmonizationFlags(round, postPenaltyCur, postPenaltyPrev);
+    // 'b' wins pairwise AND 'b' leads absolutely → no logic flag
+    expect(postPenaltyFlags.find((f) => f.dimension === "logic")).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
