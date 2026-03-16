@@ -1,8 +1,8 @@
-import { expoOut } from "svelte/easing";
+import { backInOut } from "svelte/easing";
 
 export function flyInFromTop(
   node: Element,
-  { duration = 1000, delay = 0, easing = expoOut } = {},
+  { duration = 2000, delay = 0, easing = backInOut } = {},
 ) {
   // 1. Grab the element's computed styles
   const style = getComputedStyle(node);
@@ -33,7 +33,7 @@ export function flyInFromTop(
 
 export function flyOutToBottom(
   node: Element,
-  { duration = 1000, delay = 0, easing = expoOut } = {},
+  { duration = 2000, delay = 0, easing = backInOut } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -63,7 +63,7 @@ export function flyOutToBottom(
 }
 export function flyInFromLeft(
   node: Element,
-  { duration = 400, delay = 0, easing = expoOut } = {},
+  { duration = 400, delay = 0, easing = backInOut } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -86,7 +86,7 @@ export function flyInFromLeft(
 }
 export function flyOutToRight(
   node: Element,
-  { duration = 400, delay = 0, easing = expoOut } = {},
+  { duration = 400, delay = 0, easing = backInOut } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -116,7 +116,13 @@ export function flyOutToRight(
 }
 export function spinFly(
   node: Element,
-  { duration = 1500, delay = 0, easing = expoOut, y = "100vh", spins = 1 } = {},
+  {
+    duration = 1500,
+    delay = 0,
+    easing = backInOut,
+    y = "100vh",
+    spins = 1,
+  } = {},
 ) {
   return {
     delay,

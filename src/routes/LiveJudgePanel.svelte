@@ -1,8 +1,6 @@
 <script lang="ts">
   import { flip } from "svelte/animate";
   import {
-    flyInFromLeft,
-    flyOutToRight,
     flyInFromTop,
     flyOutToBottom,
   } from "$lib/transitions";
@@ -119,8 +117,8 @@
     style="border-color: {narrativeVerdict.agreesWithScorecard
       ? '#7c6af740'
       : '#f59e0b40'}; animation-delay: 150ms"
-    in:flyInFromLeft
-    out:flyOutToRight
+    in:flyInFromTop
+    out:flyOutToBottom
   >
     <div
       class="flex items-center gap-3 px-4 py-3 border-b"
@@ -226,8 +224,8 @@
       <div
         class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
         style="border-color: #7c6af740; animation-delay: 250ms"
-        in:flyInFromLeft
-        out:flyOutToRight
+        in:flyInFromTop
+        out:flyOutToBottom
       >
         <div
           class="flex items-center gap-3 px-4 py-3 border-b"
@@ -306,8 +304,8 @@
       <div
         class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
         style="border-color: #7c6af740; animation-delay: 350ms"
-        in:flyInFromLeft
-        out:flyOutToRight
+        in:flyInFromTop
+        out:flyOutToBottom
       >
         <div class="px-4 py-3 flex items-center gap-3">
           <div
@@ -336,8 +334,8 @@
       <div
         class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
         style="animation-delay: 0ms"
-        in:flyInFromLeft
-        out:flyOutToRight
+        in:flyInFromTop
+        out:flyOutToBottom
       >
         {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
       </div>
@@ -358,8 +356,8 @@
       <div
         class="rounded-xl border bg-[--color-panel] p-3 judge-card"
         style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-        in:flyInFromLeft
-        out:flyOutToRight
+        in:flyInFromTop
+        out:flyOutToBottom
         animate:flip={{ duration: 1000 }}
       >
         <!-- Round header -->
