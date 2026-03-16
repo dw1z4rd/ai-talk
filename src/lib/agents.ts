@@ -607,7 +607,7 @@ export function buildJudgeAgent(
   agentAName: string,
   agentBName: string,
 ): Agent {
-  const def = MODEL_CATALOG[judgeId] ?? MODEL_CATALOG["gpt-oss:120b-cloud"];
+  const def = MODEL_CATALOG[judgeId] ?? MODEL_CATALOG["kimi-k2-thinking:cloud"];
   return {
     id: judgeId,
     name: def.name,

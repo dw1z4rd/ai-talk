@@ -189,7 +189,7 @@ export async function compareTurns(
   );
 
   const judgeProvider = createJudgeProvider(
-    judge.modelId || "gpt-oss:120b-cloud",
+    judge.modelId || "kimi-k2-thinking:cloud",
   );
   const start = Date.now();
 
@@ -928,7 +928,7 @@ ${transcriptText}
 Write your verdict now:`;
 
   const judgeProvider = createJudgeProvider(
-    judge.modelId || "gpt-oss:120b-cloud",
+    judge.modelId || "kimi-k2-thinking:cloud",
   );
   const start = Date.now();
 
@@ -1058,7 +1058,7 @@ CUMULATIVE POINTS LEADER: ${pointsLeaderName}
 Write your split analysis:`;
 
   const judgeProvider = createJudgeProvider(
-    judge.modelId || "gpt-oss:120b-cloud",
+    judge.modelId || "kimi-k2-thinking:cloud",
   );
   try {
     const text = await judgeProvider.generateText(prompt, {
@@ -1107,7 +1107,7 @@ ${narrativeText.slice(0, 500)}
 Write your adjudication:`;
 
   const judgeProvider = createJudgeProvider(
-    judge.modelId || "gpt-oss:120b-cloud",
+    judge.modelId || "kimi-k2-thinking:cloud",
   );
   try {
     const text = await judgeProvider.generateText(prompt, {
@@ -1173,7 +1173,7 @@ ${roundSummaries}${narrativeBlock}
 Write your consistency report:`;
 
   const judgeProvider = createJudgeProvider(
-    judge.modelId || "gpt-oss:120b-cloud",
+    judge.modelId || "kimi-k2-thinking:cloud",
   );
   try {
     const text = await judgeProvider.generateText(prompt, {
@@ -1225,7 +1225,7 @@ export async function analyzeTurn(
   const domainNote = buildDomainNote(classifyDebateDomain(topic));
 
   const judgeProvider = createJudgeProvider(
-    judge.modelId || "gpt-oss:120b-cloud",
+    judge.modelId || "kimi-k2-thinking:cloud",
   );
   const start = Date.now();
 
@@ -1709,7 +1709,7 @@ Analyse positional convergence and respond with JSON only:`;
 
   try {
     const judgeProvider = createJudgeProvider(
-      judge.modelId || "gpt-oss:120b-cloud",
+      judge.modelId || "kimi-k2-thinking:cloud",
     );
     const text = await judgeProvider.generateText(prompt, {
       systemPrompt,
@@ -1774,3 +1774,4 @@ Analyse positional convergence and respond with JSON only:`;
     return fallback;
   }
 }
+
