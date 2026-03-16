@@ -74,6 +74,18 @@ interface ModelDef {
 
 export const MODEL_CATALOG: Record<string, ModelDef> = {
   // Ollama — Cloud
+
+  "minimax-m2.5:cloud": {
+    name: "MiniMax M2.5",
+    color: "#EF4444",
+    makeProvider: () =>
+      createOllamaProvider({
+        baseUrl: OLLAMA_CLOUD_URL,
+        apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+        model: "minimax-m2.5:cloud",
+      }),
+  },
+
   "nemotron-3-super-cloud": {
     name: "Nemotron 3 Super",
     color: "#FF7000",
@@ -84,6 +96,18 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
         model: "nemotron-3-super-cloud",
       }),
   },
+
+  "kimi-k2.5:cloud": {
+    name: "Kimi K2.5",
+    color: "#F59E0B",
+    makeProvider: () =>
+      createOllamaProvider({
+        baseUrl: OLLAMA_CLOUD_URL,
+        apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+        model: "kimi-k2.5:cloud",
+      }),
+  },
+
   "kimi-k2:1t-cloud": {
     name: "Kimi K2 1T",
     color: "#A78BFA",
@@ -94,6 +118,7 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
         model: "kimi-k2:1t-cloud",
       }),
   },
+
   "kimi-k2-thinking:cloud": {
     name: "Kimi K2 Thinking",
     color: "#11A1CC",
@@ -104,6 +129,7 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
         model: "kimi-k2-thinking:cloud",
       }),
   },
+
   "gpt-oss:120b-cloud": {
     name: "GPT-OSS 120B",
     color: "#FF6B35",
@@ -114,6 +140,7 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
         model: "gpt-oss:120b-cloud",
       }),
   },
+
   "qwen3-vl:235b-cloud": {
     name: "Qwen3-VL 235B",
     color: "#10B981",
@@ -124,6 +151,18 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
         model: "qwen3-vl:235b-cloud",
       }),
   },
+
+  "qwen3-next:80b-cloud": {
+    name: "Qwen3-Next 80B",
+    color: "#8B5CF6",
+    makeProvider: () =>
+      createOllamaProvider({
+        baseUrl: OLLAMA_CLOUD_URL,
+        apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+        model: "qwen3-next:80b-cloud",
+      }),
+  },
+
   "glm-4.6:cloud": {
     name: "GLM-4.6",
     color: "#8B5CF6",
@@ -132,16 +171,6 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
         baseUrl: OLLAMA_CLOUD_URL,
         apiKey: OLLAMA_CLOUD_API_KEY || undefined,
         model: "glm-4.6:cloud",
-      }),
-  },
-  "glm-5:cloud": {
-    name: "GLM-5",
-    color: "#4A9E9E",
-    makeProvider: () =>
-      createOllamaProvider({
-        baseUrl: OLLAMA_CLOUD_URL,
-        apiKey: OLLAMA_CLOUD_API_KEY || undefined,
-        model: "glm-5:cloud",
       }),
   },
 };
@@ -1132,7 +1161,9 @@ export async function generateAdaptiveReply(
       .filter(Boolean) ?? [];
   const tacticWarning =
     recentTactics.length > 0
-      ? `\n\n[RECENT TACTICS — DO NOT REPEAT]: Your last turns used: ${recentTactics.join(", ")}. Choose a different approach this turn.`
+      ? `\n\n[RECENT TACTICS — DO NOT REPEAT]: Your last turns used: ${recentTactics.join(
+          ", ",
+        )}. Choose a different approach this turn.`
       : "";
 
   const prompt =

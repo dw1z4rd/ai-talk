@@ -160,7 +160,7 @@ let bombBuffer: Uint8Array | null = null;
 
 // Configure Ollama provider based on environment
 const ollamaProvider = createOllamaProvider({
-  model: env.OLLAMA_TEXT_MODEL || "qwen3-coder:480b-cloud",
+  model: env.OLLAMA_TEXT_MODEL || "kimi-k2.5:cloud",
   baseUrl: env.OLLAMA_CLOUD_URL || "https://ollama.com/",
   apiKey: env.OLLAMA_CLOUD_API_KEY || undefined,
 });
@@ -414,12 +414,12 @@ const createTarpitStream = (
   const teardown = async () => {
     if (tornDown) return; // idempotent — prevent double-emit
     tornDown = true;
-    
+
     // Abort any ongoing fetch requests
     if (abortController) {
       abortController.abort();
     }
-    
+
     const dropEvent = makeConnectionDroppedEvent(
       ip,
       pathname,
@@ -433,7 +433,7 @@ const createTarpitStream = (
       sessionId,
       duration_seconds: dropEvent.duration_seconds,
     });
-    
+
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`[TARPIT] 🤖 Bot ${ip} disconnected after ${elapsed} seconds`);
   };
@@ -551,7 +551,7 @@ const createTarpitStream = (
         try {
           // Create AbortController for this specific request
           abortController = new AbortController();
-          
+
           await ollamaProvider.generateText(TARPIT_PROMPT, {
             onToken: (token: string) => {
               if (cancelled) return;

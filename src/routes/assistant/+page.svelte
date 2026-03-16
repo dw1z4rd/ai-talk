@@ -5,13 +5,15 @@
     {
       group: "Ollama — Cloud",
       options: [
+        { id: "minimax-m2.5:cloud", name: "MiniMax M2.5", color: "#EF4444" },
         { id: "nemotron-3-super-cloud", name: "Nemotron 3 Super", color: "#FF7000" },
+        { id: "kimi-k2.5:cloud", name: "Kimi K2.5", color: "#F59E0B" },
         { id: "kimi-k2:1t-cloud", name: "Kimi K2 1T", color: "#A78BFA" },
         { id: "kimi-k2-thinking:cloud", name: "Kimi K2 Thinking", color: "#11A1CC" },
         { id: "gpt-oss:120b-cloud", name: "GPT-OSS 120B", color: "#FF6B35" },
         { id: "qwen3-vl:235b-cloud", name: "Qwen3-VL 235B", color: "#10B981" },
+        { id: "qwen3-next:80b-cloud", name: "Qwen3-Next 80B", color: "#8B5CF6" },
         { id: "glm-4.6:cloud", name: "GLM-4.6", color: "#8B5CF6" },
-        { id: "glm-5:cloud", name: "GLM-5", color: "#4A9E9E" },
       ],
     },
   ];

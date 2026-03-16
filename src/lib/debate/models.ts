@@ -3,9 +3,19 @@ export const MODEL_OPTIONS = [
     group: "Ollama — Cloud",
     options: [
       {
+        id: "minimax-m2.5:cloud",
+        name: "MiniMax M2.5",
+        color: "#EF4444",
+      },
+      {
         id: "nemotron-3-super-cloud",
         name: "Nemotron 3 Super",
         color: "#FF7000",
+      },
+      {
+        id: "kimi-k2.5:cloud",
+        name: "Kimi K2.5",
+        color: "#F59E0B",
       },
       {
         id: "kimi-k2:1t-cloud",
@@ -28,14 +38,14 @@ export const MODEL_OPTIONS = [
         color: "#10B981",
       },
       {
-        id: "glm-4.6:cloud",
-        name: "GLM-4.6",
+        id: "qwen3-next:80b-cloud",
+        name: "Qwen3-Next 80B",
         color: "#8B5CF6",
       },
       {
-        id: "glm-5:cloud",
-        name: "GLM-5",
-        color: "#4A9E9E",
+        id: "glm-4.6:cloud",
+        name: "GLM-4.6",
+        color: "#8B5CF6",
       },
     ],
   },
