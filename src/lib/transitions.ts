@@ -2,7 +2,7 @@ import { backInOut } from "svelte/easing";
 
 export function flyInFromTop(
   node: Element,
-  { duration = 2000, delay = 0, easing = backInOut } = {},
+  { duration = 1000, delay = 250, easing = backInOut } = {},
 ) {
   // 1. Grab the element's computed styles
   const style = getComputedStyle(node);
@@ -33,7 +33,7 @@ export function flyInFromTop(
 
 export function flyOutToBottom(
   node: Element,
-  { duration = 2000, delay = 0, easing = backInOut } = {},
+  { duration = 1000, delay = 0, easing = backInOut } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -63,7 +63,7 @@ export function flyOutToBottom(
 }
 export function flyInFromLeft(
   node: Element,
-  { duration = 400, delay = 0, easing = backInOut } = {},
+  { duration = 1000, delay = 250, easing = backInOut } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -86,7 +86,7 @@ export function flyInFromLeft(
 }
 export function flyOutToRight(
   node: Element,
-  { duration = 400, delay = 0, easing = backInOut } = {},
+  { duration = 1000, delay = 0, easing = backInOut } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);

@@ -7,6 +7,7 @@
     flyOutToBottom,
   } from "$lib/transitions";
   import { getModelInfo, getWinnerInfo } from "$lib/debate/models";
+  import { cubicInOut } from "svelte/easing";
 
   interface Props {
     liveJudgeResults: any[];
@@ -370,7 +371,7 @@
         style="border-color: #7c6af720; animation-delay: {i * 70}ms"
         in:flyInFromTop={{ delay: i * 120 }}
         out:flyOutToBottom={{ delay: i * 80 }}
-        animate:flip={{ duration: 1000 }}
+        animate:flip={{ duration: 500, easing: cubicInOut }}
       >
         <!-- Round header -->
         <div class="flex items-center gap-2 mb-3 min-w-0">
