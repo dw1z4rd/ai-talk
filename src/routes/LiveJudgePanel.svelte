@@ -60,8 +60,7 @@
         style="border-color: #7c6af720"
       >
         <div
-          class="grid text-[10px] font-semibold uppercase tracking-wide text-[--color-muted] px-3 py-2 border-b border-[--color-border]"
-          style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem"
+          class="grid text-[10px] font-semibold uppercase tracking-wide text-[--color-muted] px-3 py-2 border-b border-[--color-border] turn-scores-grid"
         >
           <span>Turn</span>
           <span>Agent</span>
@@ -74,9 +73,8 @@
           {@const info = getModelInfo(r.agentId)}
           {@const s = r.absoluteScores}
           <div
-            class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row"
-            style="grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 3rem; animation-delay: {i *
-              100}ms"
+            class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row turn-scores-grid"
+            style="animation-delay: {i * 100}ms"
             in:flyInFromTop
             out:flyOutToBottom
           >
@@ -87,19 +85,19 @@
             <span
               class="text-center font-mono text-[11px]"
               title="Logic: {s.logicalCoherence}/40"
-              >{s.logicalCoherence}<span class="text-[--color-muted]">/40</span
+              >{s.logicalCoherence}<span class="text-[--color-muted] hidden sm:inline">/40</span
               ></span
             >
             <span
               class="text-center font-mono text-[11px]"
               title="Rhetoric: {s.rhetoricalForce}/30"
-              >{s.rhetoricalForce}<span class="text-[--color-muted]">/30</span
+              >{s.rhetoricalForce}<span class="text-[--color-muted] hidden sm:inline">/30</span
               ></span
             >
             <span
               class="text-center font-mono text-[11px]"
               title="Tactics: {s.tacticalEffectiveness}/30"
-              >{s.tacticalEffectiveness}<span class="text-[--color-muted]"
+              >{s.tacticalEffectiveness}<span class="text-[--color-muted] hidden sm:inline"
                 >/30</span
               ></span
             >
@@ -221,7 +219,7 @@
 <!-- 3-col analysis grid: most items span full row, round cards take 1 col each -->
 <div class="judge-main-grid">
   <!-- Scorecard + language warning (full row) -->
-  <div class="col-span-3 flex flex-col gap-3 relative">
+  <div class="col-span-full flex flex-col gap-3 relative">
     <!-- Scorecard — win tallies -->
     {#if currentLeader?.winTallies}
       {@const tallies = currentLeader.winTallies}
@@ -266,7 +264,7 @@
               >
                 {tally.agentName}
               </span>
-              <div class="flex items-center gap-3 text-xs">
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                 <span title="Logic wins" class="flex flex-col items-center">
                   <span class="text-[--color-muted] text-[10px]">Logic</span>
                   <span
@@ -346,14 +344,14 @@
     {/if}
   </div>
 
-  <!-- Recent Rounds: header spans full row, each card takes 1 col -->
+  <!-- Recent Rounds -->
   {#if pairwiseRounds.length > 0}
-    <h3
-      class="col-span-3 text-sm font-semibold text-[--color-muted-fg] px-1"
-    >
-      Recent Rounds
-    </h3>
-    {#each pairwiseRounds.slice(-3).reverse() as round, i (round.roundNumber)}
+    <div class="col-span-full flex flex-col gap-3">
+      <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
+        Recent Rounds
+      </h3>
+      <div class="judge-rounds-grid grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr))">
+      {#each pairwiseRounds.slice(-3).reverse() as round, i (round.roundNumber)}
       {@const logicWinnerInfo = getWinnerInfo(round.logicWinner)}
       {@const tacticsWinnerInfo = getWinnerInfo(round.tacticsWinner)}
       {@const rhetoricWinnerInfo = getWinnerInfo(round.rhetoricWinner)}
@@ -383,7 +381,7 @@
         </div>
 
         <!-- Winner chips -->
-        <div class="grid grid-cols-3 gap-2 mb-3">
+        <div class="flex flex-wrap gap-x-4 gap-y-2 mb-3">
           <div class="flex flex-col gap-1">
             <span
               class="text-[10px] text-[--color-muted] uppercase tracking-wide"
@@ -426,7 +424,9 @@
           </p>
         </div>
       </div>
-    {/each}
+      {/each}
+      </div>
+    </div>
   {/if}
 </div>
 
@@ -469,11 +469,26 @@
     animation-delay: 250ms;
   }
 
-  /* 3-col grid inside the judge panel */
+  /* 3-col grid inside the judge panel — collapses to 1 col on mobile */
   :global(.judge-main-grid) {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.75rem;
     align-content: start;
+  }
+  /* Turn scores table — fixed 6-col layout, denominators hidden on mobile */
+  :global(.turn-scores-grid) {
+    grid-template-columns: 2.5rem 1fr 2.5rem 2.5rem 2.5rem 2.75rem;
+  }
+  @media (max-width: 639px) {
+    :global(.judge-main-grid) {
+      grid-template-columns: 1fr;
+    }
+    :global(.judge-rounds-grid) {
+      grid-template-columns: 1fr !important;
+    }
+    :global(.turn-scores-grid) {
+      grid-template-columns: 2rem 1fr 2.25rem 2.25rem 2.25rem 2.5rem;
+    }
   }
 </style>

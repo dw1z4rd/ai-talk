@@ -530,23 +530,21 @@
   .left-col {
     width: 45vw;
     max-width: 760px;
-    min-width: 280px;
+    min-width: min(280px, 100%);
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    min-width: 0;
   }
 
   .right-col {
     width: 45vw;
     max-width: 760px;
-    min-width: 280px;
+    min-width: min(280px, 100%);
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    min-width: 0;
   }
 
   @media (max-width: 1023px) {
