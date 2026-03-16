@@ -368,8 +368,8 @@
       <div
         class="rounded-xl border bg-[--color-panel] p-3 judge-card"
         style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-        in:flyInFromTop
-        out:flyOutToBottom
+        in:flyInFromTop={{ delay: i * 120 }}
+        out:flyOutToBottom={{ delay: i * 80 }}
         animate:flip={{ duration: 1000 }}
       >
         <!-- Round header -->

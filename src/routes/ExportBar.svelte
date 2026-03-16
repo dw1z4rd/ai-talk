@@ -223,7 +223,10 @@
         content += `${"═".repeat(40)}\nPER-TURN SCORES\n\n`;
         scoredResultsTxt.forEach((r: any) => {
           const s = r.absoluteScores;
-          content += `T${r.turnNumber}  ${getModelInfo(r.agentId).name}  Logic:${s.logicalCoherence}/40  Rhetoric:${s.rhetoricalForce}/30  Tactics:${s.tacticalEffectiveness}/30  Score:${s.overallScore}\n`;
+          const liveTotal = s.logicalCoherence + s.rhetoricalForce + s.tacticalEffectiveness;
+          const delta = scoreDeltas[r.turnNumber];
+          const logicStr = delta ? `${s.logicalCoherence}(${delta > 0 ? '+' : ''}${delta})` : `${s.logicalCoherence}`;
+          content += `T${r.turnNumber}  ${getModelInfo(r.agentId).name}  Logic:${logicStr}/40  Rhetoric:${s.rhetoricalForce}/30  Tactics:${s.tacticalEffectiveness}/30  Score:${liveTotal}\n`;
         });
         content += "\n";
       }
@@ -344,7 +347,12 @@
       scoresHtml += `<tbody>`;
       scoredRows.forEach((r: any, i: number) => {
         const s = r.absoluteScores;
-        scoresHtml += `<tr style="background:${i % 2 === 0 ? "#fff" : "#f9f9f9"}"><td style="padding:0.3rem 0.5rem">T${r.turnNumber}</td><td style="padding:0.3rem 0.5rem">${escapeHtml(getModelInfo(r.agentId).name)}</td><td style="padding:0.3rem 0.5rem;text-align:center">${s.logicalCoherence}</td><td style="padding:0.3rem 0.5rem;text-align:center">${s.rhetoricalForce}</td><td style="padding:0.3rem 0.5rem;text-align:center">${s.tacticalEffectiveness}</td><td style="padding:0.3rem 0.5rem;text-align:center;font-weight:700">${s.overallScore}</td></tr>`;
+        const liveTotal = s.logicalCoherence + s.rhetoricalForce + s.tacticalEffectiveness;
+        const delta = scoreDeltas[r.turnNumber];
+        const logicCell = delta
+          ? `${s.logicalCoherence} <span style="font-size:0.75em;color:${delta < 0 ? '#dc2626' : '#16a34a'}">(${delta > 0 ? '+' : ''}${delta})</span>`
+          : `${s.logicalCoherence}`;
+        scoresHtml += `<tr style="background:${i % 2 === 0 ? "#fff" : "#f9f9f9"}"><td style="padding:0.3rem 0.5rem">T${r.turnNumber}</td><td style="padding:0.3rem 0.5rem">${escapeHtml(getModelInfo(r.agentId).name)}</td><td style="padding:0.3rem 0.5rem;text-align:center">${logicCell}</td><td style="padding:0.3rem 0.5rem;text-align:center">${s.rhetoricalForce}</td><td style="padding:0.3rem 0.5rem;text-align:center">${s.tacticalEffectiveness}</td><td style="padding:0.3rem 0.5rem;text-align:center;font-weight:700">${liveTotal}</td></tr>`;
       });
       scoresHtml += `</tbody></table>`;
     }
