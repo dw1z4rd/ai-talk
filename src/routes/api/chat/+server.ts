@@ -112,6 +112,7 @@ export const POST: RequestHandler = async ({ request }) => {
           // Send judge results: includes pairwise round data if available
           if (result.judgeResult) {
             const jr = result.judgeResult;
+            send({ type: "judgeStatus", status: "scoring", turnNumber });
             send({
               type: "judgeResult",
               agentId: agent.id,
@@ -139,6 +140,7 @@ export const POST: RequestHandler = async ({ request }) => {
         const scorecard = getDebateScorecard();
 
         if (scorecard.rounds.length > 0) {
+          send({ type: "judgeStatus", status: "writing_verdict" });
           try {
             const narrativeVerdict = await generateDebateNarrativeVerdict(
               debateAgentHistory,

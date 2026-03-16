@@ -47,6 +47,9 @@
   let momentumLeader = $state<any>(null);
   let frameControlLeader = $state<any>(null);
 
+  // Judge activity indicator
+  let judgeStatus = $state<'scoring' | 'writing_verdict' | null>(null);
+
   // Winner modal
   let winner = $state<{ id: string; name: string; color: string } | null>(null);
   let winnerScore = $state(0);
@@ -284,7 +287,10 @@
                 }),
               50,
             );
+          } else if (data.type === "judgeStatus") {
+            judgeStatus = data.status ?? null;
           } else if (data.type === "judgeResult") {
+            judgeStatus = null;
             liveJudgeResults = [
               ...liveJudgeResults,
               {
@@ -354,6 +360,7 @@
               ? { agentId: topMomentum[0], momentum: topMomentum[1] }
               : null;
           } else if (data.type === "narrativeVerdict") {
+            judgeStatus = null;
             narrativeVerdict = {
               text: data.text,
               favouredAgentId: data.favouredAgentId,
@@ -382,6 +389,7 @@
               }
             }
           } else if (data.type === "done") {
+            judgeStatus = null;
             done = true;
             running = false;
             naturallyEnded = true;
@@ -437,6 +445,7 @@
           {pairwiseRounds}
           {narrativeVerdict}
           {currentLeader}
+          {judgeStatus}
         />
       </div>
     {/if}

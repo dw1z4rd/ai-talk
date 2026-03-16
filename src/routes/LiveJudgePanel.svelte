@@ -13,9 +13,10 @@
     pairwiseRounds: any[];
     narrativeVerdict: any;
     currentLeader: any;
+    judgeStatus?: 'scoring' | 'writing_verdict' | null;
   }
 
-  let { liveJudgeResults, pairwiseRounds, narrativeVerdict, currentLeader }: Props = $props();
+  let { liveJudgeResults, pairwiseRounds, narrativeVerdict, currentLeader, judgeStatus = null }: Props = $props();
 </script>
 
 <div id="live-judge-panel" class="flex flex-col gap-4 judge-panel">
@@ -29,6 +30,23 @@
     >
     <div class="flex-1 h-px bg-[--color-border]"></div>
   </div>
+
+  <!-- Judge activity indicator -->
+  {#if judgeStatus}
+    <div
+      class="flex items-center gap-2.5 px-3 py-2 rounded-xl border"
+      style="border-color: #7c6af730; background: #7c6af708"
+    >
+      <span class="judge-thinking-dots flex gap-0.75 items-center">
+        <span class="w-1.5 h-1.5 rounded-full" style="background:#c084fc; animation: judgePulse 1.2s ease-in-out infinite"></span>
+        <span class="w-1.5 h-1.5 rounded-full" style="background:#c084fc; animation: judgePulse 1.2s ease-in-out 0.2s infinite"></span>
+        <span class="w-1.5 h-1.5 rounded-full" style="background:#c084fc; animation: judgePulse 1.2s ease-in-out 0.4s infinite"></span>
+      </span>
+      <span class="text-[11px] text-[--color-muted-fg]" style="color:#c084fc99">
+        {judgeStatus === 'writing_verdict' ? 'Writing verdict\u2026' : 'Scoring turn\u2026'}
+      </span>
+    </div>
+  {/if}
 
   <!-- Per-turn absolute scores -->
   {#if liveJudgeResults.some((r) => r.absoluteScores)}
@@ -413,6 +431,10 @@
 </div>
 
 <style>
+  @keyframes judgePulse {
+    0%, 100% { opacity: 0.25; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1); }
+  }
   @keyframes judgeReveal {
     from {
       opacity: 0;
