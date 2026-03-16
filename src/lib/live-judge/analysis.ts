@@ -201,7 +201,7 @@ export async function compareTurns(
         domainNote,
       ),
       temperature: 0.3,
-      maxTokens: 700,
+      maxTokens: 900,
       signal,
     });
 
@@ -256,7 +256,7 @@ export function generatePairwiseSystemPrompt(
   return `You are a comparative debate judge. Read two consecutive turns and pick the stronger one on three dimensions. No draws — you must choose one winner per dimension. Respond with a single JSON object only — no preamble, no markdown.
 
 Required format (use exact agent names as shown):
-{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn. For missing causal mechanisms, name which element was absent — e.g. 'stated how X produces Y but omitted why the mechanism holds under competitive markets' or 'gave mechanism but no measurable consequence.' For timeline violations, name the technology/concept and note it clearly postdates the phenomenon. Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn was more persuasive across all four components and why.","mechanism_delta":"1-2 sentences on mechanism quality for BOTH turns. For each, state which elements of the cause→process→measurable consequence chain were present or absent.","mechanism_failures":[],"counterfactual_agent":null,"counterfactual_summary":null}
+{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn. For missing causal mechanisms, name which element was absent — e.g. 'stated how X produces Y but omitted why the mechanism holds under competitive markets' or 'gave mechanism but no measurable consequence.' For timeline violations, name the technology/concept and note it clearly postdates the phenomenon. Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn was more persuasive across all four components and why.","mechanism_delta":"1-2 sentences on mechanism quality for BOTH turns. For each, state which elements of the cause→process→measurable consequence chain were present or absent.","mechanism_failures":[],"suspect_claims":[],"epistemic_note":null,"counterfactual_agent":null,"counterfactual_summary":null}
 
 --- LOGIC (forced choice) ---
 Start each turn from 8. Apply deductions:
@@ -322,7 +322,13 @@ Style ≠ Rhetoric. Punchiness and brevity alone do not constitute superior rhet
 --- COUNTERFACTUAL ---
 A counterfactual is a "no-X world" thought experiment: a turn that explicitly names a specific factor, asks what a world without it would look like, and then traces at least one full causal consequence in the form "if [X had not occurred / in a world without X], then [mechanism] → [measurable consequence]." The counterfactual must be the argument's own invention — not a paraphrase of the opponent's.
 Detection: if either turn contains a counterfactual matching this definition, set counterfactual_agent to that agent's exact name and counterfactual_summary to one sentence. If neither qualifies, set both to null.
-Scoring: the existing +1 for a complete explicit causal chain in LOGIC covers a counterfactual with a full chain — no separate bonus. A counterfactual missing the measurable consequence step is still penalized −1 under the mechanism requirement; populate mechanism_failures accordingly.`;
+Scoring: the existing +1 for a complete explicit causal chain in LOGIC covers a counterfactual with a full chain — no separate bonus. A counterfactual missing the measurable consequence step is still penalized −1 under the mechanism requirement; populate mechanism_failures accordingly.
+
+--- CLAIM AUDITABILITY ---
+For every concrete factual or empirical assertion in either turn that you considered penalizing for hollow specificity — whether or not you ultimately docked a point — add an entry to suspect_claims using the format "AgentName: [exact or close quote of the claim]". This creates an auditable record that can be reviewed independently of the scoring decision. Empty array if no such claims appeared in either turn.
+
+--- EPISTEMIC DISCIPLINE ---
+Set epistemic_note to a 1-sentence observation if either agent made strong empirical claims without appropriately acknowledging evidentiary limits — for example, stating contested statistics as settled fact, invoking unnamed research as authoritative, or asserting causal relationships as proven without hedging. This field is non-scoring: it is a qualitative flag for arc-level narrative analysis. Set to null if both agents reasoned responsibly about uncertainty.`;
 }
 
 export function generatePairwisePrompt(
@@ -493,6 +499,18 @@ function parsePairwiseResponse(
             .map((x: string) => x.trim())
             .filter((x: string) => x.length > 0)
         : undefined,
+      suspectClaims: Array.isArray(data.suspect_claims)
+        ? data.suspect_claims
+            .filter((x: unknown) => typeof x === "string")
+            .map((x: string) => x.trim())
+            .filter((x: string) => x.length > 0)
+        : undefined,
+      epistemicNote:
+        typeof data.epistemic_note === "string" &&
+        data.epistemic_note.trim() !== "null" &&
+        data.epistemic_note.trim().length > 0
+          ? data.epistemic_note.trim()
+          : undefined,
       counterfactualDetected:
         typeof data.counterfactual_agent === "string" &&
         data.counterfactual_agent !== "null" &&
@@ -559,6 +577,8 @@ function createFallbackPairwiseRound(
     rhetoricDelta: "Fallback — judge analysis unavailable for this round.",
     mechanismDelta: undefined,
     mechanismFailures: undefined,
+    suspectClaims: undefined,
+    epistemicNote: undefined,
     counterfactualDetected: undefined,
     languageWarning,
     isFallback: true,
@@ -864,11 +884,44 @@ export async function generateNarrativeVerdictText(
     .filter(Boolean)
     .join(" | ");
 
+  const pairwiseReasoning = scorecard.rounds
+    .filter((r) => !r.isFallback)
+    .map((r) => {
+      const logicWinnerName =
+        r.logicWinner === r.prevTurn.agentId
+          ? r.prevTurn.agentName
+          : r.curTurn.agentName;
+      const lines = [
+        `Round ${r.roundNumber} (${r.prevTurn.agentName} vs ${r.curTurn.agentName}):`,
+        `  Logic → ${logicWinnerName}: ${r.logicDelta}`,
+      ];
+      if (r.mechanismDelta) lines.push(`  Mechanism: ${r.mechanismDelta}`);
+      if (r.mechanismFailures && r.mechanismFailures.length > 0)
+        lines.push(`  Mechanism failures: ${r.mechanismFailures.join(", ")}`);
+      if (r.suspectClaims && r.suspectClaims.length > 0)
+        lines.push(`  Suspect claims: ${r.suspectClaims.join("; ")}`);
+      return lines.join("\n");
+    })
+    .join("\n\n");
+
+  const epistemicNotes = scorecard.rounds
+    .filter((r) => !r.isFallback && r.epistemicNote)
+    .map((r) => `Round ${r.roundNumber}: ${r.epistemicNote}`);
+
+  const reasoningSection =
+    pairwiseReasoning.length > 0
+      ? `\nPAIRWISE REASONING (per-round findings):\n${pairwiseReasoning}\n`
+      : "";
+  const epistemicSection =
+    epistemicNotes.length > 0
+      ? `\nEPISTEMIC NOTES (per-round):\n${epistemicNotes.join("\n")}\n`
+      : "";
+
   const prompt = `DEBATE TOPIC: "${topic}"
 
 PAIRWISE SCORECARD (${scorecard.rounds.length} rounds):
 ${scorecardSummary}
-
+${reasoningSection}${epistemicSection}
 FULL TRANSCRIPT:
 ${transcriptText}
 
@@ -882,7 +935,7 @@ Write your verdict now:`;
   try {
     const text = await judgeProvider.generateText(prompt, {
       systemPrompt: generateNarrativeSystemPrompt(agentAName, agentBName),
-      temperature: 0.7,
+      temperature: 0.5,
       maxTokens: 1200,
       signal,
     });
@@ -925,6 +978,8 @@ Rules:
 - Reference specific turns and arguments by name.
 - Do not reward style over substance. Academic register is not a proxy for rigorous reasoning.
 - Do not be diplomatic. Pick a winner and explain why.
+- In your verdict paragraph, explicitly reference at least one specific argument failure named in the PAIRWISE REASONING section — quote or closely paraphrase the finding. Do not invent failures that do not appear there.
+- The EPISTEMIC NOTES document patterns of unhedged empirical assertion across rounds. If one agent shows a consistent pattern of confident factual claims without evidential acknowledgment, treat this as a material quality signal at arc-level — it should inform your coherence assessment in Paragraph 1 even if individual rounds were not penalized.
 - The pairwise scorecard is the authoritative record of turn-by-turn argument quality. Treat it as presumptively correct. You may diverge with your arc-level verdict only if you identify and explicitly name one of three specific patterns: COHERENCE COLLAPSE (a debater won pairwise rounds but accumulated contradictions that hollow out the position), RECOVERY ARC (a debater fell behind on the scorecard but drove a decisive reframe that resolved the debate's core tension), or ASYMMETRIC DEPTH (one debater's wins were concentrated in logic while the other's were purely tactical or rhetorical — and the debate's motion rewards one over the other). If none of these patterns is present, your verdict must agree with the scorecard leader. When invoking an override pattern, name it explicitly in Paragraph 3.
 - At the very end, on its own line with nothing after, write exactly: VERDICT: ${nameA} OR VERDICT: ${nameB}`;
 }

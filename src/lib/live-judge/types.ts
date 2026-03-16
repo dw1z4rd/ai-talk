@@ -79,6 +79,17 @@ export interface PairwiseRound {
   mechanismDelta?: string;
   /** agentNames that had a mechanism failure in this round (missing one or more chain elements). */
   mechanismFailures?: string[];
+  /**
+   * Concrete factual/empirical assertions the judge considered penalizing for hollow specificity
+   * (whether or not a point was docked), attributed as "AgentName: claim text".
+   * Empty array or undefined means no such claims appeared.
+   */
+  suspectClaims?: string[];
+  /**
+   * 1-sentence non-scoring note on epistemic responsibility: did either agent make confident
+   * empirical claims without acknowledging evidentiary limits? undefined/null if both performed normally.
+   */
+  epistemicNote?: string;
   /** Set when a turn contains a qualifying counterfactual ("no-X world" with full causal chain). */
   counterfactualDetected?: { agentId: string; summary: string };
   languageWarning?: string;
