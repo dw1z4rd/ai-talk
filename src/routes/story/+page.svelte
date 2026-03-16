@@ -15,6 +15,11 @@
           color: "#A78BFA",
         },
         {
+          id: "kimi-k2-thinking:cloud",
+          name: "Kimi K2 Thinking",
+          color: "#11A1CC",
+        },
+        {
           id: "gpt-oss:120b-cloud",
           name: "GPT-OSS 120B",
           color: "#FF6B35",

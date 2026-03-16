@@ -94,6 +94,16 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
         model: "kimi-k2:1t-cloud",
       }),
   },
+  "kimi-k2-thinking:cloud": {
+    name: "Kimi K2 Thinking",
+    color: "#11A1CC",
+    makeProvider: () =>
+      createOllamaProvider({
+        baseUrl: OLLAMA_CLOUD_URL,
+        apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+        model: "kimi-k2-thinking:cloud",
+      }),
+  },
   "gpt-oss:120b-cloud": {
     name: "GPT-OSS 120B",
     color: "#FF6B35",

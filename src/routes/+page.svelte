@@ -19,9 +19,9 @@
   let errorMsg = $state("");
   let chatEl = $state<HTMLElement | null>(null);
   let abortController = $state<AbortController | null>(null);
-  let agentA = $state("kimi-k2:1t-cloud");
-  let agentB = $state("nemotron-3-super-cloud");
-  let leftAgentId = $state("kimi-k2:1t-cloud");
+  let agentA = $state("glm-5:cloud");
+  let agentB = $state("kimi-k2-thinking:cloud");
+  let leftAgentId = $state("kimi-k2-thinking:cloud");
   let typingAgentName = $state("");
   let typingAgentColor = $state("");
   let streamingMessage = $state<ChatMessage | null>(null);
