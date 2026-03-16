@@ -556,11 +556,14 @@ export class LiveJudgeSystem {
         // Reconcile pairwise winners with absolute scores: when both turns score
         // identically on a dimension, the winner is reset to "tie" so no scorecard
         // win is counted for either agent.
+        // Use absoluteScoreHistory keyed by turn number rather than lastAbsoluteScores
+        // keyed by agentId: the history entry is updated in-place when retroactive
+        // penalties fire during this same round, whereas lastAbsoluteScores is not.
         if (absoluteScores && !pairwiseRound.isFallback) {
           pairwiseRound = reconcileRoundWinners(
             pairwiseRound,
             absoluteScores,
-            this.panel.lastAbsoluteScores[pairwiseRound.prevTurn.agentId],
+            this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber],
           );
         }
 
@@ -646,13 +649,16 @@ export class LiveJudgeSystem {
       generateAdaptivePressure(analysis, momentumShift, frameControlShift),
     );
 
-    // Compute harmonization flags for this round (synchronous, no LLM)
+    // Compute harmonization flags for this round (synchronous, no LLM).
+    // absoluteScoreHistory[prevTurn.turnNumber] is used rather than
+    // lastAbsoluteScores[agentId] so that any retroactive penalty applied to
+    // prevTurn during this same round's flagUpdates is already reflected here.
     const harmonizationFlags: HarmonizationFlag[] =
       pairwiseRound && !pairwiseRound.isFallback
         ? computeHarmonizationFlags(
             pairwiseRound,
             absoluteScores,
-            this.panel.lastAbsoluteScores[pairwiseRound.prevTurn.agentId],
+            this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber],
           )
         : [];
     if (harmonizationFlags.length > 0) {
