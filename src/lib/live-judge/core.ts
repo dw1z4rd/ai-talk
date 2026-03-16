@@ -699,7 +699,7 @@ export class LiveJudgeSystem {
     );
     if (hiddenDirective) {
       console.log(
-        `[Hidden Directive] Turn ${turnNumber} → preview for Turn ${turnNumber + 1} (${agent.name}): ${hiddenDirective}`,
+        `[Hidden Directive] Turn ${turnNumber} → preview for Turn ${turnNumber + 1} (${opponent.name}): ${hiddenDirective}`,
       );
     }
 

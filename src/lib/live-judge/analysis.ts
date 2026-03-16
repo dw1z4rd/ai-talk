@@ -832,9 +832,9 @@ export function reconcileRoundWinners(
  * beyond their scale-specific thresholds. No LLM call — pure arithmetic.
  *
  * Scale thresholds (gap required to flag):
- *   logic:   0–40,   threshold = 8
- *   tactics: 0–30,   threshold = 6
- *   rhetoric: 0–30,  threshold = 6
+ *   logic:   0–40,   threshold = 5
+ *   tactics: 0–30,   threshold = 3
+ *   rhetoric: 0–30,  threshold = 3
  *   overall: 0–100,  threshold = 15
  */
 export function computeHarmonizationFlags(
