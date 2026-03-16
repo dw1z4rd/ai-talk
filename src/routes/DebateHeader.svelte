@@ -1,6 +1,4 @@
-<script lang="ts">
-  import Nav from "$lib/Nav.svelte";
-</script>
+
 
 <header class="text-center flex flex-col items-center gap-2">
   <div class="relative">
@@ -19,5 +17,4 @@
   <p class="text-sm text-[--color-muted] tracking-wide">
     two AIs, one topic, no mercy
   </p>
-  <Nav />
 </header>
