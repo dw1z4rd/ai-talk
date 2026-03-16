@@ -4,6 +4,7 @@
     flyInFromTop,
     flyInFromLeft,
     flyOutToRight,
+    flyOutToBottom,
   } from "$lib/transitions";
   import { getModelInfo, getWinnerInfo } from "$lib/debate/models";
 
@@ -359,7 +360,7 @@
       <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
         Recent Rounds
       </h3>
-      <div class="judge-rounds-grid grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr))">
+      <div class="judge-rounds-grid flex flex-col gap-3">
       {#each pairwiseRounds.slice(-3).reverse() as round, i (round.roundNumber)}
       {@const logicWinnerInfo = getWinnerInfo(round.logicWinner)}
       {@const tacticsWinnerInfo = getWinnerInfo(round.tacticsWinner)}
@@ -367,8 +368,8 @@
       <div
         class="rounded-xl border bg-[--color-panel] p-3 judge-card"
         style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-        in:flyInFromLeft
-        out:flyOutToRight
+        in:flyInFromTop
+        out:flyOutToBottom
         animate:flip={{ duration: 1000 }}
       >
         <!-- Round header -->
