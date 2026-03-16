@@ -71,6 +71,16 @@ export interface PairwiseRound {
   logicWinner: string;
   tacticsWinner: string;
   rhetoricWinner: string;
+  /**
+   * The original pairwise winner before any score-equality reconciliation.
+   * Preserved so that when a retroactive penalty later makes previously-equal
+   * scores diverge, re-reconciliation can restore the pairwise judgment rather
+   * than leaving the dimension permanently stuck at "tie".
+   * Set once on first reconciliation; never mutated thereafter.
+   */
+  logicWinnerRaw?: string;
+  tacticsWinnerRaw?: string;
+  rhetoricWinnerRaw?: string;
   /** 2-3 sentence justifications */
   logicDelta: string;
   tacticsDelta: string;

@@ -660,6 +660,16 @@ describe("reconcileRoundWinners", () => {
     expect(reconciled.rhetoricWinner).toBe("tie");
   });
 
+  it("preserves *WinnerRaw from the original pairwise winner", () => {
+    const round = makeRound("a", "Agent A", "b", "Agent B", "a", "b", "a");
+    const scores = makeAbsScores(); // equal → all forced to "tie"
+    const reconciled = reconcileRoundWinners(round, scores, scores);
+    expect(reconciled.logicWinner).toBe("tie");
+    expect(reconciled.logicWinnerRaw).toBe("a"); // original preserved
+    expect(reconciled.tacticsWinnerRaw).toBe("b");
+    expect(reconciled.rhetoricWinnerRaw).toBe("a");
+  });
+
   it("preserves the existing pairwise winner when absolute scores differ", () => {
     const round = makeRound("a", "Agent A", "b", "Agent B", "a", "b", "a");
     const prev = makeAbsScores({
@@ -696,6 +706,45 @@ describe("reconcileRoundWinners", () => {
     expect(reconciled.logicWinner).toBe("a"); // unchanged
     expect(reconciled.tacticsWinner).toBe("tie"); // overridden
     expect(reconciled.rhetoricWinner).toBe("b"); // unchanged
+  });
+
+  it("restores the original pairwise winner when a retroactive penalty makes previously-equal scores diverge", () => {
+    // Initial state: round was already reconciled to 'tie' on all dims (equal scores).
+    // logicWinnerRaw preserved the original pairwise winner 'a'.
+    const tiedRound: PairwiseRound = {
+      ...makeRound("a", "Agent A", "b", "Agent B", "tie", "tie", "tie"),
+      logicWinnerRaw: "a",
+      tacticsWinnerRaw: "a",
+      rhetoricWinnerRaw: "b",
+    };
+    // After a retroactive penalty, cur (Agent B) logic score drops: no longer equal.
+    const prev = makeAbsScores({ logicalCoherence: 26, tacticalEffectiveness: 15, rhetoricalForce: 20 });
+    const cur = makeAbsScores({ logicalCoherence: 14, tacticalEffectiveness: 15, rhetoricalForce: 20 });
+    const reconciled = reconcileRoundWinners(tiedRound, cur, prev);
+    // Logic diverged → restore to raw pairwise winner
+    expect(reconciled.logicWinner).toBe("a");
+    // Tactics/rhetoric still equal → remain "tie"
+    expect(reconciled.tacticsWinner).toBe("tie");
+    expect(reconciled.rhetoricWinner).toBe("tie");
+    // Raw values must be preserved
+    expect(reconciled.logicWinnerRaw).toBe("a");
+    expect(reconciled.tacticsWinnerRaw).toBe("a");
+    expect(reconciled.rhetoricWinnerRaw).toBe("b");
+  });
+
+  it("does not allow a 'tie' logicWinner to become a real winner for that dim if it had an explicit 'tie' pairwise call", () => {
+    // Here the round was explicitly set to 'tie' from the start (no raw field),
+    // meaning the LLM literally returned a draw on that dim. Diverged scores
+    // should NOT restore to 'tie' as the raw winner (it would just stay 'tie').
+    const round: PairwiseRound = {
+      ...makeRound("a", "Agent A", "b", "Agent B", "tie", "a", "a"),
+      // No logicWinnerRaw — raw is inferred as "tie"
+    };
+    const prev = makeAbsScores({ logicalCoherence: 26 });
+    const cur = makeAbsScores({ logicalCoherence: 14 });
+    const reconciled = reconcileRoundWinners(round, cur, prev);
+    // The raw was 'tie', so unequal scores → winner stays 'tie' (raw is returned)
+    expect(reconciled.logicWinner).toBe("tie");
   });
 
   it("scorecard tally skips 'tie' winners (updateScorecard integration)", () => {

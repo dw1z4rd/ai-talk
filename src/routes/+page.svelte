@@ -432,6 +432,16 @@
             };
           } else if (data.type === "finalScorecard") {
             finalScorecard = data.scorecard;
+            // Sync pairwiseRounds to the server's final reconciled rounds so the
+            // export display is consistent with the scorecard tallies. Re-reconciliation
+            // (triggered by retroactive flag penalties) updates scorecard.rounds on the
+            // server but never pushes updated round objects to the client — leaving the
+            // client's append-only pairwiseRounds array stale. Using the final scorecard
+            // rounds here ensures both the tally numbers and the per-round verdicts
+            // shown in the export reflect the same post-reconciliation state.
+            if (Array.isArray(data.scorecard?.rounds) && data.scorecard.rounds.length > 0) {
+              pairwiseRounds = data.scorecard.rounds;
+            }
             if (data.scorecard?.winTallies) {
               const tallies: [string, any][] = Object.entries(
                 data.scorecard.winTallies,

@@ -772,10 +772,14 @@ export function synthScoresFromPairwise(
 
 /**
  * Reconcile pairwise-assigned dimension winners against per-turn absolute scores.
- * When two turns score identically on a dimension, neither agent can be declared
- * the winner; the winner field is set to the "tie" sentinel so the scorecard does
- * not count a win for either agent. Non-tie discrepancies are left to
- * computeHarmonizationFlags to surface as flags.
+ *
+ * Equal scores → "tie" (no scorecard win counted for either agent).
+ * Unequal scores → the original pairwise winner is used (restored via *WinnerRaw
+ * when a retroactive penalty previously forced a tie that has since diverged).
+ *
+ * The raw pairwise winner is stored in `logicWinnerRaw` / `tacticsWinnerRaw` /
+ * `rhetoricWinnerRaw` on first reconciliation so it survives subsequent calls.
+ * Non-tie discrepancies are left to computeHarmonizationFlags to surface as flags.
  */
 export function reconcileRoundWinners(
   round: PairwiseRound,
@@ -784,23 +788,32 @@ export function reconcileRoundWinners(
 ): PairwiseRound {
   if (!curAbsolute || !prevAbsolute) return round;
 
-  const reconcile = (winner: string, curScore: number, prevScore: number) =>
-    curScore === prevScore ? "tie" : winner;
+  // Capture the true pairwise winner before any reconciliation overwrites it.
+  // If this field is already set (re-reconciliation path), preserve the prior raw value.
+  const rawLogic = round.logicWinnerRaw ?? round.logicWinner;
+  const rawTactics = round.tacticsWinnerRaw ?? round.tacticsWinner;
+  const rawRhetoric = round.rhetoricWinnerRaw ?? round.rhetoricWinner;
+
+  const reconcile = (rawWinner: string, curScore: number, prevScore: number) =>
+    curScore === prevScore ? "tie" : rawWinner;
 
   return {
     ...round,
+    logicWinnerRaw: rawLogic,
+    tacticsWinnerRaw: rawTactics,
+    rhetoricWinnerRaw: rawRhetoric,
     logicWinner: reconcile(
-      round.logicWinner,
+      rawLogic,
       curAbsolute.logicalCoherence,
       prevAbsolute.logicalCoherence,
     ),
     tacticsWinner: reconcile(
-      round.tacticsWinner,
+      rawTactics,
       curAbsolute.tacticalEffectiveness,
       prevAbsolute.tacticalEffectiveness,
     ),
     rhetoricWinner: reconcile(
-      round.rhetoricWinner,
+      rawRhetoric,
       curAbsolute.rhetoricalForce,
       prevAbsolute.rhetoricalForce,
     ),
