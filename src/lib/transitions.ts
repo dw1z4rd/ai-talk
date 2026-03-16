@@ -40,7 +40,7 @@ export function flyOutToBottom(
   const targetOpacity = parsedOpacity === 0 ? 1 : parsedOpacity;
   const transform = style.transform === "none" ? "" : style.transform;
 
-  // We must capture the exact dimensions before it leaves the document flow
+  // Capture the exact geometry before it leaves document flow
   const nodeRect = node.getBoundingClientRect();
   const distanceToBottom = window.innerHeight - nodeRect.top;
 
@@ -49,8 +49,13 @@ export function flyOutToBottom(
     duration,
     easing,
     css: (t: number, u: number) => `
-      position: absolute;
+      position: fixed;
+      top: ${nodeRect.top}px;
+      left: ${nodeRect.left}px;
       width: ${nodeRect.width}px;
+      height: ${nodeRect.height}px;
+      margin: 0;
+      pointer-events: none;
       transform: ${transform} translateY(${u * distanceToBottom}px);
       opacity: ${targetOpacity * t};
     `,
