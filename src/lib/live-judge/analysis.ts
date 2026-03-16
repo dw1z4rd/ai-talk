@@ -335,10 +335,16 @@ Set epistemic_note to a 1-sentence observation if either agent made strong empir
 
 --- OPEN FLAGS (retroactive correction) ---
 If an OPEN FLAGS block appears in the prompt, it lists hollow claims from prior turns that have not yet been penalized on the originating turn's absolute score.
-(a) For each open flag attributed to TURN A (the prevTurn): if the claim remains unsubstantiated, emit a flag_update with delta_raw -1 (one raw logic point = -4 on the 0-40 scale). Use delta_raw -2 for severe cases (fabricated statistic, named study with zero mechanism). Always use negative values for penalties. Set update_type to "penalty".
-(b) If TURN B (curTurn) explicitly substantiates a previously-flagged claim — supplying the missing mechanism chain — emit a flag_update with delta_raw +1, update_type "partial_restore", targeting the ORIGINATING turn number. Partial restore is capped at half the original penalty magnitude: if penalty was -2, the maximum restore is +1.
-(c) Include flag_id exactly as given so the register can reconcile the entry.
+(a) For each open flag attributed to TURN A (the prevTurn): if the claim remains unsubstantiated, emit a flag_update. Set delta_raw to -1 (or -2 for severe cases: fabricated statistic, named study with zero mechanism). Always use negative values for penalties. Set update_type to "penalty". Set target_turn to the originating turn number shown in the flag entry (e.g. T3 → target_turn: 3).
+(b) If TURN B (curTurn) explicitly substantiates a previously-flagged claim — supplying the missing mechanism chain — emit a flag_update with delta_raw +1, update_type "partial_restore". Set target_turn to the ORIGINATING turn number. Partial restore is capped at half the original penalty magnitude: if penalty was -2, the maximum restore is +1.
+(c) Include flag_id exactly as given (no brackets) so the register can reconcile the entry.
 (d) If a flag was resolved (partial restore applied or the agent clearly addressed it), add the flag_id to resolved_flags.
+
+Each flag_update element MUST use exactly these keys:
+  {"flag_id": "FLAG-T3-agentslug-0", "target_turn": 3, "delta_raw": -1, "update_type": "penalty", "reason": "Claim still unsubstantiated"}
+  {"flag_id": "FLAG-T3-agentslug-1", "target_turn": 3, "delta_raw": 1, "update_type": "partial_restore", "reason": "Mechanism chain supplied in current turn"}
+Omitting target_turn or using wrong key names will silently discard the update. For every open flag you see, you MUST emit either a penalty or a partial_restore — do NOT leave flag_updates empty when open flags are present.
+
 CRITICAL: Open flags govern only retroactive adjustments to previous absolute scores. They do NOT influence the logic_winner decision, which is always determined by the two current turns' content only. Never let an open flag substitute for engaging with what the current turn actually said.`;
 }
 
@@ -554,7 +560,7 @@ function parsePairwiseResponse(
               (x: unknown): x is Record<string, unknown> =>
                 typeof x === "object" && x !== null,
             )
-            .map((x): FlagUpdate | null => {
+            .map((x: Record<string, unknown>): FlagUpdate | null => {
               const flagId =
                 typeof x.flag_id === "string" ? x.flag_id.trim() : null;
               const targetTurn =
@@ -589,7 +595,7 @@ function parsePairwiseResponse(
                 updateType,
               };
             })
-            .filter((x): x is FlagUpdate => x !== null)
+            .filter((x: FlagUpdate | null): x is FlagUpdate => x !== null)
         : undefined,
       languageWarning,
       isFallback: false,

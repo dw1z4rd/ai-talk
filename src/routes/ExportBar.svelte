@@ -134,7 +134,9 @@
           "|------|-------|----------|-------------|------------|-------|\n";
         scoredResults.forEach((r: any) => {
           const s = r.absoluteScores;
-          content += `| T${r.turnNumber} | ${getModelInfo(r.agentId).name} | ${s.logicalCoherence} | ${s.rhetoricalForce} | ${s.tacticalEffectiveness} | ${s.overallScore} |\n`;
+          // Use the live sum so any retroactive logicalCoherence patches are reflected.
+          const liveTotal = s.logicalCoherence + s.rhetoricalForce + s.tacticalEffectiveness;
+          content += `| T${r.turnNumber} | ${getModelInfo(r.agentId).name} | ${s.logicalCoherence} | ${s.rhetoricalForce} | ${s.tacticalEffectiveness} | ${liveTotal} |\n`;
         });
       }
 

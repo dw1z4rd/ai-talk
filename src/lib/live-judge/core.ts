@@ -261,10 +261,15 @@ export class LiveJudgeSystem {
               claimedName.toLowerCase() === prevAgentName.toLowerCase() &&
               claimText.length > 0
             ) {
-              // Deduplicate by claim text only. Each claim gets a unique suffixed
-              // flagId so multiple claims from the same turn are all registered.
+              // Deduplicate by exact text OR shared 80-char prefix (catches LLM
+              // rephrasing the same claim across turns, e.g. "The FDA has designated
+              // MDMA-assisted therapy…" reworded slightly in a later turn).
+              const prefix80 = claimText.slice(0, 80).toLowerCase();
               const alreadyExists = this.panel.claimFlagRegister.some(
-                (f) => f.claim === claimText,
+                (f) =>
+                  f.claim === claimText ||
+                  (prefix80.length >= 40 &&
+                    f.claim.slice(0, 80).toLowerCase() === prefix80),
               );
               if (!alreadyExists) {
                 const claimIndex = this.panel.claimFlagRegister.filter(
