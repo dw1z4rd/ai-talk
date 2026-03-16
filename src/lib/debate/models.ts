@@ -28,11 +28,6 @@ export const MODEL_OPTIONS = [
         color: "#11A1CC",
       },
       {
-        id: "kimi-k2-thinking:cloud",
-        name: "Kimi K2 Thinking",
-        color: "#11A1CC",
-      },
-      {
         id: "qwen3-vl:235b-cloud",
         name: "Qwen3-VL 235B",
         color: "#10B981",
