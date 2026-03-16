@@ -50,182 +50,191 @@
     </div>
   {/if}
 
-  <!-- Per-turn absolute scores -->
-  {#if liveJudgeResults.some((r) => r.absoluteScores)}
-    {@const scoredTurns = liveJudgeResults.filter((r) => r.absoluteScores)}
-    <div class="flex flex-col gap-2">
-      <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
-        Turn Scores
-      </h3>
-      <div
-        class="rounded-xl border bg-[--color-panel] overflow-hidden"
-        style="border-color: #7c6af720"
-      >
-        <div
-          class="grid text-[10px] font-semibold uppercase tracking-wide text-[--color-muted] px-3 py-2 border-b border-[--color-border] turn-scores-grid"
-        >
-          <span>Turn</span>
-          <span>Agent</span>
-          <span class="text-center">Logic</span>
-          <span class="text-center">Rhet.</span>
-          <span class="text-center">Tact.</span>
-          <span class="text-center">Score</span>
-        </div>
-        {#each scoredTurns as r, i (r.turnNumber)}
-          {@const info = getModelInfo(r.agentId)}
-          {@const s = r.absoluteScores}
-          <div
-            class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row turn-scores-grid"
-            style="animation-delay: {i * 100}ms"
-            in:flyInFromLeft
-            out:flyOutToRight
-          >
-            <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
-            <span class="font-medium truncate" style="color: {info.color}"
-              >{info.name}</span
-            >
-            <span
-              class="flex flex-col items-center leading-tight"
-              title="Logic: {s.logicalCoherence}/40{scoreDeltas[r.turnNumber] ? ' (retroactively adjusted: ' + (scoreDeltas[r.turnNumber] > 0 ? '+' : '') + scoreDeltas[r.turnNumber] + ')' : ''}"
-            >
-              <span class="font-mono text-[12px]">{s.logicalCoherence}</span>
-              <span class="text-[9px] text-[--color-muted]">/40</span>
-              {#if scoreDeltas[r.turnNumber]}
-                {@const d = scoreDeltas[r.turnNumber]}
-                <span
-                  class="font-mono text-[9px] font-bold mt-0.5 px-1 rounded"
-                  style="color: {d < 0 ? '#f87171' : '#34d399'}; background: {d < 0 ? '#f8717118' : '#34d39918'}"
-                >{d > 0 ? '+' : ''}{d}</span>
-              {/if}
-            </span>
-            <span
-              class="flex flex-col items-center leading-tight"
-              title="Rhetoric: {s.rhetoricalForce}/30"
-            >
-              <span class="font-mono text-[12px]">{s.rhetoricalForce}</span>
-              <span class="text-[9px] text-[--color-muted]">/30</span>
-            </span>
-            <span
-              class="flex flex-col items-center leading-tight"
-              title="Tactics: {s.tacticalEffectiveness}/30"
-            >
-              <span class="font-mono text-[12px]">{s.tacticalEffectiveness}</span>
-              <span class="text-[9px] text-[--color-muted]">/30</span>
-            </span>
-            <span
-              class="text-center font-mono text-[11px] font-semibold"
-              style="color: {info.color}">{s.logicalCoherence + s.rhetoricalForce + s.tacticalEffectiveness}</span
-            >
-          </div>
-        {/each}
-      </div>
-    </div>
-  {/if}
-</div>
+  <!-- Narrative verdict + Turn Scores in a keyed list so flip animates the push-down -->
+  {#each [
+    ...(narrativeVerdict ? [{ id: 'verdict' }] : []),
+    ...(liveJudgeResults.some((r) => r.absoluteScores) ? [{ id: 'scores' }] : []),
+  ] as section (section.id)}
+    <div animate:flip={{ duration: 500, easing: cubicInOut }}>
 
-<!-- Narrative verdict (shown after debate completes) -->
-{#if narrativeVerdict}
-  <div
-    class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
-    style="border-color: {narrativeVerdict.agreesWithScorecard
-      ? '#7c6af740'
-      : '#f59e0b40'}; animation-delay: 150ms"
-    in:flyInFromLeft
-    out:flyOutToRight
-  >
-    <div
-      class="flex items-center gap-3 px-4 py-3 border-b"
-      style="border-color: {narrativeVerdict.agreesWithScorecard
-        ? '#7c6af725'
-        : '#f59e0b25'}; background: {narrativeVerdict.agreesWithScorecard
-        ? '#7c6af708'
-        : '#f59e0b08'}"
-    >
-      <div class="flex flex-col">
-        <span
-          class="text-sm font-bold"
-          style="color: {narrativeVerdict.agreesWithScorecard
-            ? '#c084fc'
-            : '#fbbf24'}"
-        >
-          {narrativeVerdict.agreesWithScorecard
-            ? "Narrative Verdict"
-            : "⚡ Narrative Arc Diverges"}
-        </span>
-        <span class="text-[10px] text-[--color-muted]"
-          >arc-level · cumulative thesis coherence</span
-        >
-      </div>
-      {#if narrativeVerdict.favouredAgentId}
-        {@const favouredInfo = getModelInfo(narrativeVerdict.favouredAgentId)}
-        <span
-          class="ml-auto text-xs font-semibold"
-          style="color: {favouredInfo.color}"
-          >→ {favouredInfo.name}</span
-        >
-      {/if}
-    </div>
-    {#if narrativeVerdict.convergence?.detected}
-      {@const conv = narrativeVerdict.convergence}
-      <div class="px-4 pb-4 pt-0">
+      {#if section.id === 'verdict'}
+        <!-- Narrative verdict (shown after debate completes) -->
         <div
-          class="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2.5"
+          class="rounded-2xl border overflow-hidden bg-[--color-panel]"
+          style="border-color: {narrativeVerdict.agreesWithScorecard
+            ? '#7c6af740'
+            : '#f59e0b40'}"
+          in:flyInFromTop={{ duration: 1000 }}
+          out:flyOutToBottom={{ duration: 1000 }}
         >
-          <p class="text-[11px] font-semibold text-sky-400 mb-1">
-            ⚠ Positional convergence detected!
-            {#if conv.convergenceTurnRange}
-              · {conv.convergenceTurnRange}{/if}
-          </p>
-          {#if conv.positionalGapDescription}
+          <div
+            class="flex items-center gap-3 px-4 py-3 border-b"
+            style="border-color: {narrativeVerdict.agreesWithScorecard
+              ? '#7c6af725'
+              : '#f59e0b25'}; background: {narrativeVerdict.agreesWithScorecard
+              ? '#7c6af708'
+              : '#f59e0b08'}"
+          >
+            <div class="flex flex-col">
+              <span
+                class="text-sm font-bold"
+                style="color: {narrativeVerdict.agreesWithScorecard
+                  ? '#c084fc'
+                  : '#fbbf24'}"
+              >
+                {narrativeVerdict.agreesWithScorecard
+                  ? "Narrative Verdict"
+                  : "⚡ Narrative Arc Diverges"}
+              </span>
+              <span class="text-[10px] text-[--color-muted]"
+                >arc-level · cumulative thesis coherence</span
+              >
+            </div>
+            {#if narrativeVerdict.favouredAgentId}
+              {@const favouredInfo = getModelInfo(narrativeVerdict.favouredAgentId)}
+              <span
+                class="ml-auto text-xs font-semibold"
+                style="color: {favouredInfo.color}"
+                >→ {favouredInfo.name}</span
+              >
+            {/if}
+          </div>
+          {#if narrativeVerdict.convergence?.detected}
+            {@const conv = narrativeVerdict.convergence}
+            <div class="px-4 pb-4 pt-0">
+              <div
+                class="rounded-xl border border-sky-500/20 bg-sky-500/5 px-3 py-2.5"
+              >
+                <p class="text-[11px] font-semibold text-sky-400 mb-1">
+                  ⚠ Positional convergence detected!
+                  {#if conv.convergenceTurnRange}
+                    · {conv.convergenceTurnRange}{/if}
+                </p>
+                {#if conv.positionalGapDescription}
+                  <p
+                    class="text-[11px] text-[--color-muted-fg] leading-relaxed mb-1"
+                  >
+                    {conv.positionalGapDescription}
+                  </p>
+                {/if}
+                <p class="text-[11px] text-[--color-muted] leading-relaxed">
+                  Remaining disagreement: <span class="text-sky-300/80"
+                    >{conv.remainingDisagreementType}</span
+                  >
+                  · Motion viability:
+                  <span class="text-sky-300/80"
+                    >{conv.motionViability === "degenerate_convergence"
+                      ? "degenerate — opposition collapsed"
+                      : conv.motionViability}</span
+                  >
+                </p>
+              </div>
+            </div>
+          {/if}
+          <div class="px-4 py-4">
             <p
-              class="text-[11px] text-[--color-muted-fg] leading-relaxed mb-1"
+              class="text-sm text-[--color-muted-fg] leading-relaxed whitespace-pre-line"
             >
-              {conv.positionalGapDescription}
+              {narrativeVerdict.text}
             </p>
+          </div>
+          {#if narrativeVerdict.conflictResolution}
+            <div class="px-4 pb-4 pt-0">
+              <div
+                class="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5"
+              >
+                {#if narrativeVerdict.scorecardInternallyConsistent === false}
+                  <p class="text-[11px] font-semibold text-amber-400 mb-1">
+                    Why they diverged · scorecard internally split
+                  </p>
+                {:else}
+                  <p class="text-[11px] font-semibold text-amber-400 mb-1">
+                    Why they diverged
+                  </p>
+                {/if}
+                <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">
+                  {narrativeVerdict.conflictResolution}
+                </p>
+              </div>
+            </div>
           {/if}
-          <p class="text-[11px] text-[--color-muted] leading-relaxed">
-            Remaining disagreement: <span class="text-sky-300/80"
-              >{conv.remainingDisagreementType}</span
-            >
-            · Motion viability:
-            <span class="text-sky-300/80"
-              >{conv.motionViability === "degenerate_convergence"
-                ? "degenerate — opposition collapsed"
-                : conv.motionViability}</span
-            >
-          </p>
         </div>
-      </div>
-    {/if}
-    <div class="px-4 py-4">
-      <p
-        class="text-sm text-[--color-muted-fg] leading-relaxed whitespace-pre-line"
-      >
-        {narrativeVerdict.text}
-      </p>
+
+      {:else}
+        <!-- Per-turn absolute scores -->
+        {@const scoredTurns = liveJudgeResults.filter((r) => r.absoluteScores)}
+        <div class="flex flex-col gap-2">
+          <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
+            Turn Scores
+          </h3>
+          <div
+            class="rounded-xl border bg-[--color-panel] overflow-hidden"
+            style="border-color: #7c6af720"
+          >
+            <div
+              class="grid text-[10px] font-semibold uppercase tracking-wide text-[--color-muted] px-3 py-2 border-b border-[--color-border] turn-scores-grid"
+            >
+              <span>Turn</span>
+              <span>Agent</span>
+              <span class="text-center">Logic</span>
+              <span class="text-center">Rhet.</span>
+              <span class="text-center">Tact.</span>
+              <span class="text-center">Score</span>
+            </div>
+            {#each scoredTurns as r, i (r.turnNumber)}
+              {@const info = getModelInfo(r.agentId)}
+              {@const s = r.absoluteScores}
+              <div
+                class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row turn-scores-grid"
+                style="animation-delay: {i * 100}ms"
+                in:flyInFromLeft
+                out:flyOutToRight
+              >
+                <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
+                <span class="font-medium truncate" style="color: {info.color}"
+                  >{info.name}</span
+                >
+                <span
+                  class="flex flex-col items-center leading-tight"
+                  title="Logic: {s.logicalCoherence}/40{scoreDeltas[r.turnNumber] ? ' (retroactively adjusted: ' + (scoreDeltas[r.turnNumber] > 0 ? '+' : '') + scoreDeltas[r.turnNumber] + ')' : ''}"
+                >
+                  <span class="font-mono text-[12px]">{s.logicalCoherence}</span>
+                  <span class="text-[9px] text-[--color-muted]">/40</span>
+                  {#if scoreDeltas[r.turnNumber]}
+                    {@const d = scoreDeltas[r.turnNumber]}
+                    <span
+                      class="font-mono text-[9px] font-bold mt-0.5 px-1 rounded"
+                      style="color: {d < 0 ? '#f87171' : '#34d399'}; background: {d < 0 ? '#f8717118' : '#34d39918'}"
+                    >{d > 0 ? '+' : ''}{d}</span>
+                  {/if}
+                </span>
+                <span
+                  class="flex flex-col items-center leading-tight"
+                  title="Rhetoric: {s.rhetoricalForce}/30"
+                >
+                  <span class="font-mono text-[12px]">{s.rhetoricalForce}</span>
+                  <span class="text-[9px] text-[--color-muted]">/30</span>
+                </span>
+                <span
+                  class="flex flex-col items-center leading-tight"
+                  title="Tactics: {s.tacticalEffectiveness}/30"
+                >
+                  <span class="font-mono text-[12px]">{s.tacticalEffectiveness}</span>
+                  <span class="text-[9px] text-[--color-muted]">/30</span>
+                </span>
+                <span
+                  class="text-center font-mono text-[11px] font-semibold"
+                  style="color: {info.color}">{s.logicalCoherence + s.rhetoricalForce + s.tacticalEffectiveness}</span
+                >
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
     </div>
-    {#if narrativeVerdict.conflictResolution}
-      <div class="px-4 pb-4 pt-0">
-        <div
-          class="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5"
-        >
-          {#if narrativeVerdict.scorecardInternallyConsistent === false}
-            <p class="text-[11px] font-semibold text-amber-400 mb-1">
-              Why they diverged · scorecard internally split
-            </p>
-          {:else}
-            <p class="text-[11px] font-semibold text-amber-400 mb-1">
-              Why they diverged
-            </p>
-          {/if}
-          <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">
-            {narrativeVerdict.conflictResolution}
-          </p>
-        </div>
-      </div>
-    {/if}
-  </div>
-{/if}
+  {/each}
+</div>
 
 <!-- 3-col analysis grid: most items span full row, round cards take 1 col each -->
 <div class="judge-main-grid">
