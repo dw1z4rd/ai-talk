@@ -219,6 +219,13 @@ export const POST: RequestHandler = async ({ request }) => {
         }
         pendingJudges.clear();
 
+        // Drain the microtask queue before sending writing_verdict. The flush
+        // loop's `await pending.promise` resumes via a direct .then() on the
+        // judge promise, but the chained .catch().finally() executes 2-3
+        // microtask ticks later. Without this boundary, .finally() fires after
+        // writing_verdict and sends status:null, immediately wiping the banner.
+        await new Promise((r) => setTimeout(r, 0));
+
         // ── Post-debate: narrative verdict ────────────────────────────────
         const debateAgentHistory = history.filter(
           (m) => m.agentId !== "moderator",
