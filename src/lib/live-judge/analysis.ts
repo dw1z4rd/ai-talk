@@ -622,7 +622,7 @@ export function updateScorecard(
 
   // Record counterfactual submission if detected in this round
   if (round.counterfactualDetected) {
-    updated.counterfactualTrack[round.counterfactualDetected.agentId] = true;
+    updated.counterfactualTrack![round.counterfactualDetected.agentId] = true;
   }
 
   // Tally wins

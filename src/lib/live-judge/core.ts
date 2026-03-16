@@ -197,7 +197,7 @@ export class LiveJudgeSystem {
       const previousLogicDelta =
         lastRound &&
         !lastRound.isFallback &&
-        lastRound.logicWeakerTurn === "prev"
+        lastRound.logicWinner !== lastRound.prevTurn.agentId
           ? lastRound.logicDelta
           : undefined;
 
