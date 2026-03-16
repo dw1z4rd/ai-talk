@@ -187,6 +187,7 @@ export async function compareTurns(
     curTurnNumber,
     topic,
     isOpeningRound,
+    undefined,
     openFlags,
   );
 
@@ -358,10 +359,15 @@ export function generatePairwisePrompt(
   turnB: number,
   topic: string,
   isOpeningRound: boolean,
+  previousLogicDelta?: string,
   openFlags?: OpenFlag[],
 ): string {
   const openingNote = isOpeningRound
     ? `\n[NOTE: Turn ${turnA} is the OPENING statement — ${nameA} spoke first with no opponent yet. Apply OPENING TURN rules to their turn.]`
+    : "";
+
+  const previousDeltaNote = previousLogicDelta
+    ? `\n\nPREVIOUS ROUND JUDGE NOTE: ${previousLogicDelta}`
     : "";
 
   // Build a structured OPEN FLAGS block instead of raw prose delta.
@@ -376,7 +382,7 @@ export function generatePairwisePrompt(
       ? `\n\nOPEN FLAGS (unresolved hollow claims from prior turns by ${nameA}):\n${prevTurnFlags.map((f) => `- [${f.flagId}] T${f.originTurn}: "${f.claim}" — mechanism absent [UNRESOLVED]`).join("\n")}\nSee OPEN FLAGS section in the system prompt for instructions on how to handle these.`
       : "";
 
-  return `DEBATE TOPIC: ${topic}${openingNote}${openFlagsNote}
+  return `DEBATE TOPIC: ${topic}${openingNote}${previousDeltaNote}${openFlagsNote}
 
 TURN ${turnA} — ${nameA}:
 "${messageA}"
