@@ -80,6 +80,7 @@ export const POST: RequestHandler = async ({ request }) => {
           emitted: boolean;
         };
         const pendingJudges = new Map<string, PendingJudge>();
+        let inFlightJudges = 0;
 
         const emitJudgeResult = (jr: any) => {
           send({
