@@ -3,8 +3,8 @@ export const MODEL_OPTIONS = [
     group: "Ollama — Cloud",
     options: [
       {
-        id: "devstral-small-2:24b-cloud",
-        name: "Devstral Small 2",
+        id: "nemotron-3-super-cloud",
+        name: "Nemotron 3 Super",
         color: "#FF7000",
       },
       {

@@ -25,7 +25,7 @@ export const POST: RequestHandler = async ({ request }) => {
   const totalTurns = Math.min(Number(turns) || 12, 30) * 2; // Multiply by 2 debaters
 
   const agentAId = agentA ?? "kimi-k2:1t-cloud";
-  const agentBId = agentB ?? "devstral-small-2:24b-cloud";
+  const agentBId = agentB ?? "nemotron-3-super-cloud";
 
   const stream = new ReadableStream({
     async start(controller) {

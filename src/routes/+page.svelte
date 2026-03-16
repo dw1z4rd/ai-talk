@@ -20,7 +20,7 @@
   let chatEl = $state<HTMLElement | null>(null);
   let abortController = $state<AbortController | null>(null);
   let agentA = $state("kimi-k2:1t-cloud");
-  let agentB = $state("devstral-small-2:24b-cloud");
+  let agentB = $state("nemotron-3-super-cloud");
   let leftAgentId = $state("kimi-k2:1t-cloud");
   let typingAgentName = $state("");
   let typingAgentColor = $state("");

@@ -5,9 +5,7 @@
     {
       group: "Ollama — Cloud",
       options: [
-        { id: "deepseek-v3.1:671b-cloud", name: "DeepSeek V3.1", color: "#4B8BF5" },
-        { id: "deepseek-v3.2-cloud", name: "DeepSeek V3.2", color: "#3B7BFF" },
-        { id: "devstral-small-2:24b-cloud", name: "Devstral Small 2", color: "#FF7000" },
+        { id: "nemotron-3-super-cloud", name: "Nemotron 3 Super", color: "#FF7000" },
         { id: "kimi-k2:1t-cloud", name: "Kimi K2 1T", color: "#A78BFA" },
         { id: "gpt-oss:120b-cloud", name: "GPT-OSS 120B", color: "#FF6B35" },
         { id: "qwen3-vl:235b-cloud", name: "Qwen3-VL 235B", color: "#10B981" },

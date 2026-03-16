@@ -5,8 +5,8 @@
       group: "Ollama — Cloud",
       options: [
         {
-          id: "devstral-small-2:24b-cloud",
-          name: "Devstral Small 2",
+          id: "nemotron-3-super-cloud",
+          name: "Nemotron 3 Super",
           color: "#FF7000",
         },
         {
@@ -57,7 +57,7 @@
   let chatEl = $state<HTMLElement | null>(null);
   let abortController = $state<AbortController | null>(null);
 
-  let agentA = $state("devstral-small-2:24b-cloud");
+  let agentA = $state("nemotron-3-super-cloud");
   let agentB = $state("gpt-oss:120b-cloud");
   let agentC = $state("gpt-oss:120b-cloud");
 

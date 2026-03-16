@@ -74,14 +74,14 @@ interface ModelDef {
 
 export const MODEL_CATALOG: Record<string, ModelDef> = {
   // Ollama — Cloud
-  "devstral-small-2:24b-cloud": {
-    name: "Devstral Small 2",
+  "nemotron-3-super-cloud": {
+    name: "Nemotron 3 Super",
     color: "#FF7000",
     makeProvider: () =>
       createOllamaProvider({
         baseUrl: OLLAMA_CLOUD_URL,
         apiKey: OLLAMA_CLOUD_API_KEY || undefined,
-        model: "devstral-small-2:24b-cloud",
+        model: "nemotron-3-super-cloud",
       }),
   },
   "kimi-k2:1t-cloud": {
@@ -447,7 +447,7 @@ export function buildAgents(
 ): Agent[] {
   const defA = MODEL_CATALOG[agentAId] ?? MODEL_CATALOG["kimi-k2:1t-cloud"];
   const defB =
-    MODEL_CATALOG[agentBId] ?? MODEL_CATALOG["devstral-small-2:24b-cloud"];
+    MODEL_CATALOG[agentBId] ?? MODEL_CATALOG["nemotron-3-super-cloud"];
 
   // Available personality archetypes
   const archetypes = Object.keys(PERSONALITY_ARCHETYPES);
@@ -862,7 +862,7 @@ export function buildAdaptiveAgents(
 
   const defA = MODEL_CATALOG[firstId] ?? MODEL_CATALOG["kimi-k2:1t-cloud"];
   const defB =
-    MODEL_CATALOG[secondId] ?? MODEL_CATALOG["devstral-small-2:24b-cloud"];
+    MODEL_CATALOG[secondId] ?? MODEL_CATALOG["nemotron-3-super-cloud"];
 
   const archetypes = Object.keys(PERSONALITY_ARCHETYPES);
   const archetypeA =
