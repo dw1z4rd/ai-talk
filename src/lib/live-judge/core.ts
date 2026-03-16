@@ -260,11 +260,18 @@ export class LiveJudgeSystem {
               claimedName.toLowerCase() === prevAgentName.toLowerCase() &&
               claimText.length > 0
             ) {
-              const flagId = `FLAG-T${prevTurnNumber}-${prevAgentId.replace(/[^a-z0-9]/gi, "").slice(0, 12)}`;
+              // Deduplicate by claim text only. Each claim gets a unique suffixed
+              // flagId so multiple claims from the same turn are all registered.
               const alreadyExists = this.panel.claimFlagRegister.some(
-                (f) => f.flagId === flagId || f.claim === claimText,
+                (f) => f.claim === claimText,
               );
               if (!alreadyExists) {
+                const claimIndex = this.panel.claimFlagRegister.filter(
+                  (f) =>
+                    f.agentId === prevAgentId &&
+                    f.originTurn === prevTurnNumber,
+                ).length;
+                const flagId = `FLAG-T${prevTurnNumber}-${prevAgentId.replace(/[^a-z0-9]/gi, "").slice(0, 12)}-${claimIndex}`;
                 this.panel.claimFlagRegister.push({
                   flagId,
                   agentId: prevAgentId,

@@ -569,12 +569,9 @@ function parsePairwiseResponse(
                 x.update_type === "partial_restore"
                   ? "partial_restore"
                   : "penalty";
-              // Resolve the agentId from flagId prefix if possible, else fall back to prevTurn
-              const agentId = flagId
-                ? flagId.toLowerCase().includes(curAgentName.toLowerCase())
-                  ? curAgentId
-                  : prevAgentId
-                : prevAgentId;
+              // Flags are always for the prevTurn agent — the OPEN FLAGS block
+              // instructs the LLM to only issue updates for prevTurn claims.
+              const agentId = prevAgentId;
               if (!flagId || targetTurn === null || deltaRaw === null)
                 return null;
               // Clamp: penalties must be negative, restores positive, raw magnitude ≤ 3
@@ -988,16 +985,48 @@ export async function generateNarrativeVerdictText(
       ? `\nEPISTEMIC NOTES (per-round):\n${epistemicNotes.join("\n")}\n`
       : "";
 
+  // Pre-compute a round-win record line so the LLM can easily spot momentum
+  // reversals and identify RECOVERY ARC or ASYMMETRIC DEPTH patterns without
+  // having to reconstruct it from the full PAIRWISE REASONING prose.
+  const roundWinRecord = scorecard.rounds
+    .filter((r) => !r.isFallback)
+    .map((r) => {
+      // Resolve a dimension winner ID to a display name; "tie" (post-reconciliation)
+      // and any unrecognised ID resolve to null (not counted for either side).
+      const resolveName = (winnerId: string): string | null => {
+        if (winnerId === r.prevTurn.agentId) return r.prevTurn.agentName;
+        if (winnerId === r.curTurn.agentId) return r.curTurn.agentName;
+        return null;
+      };
+      const wins: Record<string, number> = {};
+      for (const w of [
+        resolveName(r.logicWinner),
+        resolveName(r.tacticsWinner),
+        resolveName(r.rhetoricWinner),
+      ]) {
+        if (w) wins[w] = (wins[w] ?? 0) + 1;
+      }
+      const sorted = Object.entries(wins).sort((a, b) => b[1] - a[1]);
+      const roundWinner =
+        sorted.length > 0 &&
+        (sorted.length === 1 || sorted[0][1] > sorted[1][1])
+          ? sorted[0][0]
+          : "TIE";
+      return `R${r.roundNumber}→${roundWinner}`;
+    })
+    .join(" · ");
+
   const prompt = `DEBATE TOPIC: "${topic}"
 
 PAIRWISE SCORECARD (${scorecard.rounds.length} rounds):
 ${scorecardSummary}
+
+ROUND-WIN RECORD: ${roundWinRecord}
 ${reasoningSection}${epistemicSection}
 FULL TRANSCRIPT:
 ${transcriptText}
 
 Write your verdict now:`;
-
   const judgeProvider = createJudgeProvider(
     judge.modelId || "kimi-k2-thinking:cloud",
   );
