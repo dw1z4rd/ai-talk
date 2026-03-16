@@ -319,6 +319,13 @@ export interface LiveJudgePanel {
   previousTurn: PairwiseTurnRef | null;
   /** Most recent per-turn absolute scores per agent, used for harmonization checks. */
   lastAbsoluteScores: { [agentId: string]: JudgeScores };
+  /**
+   * Per-turn absolute scores indexed by turn number (not overwritten).
+   * Used for retroactive re-reconciliation: when a claim penalty changes a turn's
+   * absolute score, we re-evaluate the pairwise round winners for that turn with
+   * the corrected score rather than leaving the scorecard in a stale state.
+   */
+  absoluteScoreHistory: { [turnNumber: number]: JudgeScores };
   /** Running register of open (unresolved / partially-penalized) hollow claims. */
   claimFlagRegister: ClaimFlagRegister;
   /** Per-turn retroactive score adjustments accumulated across all rounds. */

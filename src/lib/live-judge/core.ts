@@ -96,6 +96,7 @@ export class LiveJudgeSystem {
       },
       previousTurn: null,
       lastAbsoluteScores: {},
+      absoluteScoreHistory: {},
       claimFlagRegister: [],
       retroactiveDeltas: {},
     };
@@ -172,8 +173,12 @@ export class LiveJudgeSystem {
         absoluteScores = openingAnalysis.scores;
         // Persist so Turn 2 harmonization check has a prevAbsolute to compare against
         this.panel.lastAbsoluteScores[agent.id] = absoluteScores;
+        this.panel.absoluteScoreHistory[turnNumber] = absoluteScores;
       } catch {
-        // Opening analysis failed — leave neutral scores
+        // Opening analysis failed — store neutral fallback so Round 1 harmonization
+        // is not silently skipped due to a missing prevAbsolute entry.
+        this.panel.lastAbsoluteScores[agent.id] = aggregatedScores;
+        this.panel.absoluteScoreHistory[turnNumber] = aggregatedScores;
       }
     } else {
       // Turn 2+: run pairwise comparison against the previous turn.
@@ -245,57 +250,115 @@ export class LiveJudgeSystem {
         judge.analysisCount++;
 
         // ── Seed new open flags from pairwise suspect_claims ──────────────────
-        // Any claim attributed to the prevTurn agent that hasn't already been
-        // registered gets added as an unresolved flag for future rounds to evaluate.
+        // Claims attributed to the prevTurn agent are seeded immediately so they
+        // are available as open flags in the very next round.
+        // Claims attributed to the curTurn agent are also early-registered here
+        // (rather than waiting for them to appear as prevTurn next round), so that
+        // if the debate ends before that agent speaks again as prevTurn, their
+        // hollow claims still receive a penalty. The existing deduplication logic
+        // prevents double-seeding when the next round re-encounters the same claim.
         if (pairwiseResult.suspectClaims && !pairwiseResult.isFallback) {
+          // ── Prev-turn agent flags ────────────────────────────────────────────
           let newFlagsSeeded = 0;
+          // Filter to only prevAgent claims for the denominator displayed in the log.
+          const prevAgentSuspectClaims = pairwiseResult.suspectClaims.filter(
+            (c) =>
+              c.toLowerCase().startsWith(prevAgentName.toLowerCase() + ":"),
+          );
           for (const entry of pairwiseResult.suspectClaims) {
             // Format: "AgentName: claim text"
             const colonIdx = entry.indexOf(":");
             if (colonIdx === -1) continue;
             const claimedName = entry.slice(0, colonIdx).trim();
             const claimText = entry.slice(colonIdx + 1).trim();
-            // Only create flags for the prevTurn agent (curTurn flags go through
-            // the pre-flagged PRE-FLAGGED CLAIMS mechanism in analyzeTurn).
             if (
-              claimedName.toLowerCase() === prevAgentName.toLowerCase() &&
-              claimText.length > 0
-            ) {
-              // Deduplicate by exact text OR shared 80-char prefix (catches LLM
-              // rephrasing the same claim across turns, e.g. "The FDA has designated
-              // MDMA-assisted therapy…" reworded slightly in a later turn).
-              const prefix80 = claimText.slice(0, 80).toLowerCase();
-              const alreadyExists = this.panel.claimFlagRegister.some(
+              claimedName.toLowerCase() !== prevAgentName.toLowerCase() ||
+              claimText.length === 0
+            )
+              continue;
+            // Deduplicate by exact text OR shared 80-char prefix (catches LLM
+            // rephrasing the same claim across turns).
+            const prefix80 = claimText.slice(0, 80).toLowerCase();
+            const alreadyExists = this.panel.claimFlagRegister.some(
+              (f) =>
+                f.claim === claimText ||
+                (prefix80.length >= 40 &&
+                  f.claim.slice(0, 80).toLowerCase() === prefix80),
+            );
+            if (!alreadyExists) {
+              const claimIndex = this.panel.claimFlagRegister.filter(
                 (f) =>
-                  f.claim === claimText ||
-                  (prefix80.length >= 40 &&
-                    f.claim.slice(0, 80).toLowerCase() === prefix80),
-              );
-              if (!alreadyExists) {
-                const claimIndex = this.panel.claimFlagRegister.filter(
-                  (f) =>
-                    f.agentId === prevAgentId &&
-                    f.originTurn === prevTurnNumber,
-                ).length;
-                const flagId = `FLAG-T${prevTurnNumber}-${prevAgentId.replace(/[^a-z0-9]/gi, "").slice(0, 12)}-${claimIndex}`;
-                this.panel.claimFlagRegister.push({
-                  flagId,
-                  agentId: prevAgentId,
-                  agentName: prevAgentName,
-                  originTurn: prevTurnNumber,
-                  claim: claimText,
-                  status: "unresolved",
-                });
-                newFlagsSeeded++;
-              }
+                  f.agentId === prevAgentId && f.originTurn === prevTurnNumber,
+              ).length;
+              const flagId = `FLAG-T${prevTurnNumber}-${prevAgentId.replace(/[^a-z0-9]/gi, "").slice(0, 12)}-${claimIndex}`;
+              this.panel.claimFlagRegister.push({
+                flagId,
+                agentId: prevAgentId,
+                agentName: prevAgentName,
+                originTurn: prevTurnNumber,
+                claim: claimText,
+                status: "unresolved",
+              });
+              newFlagsSeeded++;
             }
           }
+          // Log only prevAgent-attributed claims; including curAgent claims in the
+          // count gave a misleading "seeded N/M for prevAgent" where M counted turns
+          // from the other agent.
           console.log(
-            `[Claim Flags] Round ${roundNumber} seeded ${newFlagsSeeded}/${pairwiseResult.suspectClaims.length} new flag(s) for ${prevAgentName} T${prevTurnNumber}` +
-              (pairwiseResult.suspectClaims.length > 0
-                ? ` — claims: ${pairwiseResult.suspectClaims.map((c) => `"${c.slice(0, 60)}${c.length > 60 ? "…" : ""}"`).join(", ")}`
+            `[Claim Flags] Round ${roundNumber} seeded ${newFlagsSeeded}/${prevAgentSuspectClaims.length} new flag(s) for ${prevAgentName} T${prevTurnNumber}` +
+              (prevAgentSuspectClaims.length > 0
+                ? ` — claims: ${prevAgentSuspectClaims.map((c) => `"${c.slice(0, 60)}${c.length > 60 ? "…" : ""}"`).join(", ")}`
                 : ""),
           );
+
+          // ── Cur-turn agent early-register ────────────────────────────────────
+          // Seed suspect claims for the current turn's agent now rather than
+          // waiting for the next pairwise round to re-surface them. This ensures
+          // that even if the debate ends before this agent speaks again as prevTurn,
+          // the claim is in the register and its status is tracked.
+          let curFlagsSeeded = 0;
+          for (const entry of pairwiseResult.suspectClaims) {
+            const colonIdx = entry.indexOf(":");
+            if (colonIdx === -1) continue;
+            const claimedName = entry.slice(0, colonIdx).trim();
+            const claimText = entry.slice(colonIdx + 1).trim();
+            if (
+              claimedName.toLowerCase() !== agent.name.toLowerCase() ||
+              claimText.length === 0
+            )
+              continue;
+            const prefix80 = claimText.slice(0, 80).toLowerCase();
+            const alreadyExists = this.panel.claimFlagRegister.some(
+              (f) =>
+                f.claim === claimText ||
+                (prefix80.length >= 40 &&
+                  f.claim.slice(0, 80).toLowerCase() === prefix80),
+            );
+            if (!alreadyExists) {
+              const claimIndex = this.panel.claimFlagRegister.filter(
+                (f) => f.agentId === agent.id && f.originTurn === turnNumber,
+              ).length;
+              const flagId = `FLAG-T${turnNumber}-${agent.id.replace(/[^a-z0-9]/gi, "").slice(0, 12)}-${claimIndex}`;
+              this.panel.claimFlagRegister.push({
+                flagId,
+                agentId: agent.id,
+                agentName: agent.name,
+                originTurn: turnNumber,
+                claim: claimText,
+                status: "unresolved",
+              });
+              curFlagsSeeded++;
+            }
+          }
+          if (curFlagsSeeded > 0) {
+            const curAgentSuspectClaims = pairwiseResult.suspectClaims.filter(
+              (c) => c.toLowerCase().startsWith(agent.name.toLowerCase() + ":"),
+            );
+            console.log(
+              `[Claim Flags] Round ${roundNumber} early-registered ${curFlagsSeeded}/${curAgentSuspectClaims.length} flag(s) for ${agent.name} T${turnNumber}`,
+            );
+          }
         } else if (!pairwiseResult.isFallback) {
           console.log(
             `[Claim Flags] Round ${roundNumber}: pairwise judge returned no suspect_claims for ${prevAgentName} T${prevTurnNumber}`,
@@ -305,10 +368,13 @@ export class LiveJudgeSystem {
         // ── Apply retroactive score corrections from flag_updates ─────────────
         // The judge issues UPDATE instructions for prevTurn's absolute score.
         // We apply them to retroactiveDeltas; the SSE layer emits scoreUpdate events.
+        // absoluteScoreHistory is also updated so that re-reconciliation (below) can
+        // re-evaluate pairwise round winners using the corrected absolute scores.
         if (pairwiseResult.flagUpdates && !pairwiseResult.isFallback) {
           console.log(
             `[Claim Flags] Round ${roundNumber}: ${pairwiseResult.flagUpdates.length} flag_update(s) received`,
           );
+          const penalisedTurns = new Set<number>();
           for (const update of pairwiseResult.flagUpdates) {
             const { flagId, targetTurn, deltaRaw, updateType } = update;
 
@@ -338,6 +404,20 @@ export class LiveJudgeSystem {
               logicalCoherence: existing + scaledDelta,
             };
 
+            // Mirror the same delta into absoluteScoreHistory so re-reconciliation
+            // uses the post-penalty score when re-evaluating tied rounds.
+            const hist = this.panel.absoluteScoreHistory[targetTurn];
+            if (hist) {
+              this.panel.absoluteScoreHistory[targetTurn] = {
+                ...hist,
+                logicalCoherence: Math.max(
+                  0,
+                  hist.logicalCoherence + scaledDelta,
+                ),
+              };
+              penalisedTurns.add(targetTurn);
+            }
+
             // Update flag status in the register
             if (flag) {
               flag.status =
@@ -346,6 +426,93 @@ export class LiveJudgeSystem {
             console.log(
               `[Claim Flags] ${updateType} on ${flagId} → T${targetTurn} logicalCoherence ${effectiveDelta > 0 ? "+" : ""}${effectiveDelta * 4} (scaled)`,
             );
+          }
+
+          // ── Re-reconcile pairwise round winners ─────────────────────────────
+          // For each turn whose absolute logicalCoherence changed, re-run
+          // reconcileRoundWinners on every pairwise round that included that turn.
+          // This corrects the specific case where penalties make a previously-equal
+          // score pair unequal (or vice versa), keeping the absolute score table
+          // and the pairwise scorecard consistent.
+          for (const affectedTurn of penalisedTurns) {
+            const affectedAbs = this.panel.absoluteScoreHistory[affectedTurn];
+            if (!affectedAbs) continue;
+
+            for (let ri = 0; ri < this.panel.scorecard.rounds.length; ri++) {
+              const round = this.panel.scorecard.rounds[ri];
+              const isPrev = round.prevTurn.turnNumber === affectedTurn;
+              const isCur = round.curTurn.turnNumber === affectedTurn;
+              if (!isPrev && !isCur) continue;
+
+              const prevAbs = isPrev
+                ? affectedAbs
+                : this.panel.absoluteScoreHistory[round.prevTurn.turnNumber];
+              const curAbs = isCur
+                ? affectedAbs
+                : this.panel.absoluteScoreHistory[round.curTurn.turnNumber];
+              if (!prevAbs || !curAbs) continue;
+
+              const updatedRound = reconcileRoundWinners(
+                round,
+                curAbs,
+                prevAbs,
+              );
+              const dimPairs: Array<
+                [
+                  "logicWinner" | "tacticsWinner" | "rhetoricWinner",
+                  "logic" | "tactics" | "rhetoric",
+                ]
+              > = [
+                ["logicWinner", "logic"],
+                ["tacticsWinner", "tactics"],
+                ["rhetoricWinner", "rhetoric"],
+              ];
+
+              let anyChange = false;
+              for (const [field, tallyKey] of dimPairs) {
+                const oldWinner = round[field];
+                const newWinner = updatedRound[field];
+                if (oldWinner === newWinner) continue;
+                anyChange = true;
+                // Un-tally the old winner and tally the new one
+                if (
+                  oldWinner !== "tie" &&
+                  this.panel.scorecard.winTallies[oldWinner]
+                ) {
+                  this.panel.scorecard.winTallies[oldWinner][tallyKey]--;
+                  this.panel.scorecard.winTallies[oldWinner].total--;
+                }
+                if (
+                  newWinner !== "tie" &&
+                  this.panel.scorecard.winTallies[newWinner]
+                ) {
+                  this.panel.scorecard.winTallies[newWinner][tallyKey]++;
+                  this.panel.scorecard.winTallies[newWinner].total++;
+                }
+                console.log(
+                  `[Claim Flags] Re-reconciled R${round.roundNumber} ${tallyKey}: ${oldWinner} → ${newWinner} after T${affectedTurn} penalty`,
+                );
+              }
+
+              if (anyChange) {
+                this.panel.scorecard.rounds[ri] = {
+                  ...round,
+                  logicWinner: updatedRound.logicWinner,
+                  tacticsWinner: updatedRound.tacticsWinner,
+                  rhetoricWinner: updatedRound.rhetoricWinner,
+                };
+              }
+            }
+
+            // Recompute overallWinner after tally adjustments
+            const sortedTallies = Object.entries(
+              this.panel.scorecard.winTallies,
+            ).sort((a, b) => b[1].total - a[1].total);
+            this.panel.scorecard.overallWinner =
+              sortedTallies.length >= 2 &&
+              sortedTallies[0][1].total > sortedTallies[1][1].total
+                ? sortedTallies[0][0]
+                : null;
           }
         }
 
@@ -363,8 +530,9 @@ export class LiveJudgeSystem {
 
         if (absoluteAnalysis) {
           absoluteScores = absoluteAnalysis.scores;
-          // Persist for next round's harmonization check
+          // Persist for next round's harmonization check and retroactive re-reconciliation
           this.panel.lastAbsoluteScores[agent.id] = absoluteScores;
+          this.panel.absoluteScoreHistory[turnNumber] = absoluteScores;
         }
 
         // Reconcile pairwise winners with absolute scores: when both turns score

@@ -326,6 +326,7 @@ Style ≠ Rhetoric. Punchiness and brevity alone do not constitute superior rhet
 A counterfactual is a "no-X world" thought experiment: a turn that explicitly names a specific factor, asks what a world without it would look like, and then traces at least one full causal consequence in the form "if [X had not occurred / in a world without X], then [mechanism] → [measurable consequence]." The counterfactual must be the argument's own invention — not a paraphrase of the opponent's.
 Detection: if either turn contains a counterfactual matching this definition, set counterfactual_agent to that agent's exact name and counterfactual_summary to one sentence. If neither qualifies, set both to null.
 Scoring: the existing +1 for a complete explicit causal chain in LOGIC covers a counterfactual with a full chain — no separate bonus. A counterfactual missing the measurable consequence step is still penalized −1 under the mechanism requirement; populate mechanism_failures accordingly.
+HYPOTHETICAL FIGURES IN COUNTERFACTUALS: A specific number or percentage used to illustrate the magnitude of a hypothetical consequence within a counterfactual scenario (e.g. "in a world without X, a 2% disorder rate might follow") is an illustrative hypothetical, NOT a factual empirical claim. Do NOT flag it for hollow specificity and do NOT add it to suspect_claims. The hollow-specificity penalty applies only to claims presented as factual descriptions of actual events or documented studies.
 
 --- CLAIM AUDITABILITY ---
 For every concrete factual or empirical assertion in either turn that you considered penalizing for hollow specificity — whether or not you ultimately docked a point — add an entry to suspect_claims using the format "AgentName: [exact or close quote of the claim]". This creates an auditable record that can be reviewed independently of the scoring decision. Empty array if no such claims appeared in either turn.
@@ -961,13 +962,20 @@ export async function generateNarrativeVerdictText(
   const pairwiseReasoning = scorecard.rounds
     .filter((r) => !r.isFallback)
     .map((r) => {
-      const logicWinnerName =
-        r.logicWinner === r.prevTurn.agentId
-          ? r.prevTurn.agentName
-          : r.curTurn.agentName;
+      // Resolve a dimension winner ID to a display name.
+      // When the winner is "tie" (set by reconcileRoundWinners), show "Draw"
+      // rather than falling through to the curTurn agent name — the previous
+      // behaviour caused the narrative LLM to misattribute dimension wins.
+      const resolveDim = (winnerId: string): string => {
+        if (winnerId === r.prevTurn.agentId) return r.prevTurn.agentName;
+        if (winnerId === r.curTurn.agentId) return r.curTurn.agentName;
+        return "Draw";
+      };
       const lines = [
         `Round ${r.roundNumber} (${r.prevTurn.agentName} vs ${r.curTurn.agentName}):`,
-        `  Logic → ${logicWinnerName}: ${r.logicDelta}`,
+        `  Logic → ${resolveDim(r.logicWinner)}: ${r.logicDelta}`,
+        `  Tactics → ${resolveDim(r.tacticsWinner)}: ${r.tacticsDelta}`,
+        `  Rhetoric → ${resolveDim(r.rhetoricWinner)}: ${r.rhetoricDelta}`,
       ];
       if (r.mechanismDelta) lines.push(`  Mechanism: ${r.mechanismDelta}`);
       if (r.mechanismFailures && r.mechanismFailures.length > 0)
@@ -1290,14 +1298,19 @@ export async function generateRubricHarmonization(
   if (analysisRounds.length < 3) return "";
 
   const roundSummaries = analysisRounds
-    .map(
-      (r) =>
+    .map((r) => {
+      const w = (id: string) =>
+        id === r.prevTurn.agentId
+          ? r.prevTurn.agentName
+          : id === r.curTurn.agentId
+            ? r.curTurn.agentName
+            : "Draw";
+      return (
         `Round ${r.roundNumber} (T${r.prevTurn.turnNumber}:${r.prevTurn.agentName} vs T${r.curTurn.turnNumber}:${r.curTurn.agentName}): ` +
-        `Logic→${r.logicWinner === r.prevTurn.agentId ? r.prevTurn.agentName : r.curTurn.agentName} | ` +
-        `Tactics→${r.tacticsWinner === r.prevTurn.agentId ? r.prevTurn.agentName : r.curTurn.agentName} | ` +
-        `Rhetoric→${r.rhetoricWinner === r.prevTurn.agentId ? r.prevTurn.agentName : r.curTurn.agentName}\n` +
-        `Logic: "${r.logicDelta}" | Tactics: "${r.tacticsDelta}" | Rhetoric: "${r.rhetoricDelta}"`,
-    )
+        `Logic→${w(r.logicWinner)} | Tactics→${w(r.tacticsWinner)} | Rhetoric→${w(r.rhetoricWinner)}\n` +
+        `Logic: "${r.logicDelta}" | Tactics: "${r.tacticsDelta}" | Rhetoric: "${r.rhetoricDelta}"`
+      );
+    })
     .join("\n\n");
 
   const narrativeBlock = narrativeVerdictText
