@@ -67,12 +67,45 @@ export const POST: RequestHandler = async ({ request }) => {
         ).length;
 
         let turn = aiMessagesCount;
+
+        // Per-agent pending judge: maps agentId → { promise, turnNumber }.
+        // The judge for turn N runs concurrently with the next agent's generation.
+        // We await it (and emit its result) at the start of the SAME agent's next
+        // turn (turn N+2), guaranteeing hiddenDirective is applied in time.
+        type PendingJudge = { promise: Promise<any>; turnNumber: number };
+        const pendingJudges = new Map<string, PendingJudge>();
+
+        const emitJudgeResult = (jr: any) => {
+          send({
+            type: "judgeResult",
+            agentId: jr.agentId,
+            turnNumber: jr.turnNumber,
+            scores: jr.scores,
+            momentumShift: jr.momentumShift,
+            frameControlShift: jr.frameControlShift,
+            tacticalAnalysis: jr.tacticalAnalysis,
+            reasoning: jr.reasoning,
+            pairwiseRound: jr.pairwiseRound ?? null,
+            scorecard: jr.scorecard ?? null,
+            absoluteScores: jr.absoluteScores ?? null,
+          });
+        };
+
         while (turn < totalTurns) {
           const agent = agents[turn % agents.length];
           const opponentAgent = agents[(turn + 1) % agents.length];
           const turnNumber = turn + 1;
 
-          const result = await generateAdaptiveReply(
+          // Flush this agent's previous judge before they speak again.
+          // By this point it has had a full turn's generation time to complete.
+          const myPending = pendingJudges.get(agent.id);
+          if (myPending) {
+            const jr = await myPending.promise;
+            if (jr) emitJudgeResult(jr);
+            pendingJudges.delete(agent.id);
+          }
+
+          const { reply, judgePromise } = await generateAdaptiveReply(
             agent,
             history,
             safeTopic,
@@ -104,34 +137,25 @@ export const POST: RequestHandler = async ({ request }) => {
             },
           );
 
-          if (!result.reply) {
+          if (!reply) {
             turn++;
             continue;
           }
 
-          // Send judge results: includes pairwise round data if available
-          if (result.judgeResult) {
-            const jr = result.judgeResult;
-            send({ type: "judgeStatus", status: "scoring", turnNumber });
-            send({
-              type: "judgeResult",
-              agentId: agent.id,
-              turnNumber: jr.turnNumber,
-              scores: jr.scores,
-              momentumShift: jr.momentumShift,
-              frameControlShift: jr.frameControlShift,
-              tacticalAnalysis: jr.tacticalAnalysis,
-              reasoning: jr.reasoning,
-              // Pairwise scoring fields (undefined on Turn 1 opening)
-              pairwiseRound: jr.pairwiseRound ?? null,
-              scorecard: jr.scorecard ?? null,
-              absoluteScores: jr.absoluteScores ?? null,
-            });
-          }
+          // Judge is now running in background. Signal the UI and pipeline it.
+          send({ type: "judgeStatus", status: "scoring", turnNumber });
+          pendingJudges.set(agent.id, { promise: judgePromise, turnNumber });
 
           turn++;
           await new Promise((r) => setTimeout(r, 250));
         }
+
+        // Flush any remaining pending judges (last 1–2 turns) before the verdict.
+        for (const [, pending] of pendingJudges) {
+          const jr = await pending.promise;
+          if (jr) emitJudgeResult(jr);
+        }
+        pendingJudges.clear();
 
         // ── Post-debate: narrative verdict ────────────────────────────────
         const debateAgentHistory = history.filter(

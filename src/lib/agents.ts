@@ -1078,7 +1078,10 @@ export async function generateAdaptiveReply(
   context?: string,
   onToken?: (token: string) => void,
   onReply?: (reply: string) => void,
-): Promise<{ reply: string | null; judgeResult?: LiveJudgeResult }> {
+): Promise<{
+  reply: string | null;
+  judgePromise: Promise<LiveJudgeResult | undefined>;
+}> {
   // Generate the reply
   let systemPrompt = agent.systemPrompt;
 
@@ -1131,132 +1134,133 @@ export async function generateAdaptiveReply(
   });
 
   if (!reply) {
-    return { reply };
+    return { reply, judgePromise: Promise.resolve(undefined) };
   }
 
   // Capture opponent's last message before onReply mutates history
   const opponentMessage =
     history.length > 0 ? history[history.length - 1].text : "";
 
-  // Notify caller that the reply is ready — before judge analysis blocks
+  // Notify caller that the reply is ready — judge runs concurrently with next turn
   onReply?.(reply);
 
-  // Process with live judge system even if no adaptive state
-  try {
-    const liveJudgeSystem = getLiveJudgeSystem();
+  // Start judge processing as a background promise.
+  // All side-effects (hiddenDirective, adaptiveState) are applied inside it so
+  // they complete before the same agent speaks again (caller awaits this promise
+  // at the start of that agent's next turn, 2 turns away).
+  const judgePromise: Promise<LiveJudgeResult | undefined> = (async () => {
+    try {
+      const liveJudgeSystem = getLiveJudgeSystem();
 
-    const JUDGE_TIMEOUT_MS = 50_000;
-    const judgeResult = await Promise.race([
-      liveJudgeSystem.processTurn(
-        agent,
-        reply,
-        opponentAgent,
-        opponentMessage,
-        turnNumber,
-        topic,
-        context || "",
-        history,
-      ),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error(`Judge analysis timed out after ${JUDGE_TIMEOUT_MS}ms`),
-            ),
-          JUDGE_TIMEOUT_MS,
+      const JUDGE_TIMEOUT_MS = 50_000;
+      const judgeResult = await Promise.race([
+        liveJudgeSystem.processTurn(
+          agent,
+          reply,
+          opponentAgent,
+          opponentMessage,
+          turnNumber,
+          topic,
+          context || "",
+          history,
         ),
-      ),
-    ]);
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `Judge analysis timed out after ${JUDGE_TIMEOUT_MS}ms`,
+                ),
+              ),
+            JUDGE_TIMEOUT_MS,
+          ),
+        ),
+      ]);
 
-    // Only apply adaptive pressure if adaptive state exists
-    if (agent.adaptiveState) {
-      // Apply adaptive pressure to personality
-      const evolutions = applyAdaptivePressure(
-        agent.adaptiveState.personality,
-        judgeResult.adaptivePressures,
-        turnNumber,
-      );
-
-      // Record tactic usage
-      if (judgeResult.judgeAnalyses.length > 0) {
-        const allTactics = judgeResult.judgeAnalyses.flatMap((ja) =>
-          ja.usedTactics.map((t) => t.tactic),
+      // Only apply adaptive pressure if adaptive state exists
+      if (agent.adaptiveState) {
+        const evolutions = applyAdaptivePressure(
+          agent.adaptiveState.personality,
+          judgeResult.adaptivePressures,
+          turnNumber,
         );
-        const effectivenessMap = mergeEffectivenessMap(
-          judgeResult.judgeAnalyses,
-        );
 
-        allTactics.forEach((tactic) => {
-          recordTacticUsage(
-            agent.adaptiveState!.tacticalMemory,
-            tactic,
-            effectivenessMap[tactic] ?? 50,
-            `turn_${turnNumber}`,
-            allTactics[0] || "default",
-            opponentMessage,
-            turnNumber,
+        if (judgeResult.judgeAnalyses.length > 0) {
+          const allTactics = judgeResult.judgeAnalyses.flatMap((ja) =>
+            ja.usedTactics.map((t) => t.tactic),
           );
-        });
+          const effectivenessMap = mergeEffectivenessMap(
+            judgeResult.judgeAnalyses,
+          );
+
+          allTactics.forEach((tactic) => {
+            recordTacticUsage(
+              agent.adaptiveState!.tacticalMemory,
+              tactic,
+              effectivenessMap[tactic] ?? 50,
+              `turn_${turnNumber}`,
+              allTactics[0] || "default",
+              opponentMessage,
+              turnNumber,
+            );
+          });
+        }
+
+        updateAdaptationMetrics(agent.adaptiveState, evolutions, []);
       }
 
-      // Update adaptation metrics
-      updateAdaptationMetrics(
-        agent.adaptiveState,
-        evolutions,
-        [], // Goal changes would be tracked separately
+      // Generate a hidden directive for the next turn based on aggregated scores.
+      // This is silently injected into the system prompt — the model never sees why.
+      const noCounterfactualYet =
+        turnNumber + 1 >= 4 &&
+        !judgeResult.scorecard?.counterfactualTrack?.[agent.id];
+      const mechanismFailureLastRound =
+        !!judgeResult.pairwiseRound?.mechanismFailures?.includes(agent.name);
+      const directive = generateHiddenDirective(
+        judgeResult.aggregatedScores,
+        turnNumber + 1,
+        {
+          noCounterfactualYet,
+          mechanismFailureLastRound,
+        },
       );
+      if (directive) {
+        agent.hiddenDirective = directive;
+      }
+
+      const simplifiedResult: LiveJudgeResult = {
+        turnNumber: judgeResult.turnNumber,
+        agentId: judgeResult.agentId,
+        scores: judgeResult.aggregatedScores,
+        momentumShift: judgeResult.momentumShift,
+        frameControlShift: judgeResult.frameControlShift,
+        adaptivePressures: judgeResult.adaptivePressures,
+        tacticalAnalysis: {
+          usedTactics: judgeResult.judgeAnalyses.flatMap((ja) =>
+            ja.usedTactics.map((t: any) => t.tactic),
+          ),
+          effectivenessMap: mergeEffectivenessMap(judgeResult.judgeAnalyses),
+          exposedWeaknesses: judgeResult.judgeAnalyses.flatMap(
+            (ja) => ja.exposedWeaknesses,
+          ),
+        },
+        reasoning:
+          judgeResult.judgeAnalyses
+            .map((ja) => ja.reasoning)
+            .find((r) => r && !r.startsWith("Fallback analysis")) ?? "",
+        pairwiseRound: judgeResult.pairwiseRound,
+        scorecard: judgeResult.scorecard,
+        absoluteScores: judgeResult.absoluteScores,
+      };
+
+      return simplifiedResult;
+    } catch (error) {
+      console.error("Live judging failed:", error);
+      return undefined;
     }
+  })();
 
-    // Generate a hidden directive for the next turn based on aggregated scores.
-    // This is silently injected into the system prompt — the model never sees why.
-    const noCounterfactualYet =
-      turnNumber + 1 >= 4 &&
-      !judgeResult.scorecard?.counterfactualTrack?.[agent.id];
-    const mechanismFailureLastRound =
-      !!judgeResult.pairwiseRound?.mechanismFailures?.includes(agent.name);
-    const directive = generateHiddenDirective(
-      judgeResult.aggregatedScores,
-      turnNumber + 1,
-      {
-        noCounterfactualYet,
-        mechanismFailureLastRound,
-      },
-    );
-    if (directive) {
-      agent.hiddenDirective = directive;
-    }
-
-    // Convert judge result to simplified interface
-    const simplifiedResult: LiveJudgeResult = {
-      turnNumber: judgeResult.turnNumber,
-      agentId: judgeResult.agentId,
-      scores: judgeResult.aggregatedScores,
-      momentumShift: judgeResult.momentumShift,
-      frameControlShift: judgeResult.frameControlShift,
-      adaptivePressures: judgeResult.adaptivePressures,
-      tacticalAnalysis: {
-        usedTactics: judgeResult.judgeAnalyses.flatMap((ja) =>
-          ja.usedTactics.map((t: any) => t.tactic),
-        ),
-        effectivenessMap: mergeEffectivenessMap(judgeResult.judgeAnalyses),
-        exposedWeaknesses: judgeResult.judgeAnalyses.flatMap(
-          (ja) => ja.exposedWeaknesses,
-        ),
-      },
-      reasoning:
-        judgeResult.judgeAnalyses
-          .map((ja) => ja.reasoning)
-          .find((r) => r && !r.startsWith("Fallback analysis")) ?? "",
-      pairwiseRound: judgeResult.pairwiseRound,
-      scorecard: judgeResult.scorecard,
-      absoluteScores: judgeResult.absoluteScores,
-    };
-
-    return { reply, judgeResult: simplifiedResult };
-  } catch (error) {
-    console.error("Live judging failed:", error);
-    return { reply };
-  }
+  return { reply, judgePromise };
 }
 
 /**

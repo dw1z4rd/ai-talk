@@ -126,6 +126,7 @@
     winner = null;
     winnerScore = 0;
     showWinnerModal = false;
+    judgeStatus = null;
   }
 
   function buildContext(): string | undefined {
@@ -187,6 +188,7 @@
     typingAgentName = "";
     typingAgentColor = "";
     streamingMessage = null;
+    judgeStatus = null;
     abortController = new AbortController();
     showLiveJudgePanel = true;
 
@@ -290,7 +292,8 @@
           } else if (data.type === "judgeStatus") {
             judgeStatus = data.status ?? null;
           } else if (data.type === "judgeResult") {
-            judgeStatus = null;
+            // Don't clear judgeStatus here — another judge may still be in flight.
+            // judgeStatus is cleared only by writing_verdict / narrativeVerdict / done.
             liveJudgeResults = [
               ...liveJudgeResults,
               {
