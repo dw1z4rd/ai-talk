@@ -27,6 +27,11 @@ export const MODEL_OPTIONS = [
         name: "GLM-4.6",
         color: "#8B5CF6",
       },
+      {
+        id: "glm-5:cloud",
+        name: "GLM-5",
+        color: "#4A9E9E",
+      },
     ],
   },
 ];

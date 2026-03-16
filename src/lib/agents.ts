@@ -124,6 +124,16 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
         model: "glm-4.6:cloud",
       }),
   },
+  "glm-5:cloud": {
+    name: "GLM-5",
+    color: "#4A9E9E",
+    makeProvider: () =>
+      createOllamaProvider({
+        baseUrl: OLLAMA_CLOUD_URL,
+        apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+        model: "glm-5:cloud",
+      }),
+  },
 };
 
 // Personality Matrix Parameters Interface

@@ -10,6 +10,7 @@
         { id: "gpt-oss:120b-cloud", name: "GPT-OSS 120B", color: "#FF6B35" },
         { id: "qwen3-vl:235b-cloud", name: "Qwen3-VL 235B", color: "#10B981" },
         { id: "glm-4.6:cloud", name: "GLM-4.6", color: "#8B5CF6" },
+        { id: "glm-5:cloud", name: "GLM-5", color: "#4A9E9E" },
       ],
     },
   ];
