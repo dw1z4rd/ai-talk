@@ -3,7 +3,7 @@
   import {
     flyInFromTop,
     flyInFromLeft,
-    flyOutToBottom,
+    flyOutToRight,
   } from "$lib/transitions";
   import { getModelInfo, getWinnerInfo } from "$lib/debate/models";
 
@@ -75,7 +75,7 @@
             class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row turn-scores-grid"
             style="animation-delay: {i * 100}ms"
             in:flyInFromLeft
-            out:flyOutToBottom
+            out:flyOutToRight
           >
             <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
             <span class="font-medium truncate" style="color: {info.color}"
@@ -121,7 +121,7 @@
       ? '#7c6af740'
       : '#f59e0b40'}; animation-delay: 150ms"
     in:flyInFromLeft
-    out:flyOutToBottom
+    out:flyOutToRight
   >
     <div
       class="flex items-center gap-3 px-4 py-3 border-b"
@@ -228,7 +228,7 @@
         class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
         style="border-color: #7c6af740; animation-delay: 250ms"
         in:flyInFromLeft
-        out:flyOutToBottom
+        out:flyOutToRight
       >
         <div
           class="flex items-center gap-3 px-4 py-3 border-b"
@@ -308,7 +308,7 @@
         class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
         style="border-color: #7c6af740; animation-delay: 350ms"
         in:flyInFromLeft
-        out:flyOutToBottom
+        out:flyOutToRight
       >
         <div class="px-4 py-3 flex items-center gap-3">
           <div
@@ -338,7 +338,7 @@
         class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
         style="animation-delay: 0ms"
         in:flyInFromLeft
-        out:flyOutToBottom
+        out:flyOutToRight
       >
         {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
       </div>
@@ -360,7 +360,7 @@
         class="rounded-xl border bg-[--color-panel] p-3 judge-card"
         style="border-color: #7c6af720; animation-delay: {i * 70}ms"
         in:flyInFromLeft
-        out:flyOutToBottom
+        out:flyOutToRight
         animate:flip={{ duration: 1000 }}
       >
         <!-- Round header -->
