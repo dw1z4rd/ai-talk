@@ -104,7 +104,7 @@
             </span>
             <span
               class="text-center font-mono text-[11px] font-semibold"
-              style="color: {info.color}">{s.overallScore}</span
+              style="color: {info.color}">{s.logicalCoherence + s.rhetoricalForce + s.tacticalEffectiveness}</span
             >
           </div>
         {/each}

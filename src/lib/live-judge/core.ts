@@ -11,6 +11,7 @@ import {
   type DebateScorecard,
   type NarrativeVerdict,
   type HarmonizationFlag,
+  type OpenFlag,
   JUDGE_SPECIALIZATION_CONFIGS,
 } from "./types";
 import type { Agent, Message } from "$lib/agents";
@@ -95,6 +96,8 @@ export class LiveJudgeSystem {
       },
       previousTurn: null,
       lastAbsoluteScores: {},
+      claimFlagRegister: [],
+      retroactiveDeltas: {},
     };
   }
 
@@ -189,17 +192,12 @@ export class LiveJudgeSystem {
         message,
       };
 
-      const lastRound =
-        this.panel.scorecard.rounds.length > 0
-          ? this.panel.scorecard.rounds[this.panel.scorecard.rounds.length - 1]
-          : undefined;
-
-      const previousLogicDelta =
-        lastRound &&
-        !lastRound.isFallback &&
-        lastRound.logicWinner !== lastRound.prevTurn.agentId
-          ? lastRound.logicDelta
-          : undefined;
+      // Build the open flags list for the current prevTurn agent so the judge
+      // can issue retroactive corrections. We only pass flags for the agent
+      // whose turn is being held up as "prevTurn" in this comparison.
+      const openFlagsForPrev: OpenFlag[] = this.panel.claimFlagRegister.filter(
+        (f) => f.agentId === prevAgentId && f.status === "unresolved",
+      );
 
       try {
         const controller = new AbortController();
@@ -225,7 +223,7 @@ export class LiveJudgeSystem {
           topic,
           roundNumber,
           controller.signal,
-          previousLogicDelta,
+          openFlagsForPrev.length > 0 ? openFlagsForPrev : undefined,
         );
         const absoluteAnalysis = await analyzeTurn(
           judge,
@@ -245,6 +243,93 @@ export class LiveJudgeSystem {
 
         pairwiseRound = pairwiseResult;
         judge.analysisCount++;
+
+        // ── Seed new open flags from pairwise suspect_claims ──────────────────
+        // Any claim attributed to the prevTurn agent that hasn't already been
+        // registered gets added as an unresolved flag for future rounds to evaluate.
+        if (pairwiseResult.suspectClaims && !pairwiseResult.isFallback) {
+          for (const entry of pairwiseResult.suspectClaims) {
+            // Format: "AgentName: claim text"
+            const colonIdx = entry.indexOf(":");
+            if (colonIdx === -1) continue;
+            const claimedName = entry.slice(0, colonIdx).trim();
+            const claimText = entry.slice(colonIdx + 1).trim();
+            // Only create flags for the prevTurn agent (curTurn flags go through
+            // the pre-flagged PRE-FLAGGED CLAIMS mechanism in analyzeTurn).
+            if (
+              claimedName.toLowerCase() === prevAgentName.toLowerCase() &&
+              claimText.length > 0
+            ) {
+              const flagId = `FLAG-T${prevTurnNumber}-${prevAgentId.replace(/[^a-z0-9]/gi, "").slice(0, 12)}`;
+              const alreadyExists = this.panel.claimFlagRegister.some(
+                (f) => f.flagId === flagId || f.claim === claimText,
+              );
+              if (!alreadyExists) {
+                this.panel.claimFlagRegister.push({
+                  flagId,
+                  agentId: prevAgentId,
+                  agentName: prevAgentName,
+                  originTurn: prevTurnNumber,
+                  claim: claimText,
+                  status: "unresolved",
+                });
+              }
+            }
+          }
+        }
+
+        // ── Apply retroactive score corrections from flag_updates ─────────────
+        // The judge issues UPDATE instructions for prevTurn's absolute score.
+        // We apply them to retroactiveDeltas; the SSE layer emits scoreUpdate events.
+        if (pairwiseResult.flagUpdates && !pairwiseResult.isFallback) {
+          for (const update of pairwiseResult.flagUpdates) {
+            const { flagId, targetTurn, deltaRaw, updateType } = update;
+
+            // Find the original flag so we can enforce the restore cap.
+            const flag = this.panel.claimFlagRegister.find(
+              (f) => f.flagId === flagId,
+            );
+
+            // For partial restores: cap magnitude at 50% of accumulated penalties
+            // so the agent can never fully undo a docking just by citing late.
+            let effectiveDelta = deltaRaw;
+            if (updateType === "partial_restore" && flag) {
+              const existingDelta =
+                this.panel.retroactiveDeltas[targetTurn]?.logicalCoherence ?? 0;
+              // existingDelta should already be negative (penalty); restore is positive.
+              const maxRestore = Math.abs(existingDelta) / 2;
+              effectiveDelta = Math.min(deltaRaw, maxRestore);
+              if (effectiveDelta <= 0) continue; // no meaningful restore
+            }
+
+            // Accumulate in retroactiveDeltas (values are deltas on the 0-40 scale)
+            const scaledDelta = effectiveDelta * 4;
+            const existing =
+              this.panel.retroactiveDeltas[targetTurn]?.logicalCoherence ?? 0;
+            this.panel.retroactiveDeltas[targetTurn] = {
+              ...this.panel.retroactiveDeltas[targetTurn],
+              logicalCoherence: existing + scaledDelta,
+            };
+
+            // Update flag status in the register
+            if (flag) {
+              flag.status =
+                updateType === "partial_restore" ? "resolved" : "penalized";
+            }
+          }
+        }
+
+        // ── Mark explicitly resolved flags ────────────────────────────────────
+        if (pairwiseResult.resolvedFlags) {
+          for (const flagId of pairwiseResult.resolvedFlags) {
+            const flag = this.panel.claimFlagRegister.find(
+              (f) => f.flagId === flagId,
+            );
+            if (flag && flag.status === "unresolved") {
+              flag.status = "resolved";
+            }
+          }
+        }
 
         if (absoluteAnalysis) {
           absoluteScores = absoluteAnalysis.scores;
@@ -421,6 +506,10 @@ export class LiveJudgeSystem {
       absoluteScores,
       harmonizationFlags:
         harmonizationFlags.length > 0 ? harmonizationFlags : undefined,
+      retroactiveDeltas:
+        pairwiseRound?.flagUpdates && pairwiseRound.flagUpdates.length > 0
+          ? { ...this.panel.retroactiveDeltas }
+          : undefined,
     };
   }
 

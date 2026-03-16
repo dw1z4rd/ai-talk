@@ -3,6 +3,7 @@
   import { getModelInfo } from "$lib/debate/models";
   import type { ChatMessage, ContextFile } from "$lib/debate/models";
   import WinnerModal from "./WinnerModal.svelte";
+  import ScoreUpdateToast from "./ScoreUpdateToast.svelte";
   import DebateHeader from "./DebateHeader.svelte";
   import LiveJudgePanel from "./LiveJudgePanel.svelte";
   import DebateSetup from "./DebateSetup.svelte";
@@ -49,6 +50,19 @@
 
   // Judge activity indicator
   let judgeStatus = $state<'scoring' | 'writing_verdict' | null>(null);
+
+  // Score update toasts
+  interface ScoreUpdateNotification {
+    id: string;
+    targetTurn: number;
+    agentId: string;
+    agentName: string;
+    agentColor: string;
+    deltaLogic: number;
+    reason: string;
+    updateType: "penalty" | "partial_restore";
+  }
+  let scoreUpdateNotifications = $state<ScoreUpdateNotification[]>([]);
 
   // Winner modal
   let winner = $state<{ id: string; name: string; color: string } | null>(null);
@@ -362,6 +376,42 @@
             momentumLeader = topMomentum
               ? { agentId: topMomentum[0], momentum: topMomentum[1] }
               : null;
+          } else if (data.type === "scoreUpdate") {
+            // Retroactively patch the absoluteScores entry for the target turn.
+            const idx = liveJudgeResults.findIndex(
+              (r) => r.turnNumber === data.targetTurn && r.agentId === data.agentId,
+            );
+            if (idx !== -1 && liveJudgeResults[idx].absoluteScores) {
+              liveJudgeResults[idx] = {
+                ...liveJudgeResults[idx],
+                absoluteScores: {
+                  ...liveJudgeResults[idx].absoluteScores,
+                  logicalCoherence:
+                    (liveJudgeResults[idx].absoluteScores.logicalCoherence ?? 0) +
+                    data.deltaLogic,
+                },
+              };
+              liveJudgeResults = [...liveJudgeResults];
+            }
+            const notifId = crypto.randomUUID();
+            scoreUpdateNotifications = [
+              ...scoreUpdateNotifications,
+              {
+                id: notifId,
+                targetTurn: data.targetTurn,
+                agentId: data.agentId,
+                agentName: data.agentName,
+                agentColor: data.agentColor,
+                deltaLogic: data.deltaLogic,
+                reason: data.reason,
+                updateType: data.updateType,
+              },
+            ];
+            setTimeout(() => {
+              scoreUpdateNotifications = scoreUpdateNotifications.filter(
+                (n) => n.id !== notifId,
+              );
+            }, 3500);
           } else if (data.type === "narrativeVerdict") {
             judgeStatus = null;
             narrativeVerdict = {
@@ -425,6 +475,8 @@
   {winnerScore}
   {finalScorecard}
 />
+
+<ScoreUpdateToast notifications={scoreUpdateNotifications} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div

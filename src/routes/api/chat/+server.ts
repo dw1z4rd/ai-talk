@@ -5,6 +5,7 @@ import {
   resetLiveJudgeDebate,
   generateDebateNarrativeVerdict,
   getDebateScorecard,
+  MODEL_CATALOG,
 } from "$lib/agents";
 import type { Message } from "$lib/agents";
 
@@ -91,6 +92,26 @@ export const POST: RequestHandler = async ({ request }) => {
           });
         };
 
+        const emitScoreUpdates = (jr: any) => {
+          const flagUpdates: any[] = jr.pairwiseRound?.flagUpdates ?? [];
+          for (const update of flagUpdates) {
+            const def =
+              MODEL_CATALOG[update.agentId] ??
+              MODEL_CATALOG["kimi-k2:1t-cloud"];
+            send({
+              type: "scoreUpdate",
+              targetTurn: update.targetTurn,
+              agentId: update.agentId,
+              agentName: def.name,
+              agentColor: def.color,
+              deltaLogic: update.deltaRaw * 4,
+              reason: update.reason,
+              flagId: update.flagId,
+              updateType: update.updateType,
+            });
+          }
+        };
+
         while (turn < totalTurns) {
           const agent = agents[turn % agents.length];
           const opponentAgent = agents[(turn + 1) % agents.length];
@@ -101,7 +122,10 @@ export const POST: RequestHandler = async ({ request }) => {
           const myPending = pendingJudges.get(agent.id);
           if (myPending) {
             const jr = await myPending.promise;
-            if (jr) emitJudgeResult(jr);
+            if (jr) {
+              emitJudgeResult(jr);
+              emitScoreUpdates(jr);
+            }
             pendingJudges.delete(agent.id);
           }
 
@@ -153,7 +177,10 @@ export const POST: RequestHandler = async ({ request }) => {
         // Flush any remaining pending judges (last 1–2 turns) before the verdict.
         for (const [, pending] of pendingJudges) {
           const jr = await pending.promise;
-          if (jr) emitJudgeResult(jr);
+          if (jr) {
+            emitJudgeResult(jr);
+            emitScoreUpdates(jr);
+          }
         }
         pendingJudges.clear();
 

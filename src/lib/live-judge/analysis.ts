@@ -8,6 +8,8 @@ import {
   type DebateScorecard,
   type NarrativeVerdict,
   type HarmonizationFlag,
+  type OpenFlag,
+  type FlagUpdate,
 } from "./types";
 import type { Agent, Message } from "$lib/agents";
 import { MODEL_CATALOG } from "$lib/agents";
@@ -167,7 +169,7 @@ export async function compareTurns(
   topic: string,
   roundNumber: number,
   signal?: AbortSignal,
-  previousLogicDelta?: string,
+  openFlags?: OpenFlag[],
 ): Promise<PairwiseRound> {
   const langCheck = detectLanguageMismatch(prevMessage, curMessage);
   if (!langCheck.isConsistent) {
@@ -185,7 +187,7 @@ export async function compareTurns(
     curTurnNumber,
     topic,
     isOpeningRound,
-    previousLogicDelta,
+    openFlags,
   );
 
   const judgeProvider = createJudgeProvider(
@@ -201,7 +203,7 @@ export async function compareTurns(
         domainNote,
       ),
       temperature: 0.3,
-      maxTokens: 900,
+      maxTokens: 1200,
       signal,
     });
 
@@ -256,7 +258,7 @@ export function generatePairwiseSystemPrompt(
   return `You are a comparative debate judge. Read two consecutive turns and pick the stronger one on three dimensions. No draws — you must choose one winner per dimension. Respond with a single JSON object only — no preamble, no markdown.
 
 Required format (use exact agent names as shown):
-{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn. For missing causal mechanisms, name which element was absent — e.g. 'stated how X produces Y but omitted why the mechanism holds under competitive markets' or 'gave mechanism but no measurable consequence.' For timeline violations, name the technology/concept and note it clearly postdates the phenomenon. Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn was more persuasive across all four components and why.","mechanism_delta":"1-2 sentences on mechanism quality for BOTH turns. For each, state which elements of the cause→process→measurable consequence chain were present or absent.","mechanism_failures":[],"suspect_claims":[],"epistemic_note":null,"counterfactual_agent":null,"counterfactual_summary":null}
+{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn. For missing causal mechanisms, name which element was absent — e.g. 'stated how X produces Y but omitted why the mechanism holds under competitive markets' or 'gave mechanism but no measurable consequence.' For timeline violations, name the technology/concept and note it clearly postdates the phenomenon. Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn was more persuasive across all four components and why.","mechanism_delta":"1-2 sentences on mechanism quality for BOTH turns. For each, state which elements of the cause→process→measurable consequence chain were present or absent.","mechanism_failures":[],"suspect_claims":[],"epistemic_note":null,"counterfactual_agent":null,"counterfactual_summary":null,"resolved_flags":[],"flag_updates":[]}
 
 --- LOGIC (forced choice) ---
 Start each turn from 8. Apply deductions:
@@ -291,6 +293,7 @@ Claim types — classify each major claim before applying standards. Applying em
 - Empirical: assess on evidentiary grounding and mechanism chain.
 - Normative: assess on consistency with the stated normative framework. No empirical requirement unless the claim is presented as empirical.
 - Phenomenological: claims about how a phenomenon is experienced or operates in practice (distinct from measurement or definition). Assess whether the argument's model of the phenomenon maps accurately onto observed behavior. Incorrect phenomenological mapping = −1 unsupported assumption. No empirical measurement required, but accurate phenomenon modeling is.
+- Epistemic/procedural: claims about the allocation of burden of proof, evidentiary standards, or inferential architecture (e.g. "this is a positive existence claim requiring affirmative evidence", "my opponent assumed X without establishing it"). Assess whether the assigned burden is appropriate, clearly specified, and consistently maintained — not whether the claim has empirical grounding or a causal chain. Dismissing such arguments as 'unexplained logical rules' without engaging their epistemic validity is a scoring error; they must be evaluated on their own terms.
 
 --- TACTICS (forced choice) ---
 Which turn controlled the exchange? Did it target the opponent's strongest point, expose a real weakness, or redirect to better ground?
@@ -328,7 +331,15 @@ Scoring: the existing +1 for a complete explicit causal chain in LOGIC covers a 
 For every concrete factual or empirical assertion in either turn that you considered penalizing for hollow specificity — whether or not you ultimately docked a point — add an entry to suspect_claims using the format "AgentName: [exact or close quote of the claim]". This creates an auditable record that can be reviewed independently of the scoring decision. Empty array if no such claims appeared in either turn.
 
 --- EPISTEMIC DISCIPLINE ---
-Set epistemic_note to a 1-sentence observation if either agent made strong empirical claims without appropriately acknowledging evidentiary limits — for example, stating contested statistics as settled fact, invoking unnamed research as authoritative, or asserting causal relationships as proven without hedging. This field is non-scoring: it is a qualitative flag for arc-level narrative analysis. Set to null if both agents reasoned responsibly about uncertainty.`;
+Set epistemic_note to a 1-sentence observation if either agent made strong empirical claims without appropriately acknowledging evidentiary limits — for example, stating contested statistics as settled fact, invoking unnamed research as authoritative, or asserting causal relationships as proven without hedging. This field is non-scoring: it is a qualitative flag for arc-level narrative analysis. Set to null if both agents reasoned responsibly about uncertainty.
+
+--- OPEN FLAGS (retroactive correction) ---
+If an OPEN FLAGS block appears in the prompt, it lists hollow claims from prior turns that have not yet been penalized on the originating turn's absolute score.
+(a) For each open flag attributed to TURN A (the prevTurn): if the claim remains unsubstantiated, emit a flag_update with delta_raw -1 (one raw logic point = -4 on the 0-40 scale). Use delta_raw -2 for severe cases (fabricated statistic, named study with zero mechanism). Always use negative values for penalties. Set update_type to "penalty".
+(b) If TURN B (curTurn) explicitly substantiates a previously-flagged claim — supplying the missing mechanism chain — emit a flag_update with delta_raw +1, update_type "partial_restore", targeting the ORIGINATING turn number. Partial restore is capped at half the original penalty magnitude: if penalty was -2, the maximum restore is +1.
+(c) Include flag_id exactly as given so the register can reconcile the entry.
+(d) If a flag was resolved (partial restore applied or the agent clearly addressed it), add the flag_id to resolved_flags.
+CRITICAL: Open flags govern only retroactive adjustments to previous absolute scores. They do NOT influence the logic_winner decision, which is always determined by the two current turns' content only. Never let an open flag substitute for engaging with what the current turn actually said.`;
 }
 
 export function generatePairwisePrompt(
@@ -340,17 +351,25 @@ export function generatePairwisePrompt(
   turnB: number,
   topic: string,
   isOpeningRound: boolean,
-  previousLogicDelta?: string,
+  openFlags?: OpenFlag[],
 ): string {
   const openingNote = isOpeningRound
     ? `\n[NOTE: Turn ${turnA} is the OPENING statement — ${nameA} spoke first with no opponent yet. Apply OPENING TURN rules to their turn.]`
     : "";
 
-  const prevDeltaNote = previousLogicDelta
-    ? `\n[PREVIOUS ROUND JUDGE NOTE: "${previousLogicDelta}" — use this to detect argumentative stagnation or thesis drift in the current turns.]`
-    : "";
+  // Build a structured OPEN FLAGS block instead of raw prose delta.
+  // Only include flags for the prevTurn agent (nameA) since that is the agent
+  // whose abstract score can receive retroactive corrections from the judge.
+  const prevTurnFlags =
+    openFlags?.filter(
+      (f) => f.agentName === nameA && f.status === "unresolved",
+    ) ?? [];
+  const openFlagsNote =
+    prevTurnFlags.length > 0
+      ? `\n\nOPEN FLAGS (unresolved hollow claims from prior turns by ${nameA}):\n${prevTurnFlags.map((f) => `- [${f.flagId}] T${f.originTurn}: "${f.claim}" — mechanism absent [UNRESOLVED]`).join("\n")}\nSee OPEN FLAGS section in the system prompt for instructions on how to handle these.`
+      : "";
 
-  return `DEBATE TOPIC: ${topic}${openingNote}${prevDeltaNote}
+  return `DEBATE TOPIC: ${topic}${openingNote}${openFlagsNote}
 
 TURN ${turnA} — ${nameA}:
 "${messageA}"
@@ -523,6 +542,58 @@ function parsePairwiseResponse(
                   : "",
             }
           : undefined,
+      resolvedFlags: Array.isArray(data.resolved_flags)
+        ? data.resolved_flags
+            .filter((x: unknown) => typeof x === "string")
+            .map((x: string) => x.trim())
+            .filter((x: string) => x.length > 0)
+        : undefined,
+      flagUpdates: Array.isArray(data.flag_updates)
+        ? data.flag_updates
+            .filter(
+              (x: unknown): x is Record<string, unknown> =>
+                typeof x === "object" && x !== null,
+            )
+            .map((x): FlagUpdate | null => {
+              const flagId =
+                typeof x.flag_id === "string" ? x.flag_id.trim() : null;
+              const targetTurn =
+                typeof x.target_turn === "number"
+                  ? Math.round(x.target_turn)
+                  : null;
+              const deltaRaw =
+                typeof x.delta_raw === "number" ? x.delta_raw : null;
+              const reason =
+                typeof x.reason === "string" ? x.reason.trim() : "";
+              const updateType =
+                x.update_type === "partial_restore"
+                  ? "partial_restore"
+                  : "penalty";
+              // Resolve the agentId from flagId prefix if possible, else fall back to prevTurn
+              const agentId = flagId
+                ? flagId.toLowerCase().includes(curAgentName.toLowerCase())
+                  ? curAgentId
+                  : prevAgentId
+                : prevAgentId;
+              if (!flagId || targetTurn === null || deltaRaw === null)
+                return null;
+              // Clamp: penalties must be negative, restores positive, raw magnitude ≤ 3
+              const clampedDelta =
+                updateType === "penalty"
+                  ? Math.max(-3, Math.min(-1, deltaRaw))
+                  : Math.max(1, Math.min(2, deltaRaw));
+              return {
+                flagId,
+                targetTurn,
+                agentId,
+                dimension: "logicalCoherence",
+                deltaRaw: clampedDelta,
+                reason,
+                updateType,
+              };
+            })
+            .filter((x): x is FlagUpdate => x !== null)
+        : undefined,
       languageWarning,
       isFallback: false,
     };
@@ -1370,6 +1441,7 @@ Claim types — classify before applying standards. Applying empirical requireme
 - Empirical: assess on evidentiary grounding and mechanism chain.
 - Normative: assess on consistency with the stated normative framework.
 - Phenomenological: claims about how a phenomenon is experienced or operates in practice. Assess whether the argument's model of the phenomenon maps accurately onto observed behavior. Incorrect phenomenological mapping (e.g., claiming people consciously maximize expected utility across all options) = −1 unsupported assumption. No empirical citation required, but accurate phenomenon modeling is.
+- Epistemic/procedural: claims about burden of proof allocation, evidentiary standards, or inferential architecture. Assess whether the assigned burden is appropriate, clearly specified, and consistently maintained — not whether it has empirical grounding. Dismissing such arguments as 'unexplained logical rules' without engaging their epistemic validity is a scoring error.
 
 --- LOGIC CALIBRATION ANCHORS ---
 HIGH (9–10): Mechanism fully present (cause→process→measurable consequence), directly addresses the opponent's weakest load-bearing assumption, claim is falsifiable. E.g. — Phenomenological: "The attention economy erodes autonomous preference formation because the design goal is maximal engagement rather than accurate belief — meaning the mechanism specifically targets and degrades the epistemic substrate preferences require. Consequence: preferences formed under attentional capture systematically reflect the platform's optimisation target, not the agent's considered values." Scores HIGH because: mechanism identifies a specific adversarial process, consequence is measurable and distinct from the cause, directly attacks the autonomy premise. E.g. — Empirical/social science: "Trade liberalisation raises aggregate welfare but increases within-country inequality because it shifts returns toward mobile capital and skilled labour — the mechanism is factor-price equalisation operating on an already unequal endowment distribution. Measurable consequence: the Gini coefficient rises even as GDP per capita improves." Scores HIGH because: identifies the specific distributional mechanism, names the causal channel (factor-price equalisation), arrives at a falsifiable prediction that differs from the aggregate trend.

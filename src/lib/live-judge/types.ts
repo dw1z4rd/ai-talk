@@ -99,7 +99,49 @@ export interface PairwiseRound {
    * Populated after reconcileRoundWinners + computeHarmonizationFlags run.
    */
   harmonizationFlags?: HarmonizationFlag[];
+  /**
+   * Flag IDs the judge explicitly marked as resolved in this round.
+   * A flag is resolved when the current turn adequately addressed the hollow claim.
+   */
+  resolvedFlags?: string[];
+  /**
+   * Retroactive score corrections the judge issued for the previous turn (prevTurn).
+   * Each entry adjusts the logic score on the originating turn, not the current one.
+   */
+  flagUpdates?: FlagUpdate[];
   isFallback: boolean;
+}
+
+// ── Open flag register types ──────────────────────────────────────────────────
+
+/**
+ * An unresolved hollow claim that the pairwise judge seeded from suspectClaims.
+ * Persists in the register until the agent substantiates it or the debate ends.
+ */
+export interface OpenFlag {
+  flagId: string; // e.g. "FLAG-T5-minimax"
+  agentId: string;
+  agentName: string;
+  originTurn: number;
+  claim: string; // the hollow claim text
+  status: "unresolved" | "penalized" | "resolved";
+}
+
+export type ClaimFlagRegister = OpenFlag[];
+
+/**
+ * A retroactive score correction: applied to the originating turn's absolute
+ * logicalCoherence score, not to the current turn being evaluated.
+ */
+export interface FlagUpdate {
+  flagId: string;
+  targetTurn: number;
+  agentId: string;
+  dimension: "logicalCoherence";
+  /** Raw 1-10 units. Multiply by 4 to get the 0-40 scale delta. Negative = penalty, positive = partial restore. */
+  deltaRaw: number;
+  reason: string;
+  updateType: "penalty" | "partial_restore";
 }
 
 /** Running win tally for one agent across all pairwise rounds. */
@@ -277,6 +319,10 @@ export interface LiveJudgePanel {
   previousTurn: PairwiseTurnRef | null;
   /** Most recent per-turn absolute scores per agent, used for harmonization checks. */
   lastAbsoluteScores: { [agentId: string]: JudgeScores };
+  /** Running register of open (unresolved / partially-penalized) hollow claims. */
+  claimFlagRegister: ClaimFlagRegister;
+  /** Per-turn retroactive score adjustments accumulated across all rounds. */
+  retroactiveDeltas: { [turnNumber: number]: Partial<JudgeScores> };
 }
 
 export interface JudgeAnalysisResult {
@@ -307,6 +353,11 @@ export interface JudgeAnalysisResult {
   absoluteScores?: JudgeScores;
   /** Rounds where pairwise winner assignment diverged significantly from absolute per-turn scores. */
   harmonizationFlags?: HarmonizationFlag[];
+  /**
+   * Retroactive score adjustments that should be applied to previously-emitted turn results.
+   * Keyed by turn number; values are partial JudgeScores deltas (not absolute values).
+   */
+  retroactiveDeltas?: { [turnNumber: number]: Partial<JudgeScores> };
 }
 
 // Judge specialization configurations
