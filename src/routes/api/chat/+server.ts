@@ -174,6 +174,7 @@ export const POST: RequestHandler = async ({ request }) => {
           }
 
           // Judge is now running in background. Signal the UI and pipeline it.
+          inFlightJudges++;
           send({ type: "judgeStatus", status: "scoring", turnNumber });
           const pendingEntry: PendingJudge = {
             promise: judgePromise,
@@ -192,6 +193,12 @@ export const POST: RequestHandler = async ({ request }) => {
             })
             .catch(() => {
               /* errors surfaced at the await below */
+            })
+            .finally(() => {
+              inFlightJudges--;
+              if (inFlightJudges === 0) {
+                send({ type: "judgeStatus", status: null });
+              }
             });
           pendingJudges.set(agent.id, pendingEntry);
 

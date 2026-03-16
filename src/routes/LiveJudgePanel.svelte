@@ -34,14 +34,14 @@
   {#if judgeStatus}
     <div
       class="flex items-center gap-2.5 px-3 py-2 rounded-xl border"
-      style="border-color: #7c6af730; background: #7c6af708"
+      style="border-color: #7c6af730; background: #7c6af708; animation: fadeSlide 0.75s ease both"
     >
-      <span class="judge-thinking-dots flex gap-0.75 items-center">
-        <span class="w-1.5 h-1.5 rounded-full" style="background:#c084fc; animation: judgePulse 1.2s ease-in-out infinite"></span>
-        <span class="w-1.5 h-1.5 rounded-full" style="background:#c084fc; animation: judgePulse 1.2s ease-in-out 0.2s infinite"></span>
-        <span class="w-1.5 h-1.5 rounded-full" style="background:#c084fc; animation: judgePulse 1.2s ease-in-out 0.4s infinite"></span>
+      <span class="flex gap-1 items-center">
+        <span class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0ms]" style="background:#c084fc"></span>
+        <span class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:250ms]" style="background:#c084fc"></span>
+        <span class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:500ms]" style="background:#c084fc"></span>
       </span>
-      <span class="text-[11px] text-[--color-muted-fg]" style="color:#c084fc99">
+      <span class="text-[11px]" style="color:#c084fc99">
         {judgeStatus === 'writing_verdict' ? 'Writing verdict\u2026' : 'Scoring turn\u2026'}
       </span>
     </div>
@@ -432,6 +432,16 @@
 </div>
 
 <style>
+  @keyframes fadeSlide {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
   @keyframes judgePulse {
     0%, 100% { opacity: 0.25; transform: scale(0.8); }
     50% { opacity: 1; transform: scale(1); }
