@@ -88,8 +88,8 @@ export function flyOutToRight(
   const targetOpacity = parsedOpacity === 0 ? 1 : parsedOpacity;
   const transform = style.transform === "none" ? "" : style.transform;
 
+  // Capture the exact geometry of the card right before death
   const nodeRect = node.getBoundingClientRect();
-  // Calculates exactly how many pixels to move right before the left edge clears the viewport
   const distanceToRight = window.innerWidth - nodeRect.left;
 
   return {
@@ -97,8 +97,13 @@ export function flyOutToRight(
     duration,
     easing,
     css: (t: number, u: number) => `
-      position: absolute;
+      position: fixed;
+      top: ${nodeRect.top}px;
+      left: ${nodeRect.left}px;
       width: ${nodeRect.width}px;
+      height: ${nodeRect.height}px;
+      margin: 0;
+      pointer-events: none;
       transform: ${transform} translateX(${u * distanceToRight}px);
       opacity: ${targetOpacity * t};
     `,
