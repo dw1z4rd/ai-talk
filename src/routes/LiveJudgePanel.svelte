@@ -2,6 +2,7 @@
   import { flip } from "svelte/animate";
   import {
     flyInFromTop,
+    flyInFromLeft,
     flyOutToBottom,
   } from "$lib/transitions";
   import { getModelInfo, getWinnerInfo } from "$lib/debate/models";
@@ -73,7 +74,7 @@
           <div
             class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row turn-scores-grid"
             style="animation-delay: {i * 100}ms"
-            in:flyInFromTop
+            in:flyInFromLeft
             out:flyOutToBottom
           >
             <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
@@ -81,24 +82,26 @@
               >{info.name}</span
             >
             <span
-              class="text-center font-mono text-[11px]"
+              class="flex flex-col items-center leading-tight"
               title="Logic: {s.logicalCoherence}/40"
-              >{s.logicalCoherence}<span class="text-[--color-muted] hidden sm:inline">/40</span
-              ></span
             >
+              <span class="font-mono text-[12px]">{s.logicalCoherence}</span>
+              <span class="text-[9px] text-[--color-muted]">/40</span>
+            </span>
             <span
-              class="text-center font-mono text-[11px]"
+              class="flex flex-col items-center leading-tight"
               title="Rhetoric: {s.rhetoricalForce}/30"
-              >{s.rhetoricalForce}<span class="text-[--color-muted] hidden sm:inline">/30</span
-              ></span
             >
+              <span class="font-mono text-[12px]">{s.rhetoricalForce}</span>
+              <span class="text-[9px] text-[--color-muted]">/30</span>
+            </span>
             <span
-              class="text-center font-mono text-[11px]"
+              class="flex flex-col items-center leading-tight"
               title="Tactics: {s.tacticalEffectiveness}/30"
-              >{s.tacticalEffectiveness}<span class="text-[--color-muted] hidden sm:inline"
-                >/30</span
-              ></span
             >
+              <span class="font-mono text-[12px]">{s.tacticalEffectiveness}</span>
+              <span class="text-[9px] text-[--color-muted]">/30</span>
+            </span>
             <span
               class="text-center font-mono text-[11px] font-semibold"
               style="color: {info.color}">{s.overallScore}</span
@@ -117,7 +120,7 @@
     style="border-color: {narrativeVerdict.agreesWithScorecard
       ? '#7c6af740'
       : '#f59e0b40'}; animation-delay: 150ms"
-    in:flyInFromTop
+    in:flyInFromLeft
     out:flyOutToBottom
   >
     <div
@@ -224,7 +227,7 @@
       <div
         class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
         style="border-color: #7c6af740; animation-delay: 250ms"
-        in:flyInFromTop
+        in:flyInFromLeft
         out:flyOutToBottom
       >
         <div
@@ -304,7 +307,7 @@
       <div
         class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
         style="border-color: #7c6af740; animation-delay: 350ms"
-        in:flyInFromTop
+        in:flyInFromLeft
         out:flyOutToBottom
       >
         <div class="px-4 py-3 flex items-center gap-3">
@@ -334,7 +337,7 @@
       <div
         class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
         style="animation-delay: 0ms"
-        in:flyInFromTop
+        in:flyInFromLeft
         out:flyOutToBottom
       >
         {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
@@ -356,7 +359,7 @@
       <div
         class="rounded-xl border bg-[--color-panel] p-3 judge-card"
         style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-        in:flyInFromTop
+        in:flyInFromLeft
         out:flyOutToBottom
         animate:flip={{ duration: 1000 }}
       >
@@ -476,7 +479,7 @@
   }
   /* Turn scores table — fixed 6-col layout, denominators hidden on mobile */
   :global(.turn-scores-grid) {
-    grid-template-columns: 2.5rem 1fr 2.5rem 2.5rem 2.5rem 2.75rem;
+    grid-template-columns: 2.5rem 1fr 3rem 3rem 3rem 2.75rem;
   }
   @media (max-width: 639px) {
     :global(.judge-main-grid) {
@@ -486,7 +489,7 @@
       grid-template-columns: 1fr !important;
     }
     :global(.turn-scores-grid) {
-      grid-template-columns: 2rem 1fr 2.25rem 2.25rem 2.25rem 2.5rem;
+      grid-template-columns: 2rem 1fr 2.75rem 2.75rem 2.75rem 2.5rem;
     }
   }
 </style>
