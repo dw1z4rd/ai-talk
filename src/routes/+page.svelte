@@ -145,10 +145,10 @@
     isPaused = true;
     typingAgentName = "";
 
-    if (streamingMessage) {
-      messages = [...messages, streamingMessage];
-      streamingMessage = null;
-    }
+    // Discard any partial generation — the interrupted agent's turn was incomplete.
+    // On resume the server recomputes whose turn it is from history length, so
+    // discarding here means they start that turn over from the beginning.
+    streamingMessage = null;
   }
 
   function stopConversation() {
