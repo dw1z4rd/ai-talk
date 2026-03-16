@@ -19,7 +19,19 @@
   let done = $state(false);
   let errorMsg = $state("");
   let chatEl = $state<HTMLElement | null>(null);
+  let userScrolled = $state(false);
   let abortController = $state<AbortController | null>(null);
+
+  $effect(() => {
+    const el = chatEl;
+    if (!el) return;
+    const onScroll = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      userScrolled = !atBottom;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  });
   let agentA = $state("kimi-k2.5:cloud");
   let agentB = $state("qwen3-next:80b-cloud");
   let leftAgentId = $state("qwen3-next:80b-cloud");
@@ -127,6 +139,7 @@
 
   function resetConversation() {
     messages = [];
+    userScrolled = false;
     done = false;
     errorMsg = "";
     naturallyEnded = false;
@@ -182,6 +195,7 @@
   async function startConversation(resume = false) {
     if (!resume) {
       messages = [];
+      userScrolled = false;
       leftAgentId = agentA;
       naturallyEnded = false;
       showLiveJudgePanel = false;
@@ -267,14 +281,10 @@
               };
             }
             await tick();
-            setTimeout(
-              () =>
-                chatEl?.scrollTo({
-                  top: chatEl.scrollHeight,
-                  behavior: "smooth",
-                }),
-              20,
-            );
+            setTimeout(() => {
+              if (!userScrolled)
+                chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: "smooth" });
+            }, 20);
           } else if (data.type === "message") {
             streamingMessage = null;
             typingAgentName = "";
@@ -298,14 +308,10 @@
               typingAgentName = next.name;
               typingAgentColor = next.color;
             }
-            setTimeout(
-              () =>
-                chatEl?.scrollTo({
-                  top: chatEl.scrollHeight,
-                  behavior: "smooth",
-                }),
-              50,
-            );
+            setTimeout(() => {
+              if (!userScrolled)
+                chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: "smooth" });
+            }, 50);
           } else if (data.type === "judgeStatus") {
             judgeStatus = data.status ?? null;
           } else if (data.type === "judgeResult") {
@@ -510,8 +516,8 @@
     {#if showLiveJudgePanel}
       <div
         class="left-col"
-        in:flyInFromLeft={{ duration: 500 }}
-        out:flyOutToRight={{ duration: 400 }}
+        in:flyInFromLeft={{ duration: 400 }}
+        out:flyOutToRight={{ duration: 300 }}
       >
         <LiveJudgePanel
           {liveJudgeResults}

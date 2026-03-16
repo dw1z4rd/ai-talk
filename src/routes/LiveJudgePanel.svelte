@@ -64,8 +64,8 @@
           style="border-color: {narrativeVerdict.agreesWithScorecard
             ? '#7c6af740'
             : '#f59e0b40'}"
-          in:flyInFromTop={{ duration: 1000 }}
-          out:flyOutToBottom={{ duration: 1000 }}
+          in:flyInFromTop={{ duration: 450 }}
+          out:flyOutToBottom={{ duration: 350 }}
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
@@ -378,9 +378,9 @@
       <div
         class="rounded-xl border bg-[--color-panel] p-3 judge-card"
         style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-        in:flyInFromTop={{ delay: i * 120 }}
-        out:flyOutToBottom={{ delay: i * 80 }}
-        animate:flip={{ duration: 500, easing: cubicInOut }}
+        in:flyInFromTop={{ delay: i * 80 }}
+        out:flyOutToBottom
+        animate:flip={{ duration: 400, easing: cubicInOut }}
       >
         <!-- Round header -->
         <div class="flex items-center gap-2 mb-3 min-w-0">

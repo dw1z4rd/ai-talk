@@ -1,8 +1,8 @@
-import { backInOut } from "svelte/easing";
+import { cubicOut, cubicIn } from "svelte/easing";
 
 export function flyInFromTop(
   node: Element,
-  { duration = 1000, delay = 250, easing = backInOut } = {},
+  { duration = 400, delay = 0, easing = cubicOut } = {},
 ) {
   // 1. Grab the element's computed styles
   const style = getComputedStyle(node);
@@ -13,13 +13,6 @@ export function flyInFromTop(
   // 2. Calculate the distance to the viewport top
   const nodeRect = node.getBoundingClientRect();
   const startY = -nodeRect.top;
-  console.log({
-    node: node.tagName,
-    startY,
-    targetOpacity,
-    easingIsDefined: !!easing,
-    classes: node.className,
-  });
   return {
     delay,
     duration,
@@ -33,7 +26,7 @@ export function flyInFromTop(
 
 export function flyOutToBottom(
   node: Element,
-  { duration = 1000, delay = 0, easing = backInOut } = {},
+  { duration = 350, delay = 0, easing = cubicIn } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -63,7 +56,7 @@ export function flyOutToBottom(
 }
 export function flyInFromLeft(
   node: Element,
-  { duration = 1000, delay = 250, easing = backInOut } = {},
+  { duration = 350, delay = 0, easing = cubicOut } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -86,7 +79,7 @@ export function flyInFromLeft(
 }
 export function flyOutToRight(
   node: Element,
-  { duration = 1000, delay = 0, easing = backInOut } = {},
+  { duration = 300, delay = 0, easing = cubicIn } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -112,36 +105,5 @@ export function flyOutToRight(
       transform: ${transform} translateX(${u * distanceToRight}px);
       opacity: ${targetOpacity * t};
     `,
-  };
-}
-export function spinFly(
-  node: Element,
-  {
-    duration = 1500,
-    delay = 0,
-    easing = backInOut,
-    y = "100vh",
-    spins = 1,
-  } = {},
-) {
-  return {
-    delay,
-    duration,
-    easing,
-    css: (t: number) => {
-      // Calculate vertical position
-      const yOffset =
-        typeof y === "number" ? `${(1 - t) * y}px` : `calc(${1 - t} * ${y})`;
-
-      // Calculate rotation.
-      // t=0 (hidden): rotation is spins * 360deg
-      // t=1 (rendered): rotation is 0deg
-      const rotation = (1 - t) * spins * 360;
-
-      return `
-        opacity: ${t}; 
-        transform: translateX(${yOffset}) rotate(${rotation}deg);
-      `;
-    },
   };
 }
