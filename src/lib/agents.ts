@@ -1301,7 +1301,7 @@ export async function generateAdaptiveReply(
             .find((r) => r && !r.startsWith("Fallback analysis")) ?? "",
         pairwiseRound: judgeResult.pairwiseRound,
         scorecard: judgeResult.scorecard,
-        absoluteScores: judgeResult.absoluteScores,
+        absoluteScores: judgeResult.aggregatedScores,
       };
 
       return simplifiedResult;

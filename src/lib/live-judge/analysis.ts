@@ -1210,6 +1210,7 @@ export async function analyzeTurn(
   referenceContext: string,
   messageHistory: Message[],
   signal?: AbortSignal,
+  suspectClaims?: string[],
 ): Promise<TurnAnalysis> {
   const judgePrompt = generateJudgePrompt(
     judge,
@@ -1221,6 +1222,7 @@ export async function analyzeTurn(
     topic,
     referenceContext,
     messageHistory,
+    suspectClaims,
   );
   const domainNote = buildDomainNote(classifyDebateDomain(topic));
 
@@ -1281,6 +1283,7 @@ function generateJudgePrompt(
   topic: string,
   referenceContext: string,
   messageHistory: Message[],
+  suspectClaims?: string[],
 ): string {
   const contextBlock = referenceContext
     ? `\nREFERENCE MATERIAL: ${referenceContext}\n`
@@ -1289,9 +1292,18 @@ function generateJudgePrompt(
   const opponentBlock = isOpening
     ? `[OPENING TURN — ${agent.name} speaks first. No opponent argument exists yet.]`
     : `OPPONENT (${opponent.name}) just said: "${opponentMessage}"`;
+  const agentClaims = suspectClaims
+    ? suspectClaims.filter((c) =>
+        c.toLowerCase().startsWith(agent.name.toLowerCase()),
+      )
+    : [];
+  const flaggedBlock =
+    agentClaims.length > 0
+      ? `\nPRE-FLAGGED CLAIMS (pairwise judge identified these as potentially hollow — apply −1 unless the turn supplies a mechanism chain for each):\n${agentClaims.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n`
+      : "";
   return `DEBATE TOPIC: ${topic || "General debate"}
 TURN: ${turnNumber}${contextBlock}
-${opponentBlock}
+${opponentBlock}${flaggedBlock}
 
 NOW EVALUATE — ${agent.name}'s response: "${message}"
 
@@ -1312,6 +1324,7 @@ INDEPENDENCE: Score this turn entirely on its own merits. Do not anchor to or at
 --- LOGIC (1–10) ---
 Start at 6. -1 unsupported assumption, -2 significant leap, -3 logical error, -4 multiple errors. +1 if every claim has explicit causal chain. A score ≥7 must be actively earned — identify what the argument did right; absence of penalties alone justifies at most 6.
 Hollow specificity is penalizable: a specific number, percentage, named study, or allusion to unnamed research findings (e.g., "recent work shows...", "studies have found...", "experiments demonstrate...") without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account. Apply this symmetrically — no leniency based on prior-turn scoring or positional advantage.
+PRE-FLAGGED CLAIMS: If a PRE-FLAGGED CLAIMS section appears in the prompt, each listed claim was already identified by the pairwise judge as potentially hollow. You MUST apply the −1 hollow specificity penalty to each pre-flagged claim unless the turn's own text supplies an explicit mechanism chain for it. These are not suggestions — they are mandatory deductions unless a mechanism chain is present.
 +1 Grounded precision (symmetric counterpart): a claim that names a specific, verifiable datum AND supplies a mechanism chain linking it to the turn's core argument earns +1. Hollow = specificity without mechanism (−1); Grounded = specificity with mechanism (+1). Both bonuses can coexist on the same turn.
 Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
 Causal mechanism requirement: for each major causal leap, the argument must supply a mechanism sentence of the form "[how X produces Y] → [why that mechanism operates under these conditions] → [measurable consequence]." A causal leap missing any element of this template is penalized −1 as an unsupported assumption.
@@ -1774,4 +1787,3 @@ Analyse positional convergence and respond with JSON only:`;
     return fallback;
   }
 }
-

@@ -209,37 +209,38 @@ export class LiveJudgeSystem {
           controller.abort();
         }, PER_JUDGE_TIMEOUT_MS);
 
-        // Run pairwise comparison and per-turn absolute scoring in parallel.
+        // Pairwise runs first so its suspect_claims feed into the absolute scorer.
         // The absolute scoring is supplementary — its failure never blocks the pairwise result.
-        const [pairwiseResult, absoluteAnalysis] = await Promise.all([
-          compareTurns(
-            judge,
-            prevAgentId,
-            prevAgentName,
-            prevMessage,
-            prevTurnNumber,
-            agent.id,
-            agent.name,
-            message,
-            turnNumber,
-            topic,
-            roundNumber,
-            controller.signal,
-            previousLogicDelta,
-          ),
-          analyzeTurn(
-            judge,
-            agent,
-            message,
-            opponent,
-            opponentMessage,
-            turnNumber,
-            topic,
-            referenceContext,
-            messageHistory,
-            controller.signal,
-          ).catch(() => null),
-        ]).finally(() => clearTimeout(timer));
+        const pairwiseResult = await compareTurns(
+          judge,
+          prevAgentId,
+          prevAgentName,
+          prevMessage,
+          prevTurnNumber,
+          agent.id,
+          agent.name,
+          message,
+          turnNumber,
+          topic,
+          roundNumber,
+          controller.signal,
+          previousLogicDelta,
+        );
+        const absoluteAnalysis = await analyzeTurn(
+          judge,
+          agent,
+          message,
+          opponent,
+          opponentMessage,
+          turnNumber,
+          topic,
+          referenceContext,
+          messageHistory,
+          controller.signal,
+          pairwiseResult.suspectClaims,
+        )
+          .catch(() => null)
+          .finally(() => clearTimeout(timer));
 
         pairwiseRound = pairwiseResult;
         judge.analysisCount++;
