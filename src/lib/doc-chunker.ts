@@ -8,15 +8,21 @@
  *   3. Word ceiling (default 600 words) with sentence-boundary guard —
  *      never cuts mid-sentence; finds the nearest period before the ceiling
  */
-export function splitDocumentIntoChunks(text: string, maxWords = 600): string[] {
+export function splitDocumentIntoChunks(
+  text: string,
+  maxWords = 600,
+): string[] {
+  // Normalize line endings (CRLF → LF) so Windows uploads split correctly
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
   // Step 1: try section headings (# / ## / ###)
   let sections: string[] = [];
-  if (/\n#{1,3} /.test(text)) {
-    sections = text.split(/\n(?=#{1,3} )/).filter((s) => s.trim());
+  if (/\n#{1,3} /.test(normalized)) {
+    sections = normalized.split(/\n(?=#{1,3} )/).filter((s) => s.trim());
   }
   // Step 2: fall back to double-newline paragraph splits
   if (sections.length <= 1) {
-    sections = text.split(/\n{2,}/).filter((s) => s.trim());
+    sections = normalized.split(/\n{2,}/).filter((s) => s.trim());
   }
 
   // Step 3: apply word ceiling with sentence-boundary guard
