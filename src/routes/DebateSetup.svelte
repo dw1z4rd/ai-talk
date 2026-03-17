@@ -76,7 +76,7 @@
       (e.ctrlKey || e.metaKey) &&
       !running &&
       !isPaused &&
-      topic.trim()
+      (topic.trim() || docAnalysisMode)
     ) {
       e.preventDefault();
       onstart();
@@ -101,7 +101,7 @@
     <label
       for="topic"
       class="text-[11px] font-semibold uppercase tracking-widest text-[--color-muted]"
-      >Topic</label
+      >{docAnalysisMode ? 'Focus (optional)' : 'Topic'}</label
     >
     <!-- svelte-ignore a11y_autofocus -->
     <input
@@ -109,7 +109,7 @@
       type="text"
       bind:value={topic}
       onkeydown={onTopicKeydown}
-      placeholder={docAnalysisMode ? "What is this document arguing?" : "What should they debate?"}
+      placeholder={docAnalysisMode ? "What aspect to focus on? (leave blank to analyse all claims)" : "What should they debate?"}
       disabled={running}
       autofocus
       class="w-full bg-[--color-surface] border border-[--color-border] rounded-xl px-4 py-4 text-base text-white placeholder:text-[--color-muted] outline-none transition-all focus:border-[--color-accent] focus:shadow-[0_0_0_3px_#7c6af722] disabled:opacity-40 disabled:cursor-not-allowed"
@@ -320,9 +320,9 @@
       <button
         type="button"
         onclick={() => {
-          if (!running && topic.trim()) onstart();
+          if (!running && (topic.trim() || docAnalysisMode)) onstart();
         }}
-        disabled={!topic.trim()}
+        disabled={!topic.trim() && !docAnalysisMode}
         class="bg-[--color-accent] hover:bg-[--color-accent-hover] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm px-7 py-2.5 rounded-xl transition-all cursor-pointer shadow-[0_0_24px_#7c6af740] hover:shadow-[0_0_32px_#7c6af760]"
         >{docAnalysisMode ? 'Analyse' : 'Start debate'}</button
       >

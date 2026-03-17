@@ -21,10 +21,18 @@ export const POST: RequestHandler = async ({ request }) => {
       agentA?: string;
       agentB?: string;
       messages?: Message[];
-      documentSegments?: { agentId: string; agentName: string; color: string; text: string }[];
+      documentSegments?: {
+        agentId: string;
+        agentName: string;
+        color: string;
+        text: string;
+      }[];
     };
 
-  const safeTopic = topic?.trim() || "What is consciousness?";
+  const docDefaultTopic =
+    "Analyse and fact-check the claims made in this document";
+  const safeTopic =
+    topic?.trim() || (isDocMode ? docDefaultTopic : "What is consciousness?");
   const isDocMode = !!documentSegments?.length;
   const totalTurns = isDocMode
     ? documentSegments!.length * 2
@@ -42,7 +50,10 @@ export const POST: RequestHandler = async ({ request }) => {
       try {
         // Reset live judge system, passing debater IDs so the judge
         // model can be selected to differ from the debaters.
-        resetLiveJudgeDebate([agentAId, agentBId], isDocMode ? "document_audit" : "debate");
+        resetLiveJudgeDebate(
+          [agentAId, agentBId],
+          isDocMode ? "document_audit" : "debate",
+        );
 
         const history: Message[] = (messages || []).map((m: any) => {
           if (m.agentId === "moderator") {
@@ -60,9 +71,7 @@ export const POST: RequestHandler = async ({ request }) => {
         // In doc mode, always start with agentA (the document) as first speaker.
         const firstSpeakerId = isDocMode
           ? agentAId
-          : history.find(
-              (m) => m.agentId !== "moderator",
-            )?.agentId;
+          : history.find((m) => m.agentId !== "moderator")?.agentId;
         const agents = buildAdaptiveAgents(
           agentAId,
           agentBId,
@@ -128,7 +137,8 @@ export const POST: RequestHandler = async ({ request }) => {
             const agent = agents.find((a) => a.id === update.agentId);
             const def = agent
               ? { name: agent.name, color: agent.color }
-              : MODEL_CATALOG[update.agentId] ?? MODEL_CATALOG["kimi-k2:1t-cloud"];
+              : (MODEL_CATALOG[update.agentId] ??
+                MODEL_CATALOG["kimi-k2:1t-cloud"]);
             send({
               type: "scoreUpdate",
               targetTurn: update.targetTurn,
