@@ -359,6 +359,7 @@ ${
 ${nameA}'s turns are verbatim excerpts from a source document. They are NOT the output of a live debater making rhetorical choices. Apply these adjustments for ${nameA} only:
 SUPPRESS: "argumentative stagnation" (a static document cannot adapt), "thesis drift" and "positional consistency" penalties (section-to-section variation in a document is expected), and all "not responding to opponent" deductions.
 FOCUS ${nameA} scoring on: whether each claim is supported by an explicit mechanism chain, whether specificity is grounded or hollow, and whether the section is internally logically coherent. All hollow-specificity and mechanism-chain rules apply in full.
+EPISTEMIC HONESTY EXCEPTION: If a section in ${nameA}'s turn is explicitly marked as uncertain or unknown (language like "we don't know", "evidence is uncertain", "less confidently", or a labelled "What We Don't Know" / "Limitations" subsection), that section is a lower-priority audit target. Flag mechanism quality briefly if absent, but do NOT penalise citation absence for what the document honestly admits is unresolved. Confident claims presented as settled fact remain the primary scoring target. Rewarding epistemic honesty over false confidence is correct auditor behaviour.
 Apply ALL standard scoring rules to ${nameB} — they are a live auditor with complete agency over their argumentation choices.`
     : ""
 }`;
