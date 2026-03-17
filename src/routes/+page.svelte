@@ -128,7 +128,9 @@
       }
 
       if (winnerId) {
-        winner = getModelInfo(winnerId);
+        const overrides = docAnalysisMode ? { [agentA]: { name: "Document", color: "#94a3b8" } } : {};
+        const override = overrides[winnerId];
+        winner = override ? { id: winnerId, ...override } : getModelInfo(winnerId);
         const tally = scorecardData?.winTallies?.[winnerId];
         winnerScore = tally ? tally.total : (currentLeader?.score ?? 0);
 
@@ -473,7 +475,7 @@
             // rounds here ensures both the tally numbers and the per-round verdicts
             // shown in the export reflect the same post-reconciliation state.
             if (Array.isArray(data.scorecard?.rounds) && data.scorecard.rounds.length > 0) {
-              pairwiseRounds = data.scorecard.rounds;
+              pairwiseRounds = [...data.scorecard.rounds].sort((a, b) => a.roundNumber - b.roundNumber);
             }
             if (data.scorecard?.winTallies) {
               const tallies: [string, any][] = Object.entries(

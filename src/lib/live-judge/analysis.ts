@@ -703,7 +703,9 @@ export function updateScorecard(
   agentBName: string,
 ): DebateScorecard {
   const updated: DebateScorecard = {
-    rounds: [...scorecard.rounds, round],
+    rounds: [...scorecard.rounds, round].sort(
+      (a, b) => a.roundNumber - b.roundNumber,
+    ),
     winTallies: {
       [agentAId]: scorecard.winTallies[agentAId] ?? {
         agentName: agentAName,
