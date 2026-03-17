@@ -6,29 +6,6 @@ const MAX_TEXT_CHARS = 200_000;
 
 const ALLOWED_EXTENSIONS = new Set([".txt", ".md", ".pdf", ".doc", ".docx"]);
 
-// MIME types that are legitimate for each extension.
-// Some browsers report generic application/octet-stream for .txt/.md so we
-// accept that too, but we always verify the extension first.
-const EXTENSION_MIME_MAP: Record<string, Set<string>> = {
-  ".txt": new Set(["text/plain", "application/octet-stream"]),
-  ".md": new Set([
-    "text/markdown",
-    "text/plain",
-    "application/octet-stream",
-    "text/x-markdown",
-  ]),
-  ".pdf": new Set([
-    "application/pdf",
-    "application/x-pdf",
-    "application/octet-stream",
-  ]),
-  ".doc": new Set(["application/msword", "application/octet-stream"]),
-  ".docx": new Set([
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/octet-stream",
-  ]),
-};
-
 function getExtension(filename: string): string {
   const idx = filename.lastIndexOf(".");
   return idx === -1 ? "" : filename.slice(idx).toLowerCase();
@@ -75,13 +52,6 @@ export const POST: RequestHandler = async ({
   const ext = getExtension(file.name);
   if (!ALLOWED_EXTENSIONS.has(ext)) {
     throw error(415, `Unsupported file type: ${ext || "(none)"}`);
-  }
-
-  // Validate MIME type against extension
-  const reportedMime = file.type || "application/octet-stream";
-  const allowedMimes = EXTENSION_MIME_MAP[ext];
-  if (!allowedMimes.has(reportedMime)) {
-    throw error(415, "File MIME type does not match extension");
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
