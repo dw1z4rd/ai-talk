@@ -29,11 +29,11 @@ export const POST: RequestHandler = async ({ request }) => {
       }[];
     };
 
+  const isDocMode = !!documentSegments?.length;
   const docDefaultTopic =
     "Analyse and fact-check the claims made in this document";
   const safeTopic =
     topic?.trim() || (isDocMode ? docDefaultTopic : "What is consciousness?");
-  const isDocMode = !!documentSegments?.length;
   const totalTurns = isDocMode
     ? documentSegments!.length * 2
     : Math.min(Number(turns) || 12, 30) * 2; // Multiply by 2 debaters
