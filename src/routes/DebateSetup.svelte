@@ -41,6 +41,34 @@
 
   let showFiles = $state(false);
   let moderatorInput = $state("");
+  let uploadError = $state("");
+  let uploading = $state(false);
+
+  async function handleFileUpload(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ""; // reset so same file can be re-selected
+    if (!file) return;
+
+    uploadError = "";
+    uploading = true;
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/parse-document", { method: "POST", body: fd });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => res.statusText);
+        uploadError = msg || `Error ${res.status}`;
+        return;
+      }
+      const data = await res.json();
+      documentText = data.text as string;
+    } catch {
+      uploadError = "Upload failed — please try again.";
+    } finally {
+      uploading = false;
+    }
+  }
 
   function onTopicKeydown(e: KeyboardEvent) {
     if (
@@ -126,15 +154,49 @@
   {#if docAnalysisMode}
     <!-- Document paste area -->
     <div class="flex flex-col gap-1.5">
-      <label
-        for="documentText"
-        class="text-[11px] font-semibold uppercase tracking-widest text-[#ef4444]"
-        >Document</label
-      >
+      <div class="flex items-center justify-between">
+        <label
+          for="documentText"
+          class="text-[11px] font-semibold uppercase tracking-widest text-[#ef4444]"
+          >Document</label
+        >
+        <!-- File upload button -->
+        <label
+          class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-lg border transition-all cursor-pointer
+            {uploading ? 'opacity-40 pointer-events-none' : ''}
+            {running ? 'opacity-40 pointer-events-none' : ''}
+            border-[#ef4444]/40 text-[#ef4444] hover:bg-[#ef4444]/10"
+          title="Upload .txt, .md, .pdf, .doc or .docx"
+        >
+          {#if uploading}
+            <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+            </svg>
+            Loading…
+          {:else}
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Upload file
+          {/if}
+          <input
+            type="file"
+            accept=".txt,.md,.pdf,.doc,.docx"
+            class="sr-only"
+            disabled={running || uploading}
+            onchange={handleFileUpload}
+          />
+        </label>
+      </div>
+      {#if uploadError}
+        <p class="text-xs text-red-400">{uploadError}</p>
+      {/if}
       <textarea
         id="documentText"
         bind:value={documentText}
-        placeholder="Paste your document here — articles, reports, policy papers, opinion pieces..."
+        placeholder="Paste your document here, or upload a file — articles, reports, policy papers, opinion pieces..."
         rows="8"
         disabled={running}
         class="w-full bg-[--color-surface] border border-[--color-border] rounded-xl px-4 py-3 text-sm text-white placeholder:text-[--color-muted] outline-none transition-all focus:border-[#ef4444] focus:shadow-[0_0_0_3px_#ef444422] disabled:opacity-40 disabled:cursor-not-allowed resize-y"
