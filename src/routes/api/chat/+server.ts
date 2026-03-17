@@ -125,9 +125,10 @@ export const POST: RequestHandler = async ({ request }) => {
         const emitScoreUpdates = (jr: any) => {
           const flagUpdates: any[] = jr.pairwiseRound?.flagUpdates ?? [];
           for (const update of flagUpdates) {
-            const def =
-              MODEL_CATALOG[update.agentId] ??
-              MODEL_CATALOG["kimi-k2:1t-cloud"];
+            const agent = agents.find((a) => a.id === update.agentId);
+            const def = agent
+              ? { name: agent.name, color: agent.color }
+              : MODEL_CATALOG[update.agentId] ?? MODEL_CATALOG["kimi-k2:1t-cloud"];
             send({
               type: "scoreUpdate",
               targetTurn: update.targetTurn,

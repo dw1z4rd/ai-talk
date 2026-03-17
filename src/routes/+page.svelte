@@ -545,6 +545,7 @@
           {currentLeader}
           {judgeStatus}
           {scoreDeltas}
+          agentOverrides={docAnalysisMode ? { [agentA]: { name: "Document", color: "#94a3b8" } } : {}}
         />
       </div>
     {/if}
