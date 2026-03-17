@@ -571,7 +571,7 @@
         {running}
         {isPaused}
         {errorMsg}
-        onstart={() => { if (!running && topic.trim()) startConversation(); }}
+        onstart={() => { if (!running && (topic.trim() || docAnalysisMode)) startConversation(); }}
         onresume={() => startConversation(true)}
         onpause={pauseConversation}
         onstop={stopConversation}
