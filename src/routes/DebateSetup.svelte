@@ -1,7 +1,7 @@
 <script lang="ts">
   import AgentSelector from "./AgentSelector.svelte";
   import ContextFileUpload from "./ContextFileUpload.svelte";
-  import type { ContextFile } from "$lib/debate/models";
+  import { MODEL_OPTIONS, getModelInfo, type ContextFile } from "$lib/debate/models";
 
   interface Props {
     topic: string;
@@ -91,6 +91,36 @@
   {#if !docAnalysisMode}
     <!-- Agents row -->
     <AgentSelector bind:agentA bind:agentB {running} />
+  {:else}
+    <!-- Doc mode: only the auditor (Agent B) model is selectable -->
+    <div class="flex flex-col gap-1.5">
+      <label
+        for="auditorModel"
+        class="text-[11px] font-semibold uppercase tracking-widest flex items-center gap-1.5"
+        style="color: {getModelInfo(agentB).color}"
+      >
+        <span
+          class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+          style="background: {getModelInfo(agentB).color}"
+        ></span>
+        Auditor model
+      </label>
+      <select
+        id="auditorModel"
+        bind:value={agentB}
+        disabled={running}
+        class="w-full bg-[--color-surface] border border-[--color-border] rounded-xl px-4 py-3 text-sm text-white outline-none transition-all focus:border-[#ef4444] disabled:opacity-40 disabled:cursor-not-allowed"
+        style="border-left: 2px solid {getModelInfo(agentB).color}"
+      >
+        {#each MODEL_OPTIONS as group}
+          <optgroup label={group.group}>
+            {#each group.options as opt}
+              <option value={opt.id}>{opt.name}</option>
+            {/each}
+          </optgroup>
+        {/each}
+      </select>
+    </div>
   {/if}
 
   {#if docAnalysisMode}
