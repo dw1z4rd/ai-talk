@@ -13,6 +13,7 @@ import {
 } from "./types";
 import type { Agent, Message } from "$lib/agents";
 import { MODEL_CATALOG } from "$lib/agents";
+import { withRetry } from "$lib/llm-agent/retry";
 
 // ── Debate domain classification ─────────────────────────────────────────────
 
@@ -351,12 +352,16 @@ Each flag_update element MUST use exactly these keys:
 Omitting target_turn or using wrong key names will silently discard the update. For every open flag you see, you MUST emit either a penalty or a partial_restore — do NOT leave flag_updates empty when open flags are present.
 
 CRITICAL: Open flags govern only retroactive adjustments to previous absolute scores. They do NOT influence the logic_winner decision, which is always determined by the two current turns' content only. Never let an open flag substitute for engaging with what the current turn actually said.
-${mode === "document_audit" ? `
+${
+  mode === "document_audit"
+    ? `
 --- DOCUMENT AUDIT MODE ---
 ${nameA}'s turns are verbatim excerpts from a source document. They are NOT the output of a live debater making rhetorical choices. Apply these adjustments for ${nameA} only:
 SUPPRESS: "argumentative stagnation" (a static document cannot adapt), "thesis drift" and "positional consistency" penalties (section-to-section variation in a document is expected), and all "not responding to opponent" deductions.
 FOCUS ${nameA} scoring on: whether each claim is supported by an explicit mechanism chain, whether specificity is grounded or hollow, and whether the section is internally logically coherent. All hollow-specificity and mechanism-chain rules apply in full.
-Apply ALL standard scoring rules to ${nameB} — they are a live auditor with complete agency over their argumentation choices.` : ""}`;
+Apply ALL standard scoring rules to ${nameB} — they are a live auditor with complete agency over their argumentation choices.`
+    : ""
+}`;
 }
 
 export function generatePairwisePrompt(
@@ -660,7 +665,7 @@ function createFallbackPairwiseRound(
       message: curMessage,
     },
     logicWinner: prevAgentId,
-    tacticsWinner: prevAgentId,
+    tacticsWinner: curAgentId,
     rhetoricWinner: prevAgentId,
     logicDelta: "Fallback — judge analysis unavailable for this round.",
     tacticsDelta: "Fallback — judge analysis unavailable for this round.",

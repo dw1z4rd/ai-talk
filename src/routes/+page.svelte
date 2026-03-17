@@ -551,6 +551,7 @@
           {pairwiseRounds}
           {narrativeVerdict}
           {currentLeader}
+          {finalScorecard}
           {judgeStatus}
           {scoreDeltas}
           agentOverrides={docAnalysisMode ? { [agentA]: { name: "Document", color: "#94a3b8" } } : {}}

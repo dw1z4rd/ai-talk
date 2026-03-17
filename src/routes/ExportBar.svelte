@@ -57,7 +57,7 @@
     const agentBInfo = resolveAgent(agentB);
 
     if (format === "md") {
-      content = `# Debate: ${topic}\n\n_Exported ${date}_\n\n---\n\n`;
+      content = `# Debate: ${topic || "Document Analysis"}\n\n_Exported ${date}_\n\n---\n\n`;
       content += messages
         .map((m) => `### ${m.agentName}\n\n${m.text}`)
         .join("\n\n---\n\n");
@@ -114,7 +114,7 @@
         if (narrativeVerdict.favouredAgentId) {
           content += `\n**Verdict: ${getModelInfo(narrativeVerdict.favouredAgentId).name}**\n`;
         }
-        if (!narrativeVerdict.agreesWithScorecard) {
+        if (!narrativeVerdict.agreesWithScorecard && narrativeVerdict.favouredAgentId && finalScorecard?.overallWinner && narrativeVerdict.favouredAgentId !== finalScorecard.overallWinner) {
           content += `\n> ⚡ Narrative verdict disagrees with the round-by-round scorecard.\n`;
           if (narrativeVerdict.conflictResolution) {
             const splitHeader = narrativeVerdict.scorecardInternallyConsistent === false

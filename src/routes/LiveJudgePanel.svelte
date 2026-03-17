@@ -14,12 +14,24 @@
     pairwiseRounds: any[];
     narrativeVerdict: any;
     currentLeader: any;
+    finalScorecard?: any;
     judgeStatus?: 'scoring' | 'writing_verdict' | null;
     scoreDeltas?: Record<number, number>;
     agentOverrides?: Record<string, { name: string; color: string }>;
   }
 
-  let { liveJudgeResults, pairwiseRounds, narrativeVerdict, currentLeader, judgeStatus = null, scoreDeltas = {}, agentOverrides = {} }: Props = $props();
+  let { liveJudgeResults, pairwiseRounds, narrativeVerdict, currentLeader, finalScorecard = null, judgeStatus = null, scoreDeltas = {}, agentOverrides = {} }: Props = $props();
+
+  // Recompute agreement against the FINAL scorecard (not at generation time)
+  // to avoid false flags caused by fallback rounds skewing mid-run tallies.
+  const verdictAgreesWithScorecard = $derived(
+    !narrativeVerdict
+      ? true
+      : narrativeVerdict.favouredAgentId !== null &&
+          narrativeVerdict.favouredAgentId !== undefined &&
+          finalScorecard?.overallWinner !== undefined &&
+          narrativeVerdict.favouredAgentId === finalScorecard?.overallWinner,
+  );
 
   function resolveAgent(id: string): { id: string; name: string; color: string } {
     if (id === "tie") return { id: "tie", name: "Draw", color: "#6b7280" };
@@ -69,7 +81,7 @@
         <!-- Narrative verdict (shown after debate completes) -->
         <div
           class="rounded-2xl border overflow-hidden bg-[--color-panel]"
-          style="border-color: {narrativeVerdict.agreesWithScorecard
+          style="border-color: {verdictAgreesWithScorecard
             ? '#7c6af740'
             : '#f59e0b40'}"
           in:flyInFromTop={{ duration: 450 }}
@@ -77,20 +89,20 @@
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
-            style="border-color: {narrativeVerdict.agreesWithScorecard
+            style="border-color: {verdictAgreesWithScorecard
               ? '#7c6af725'
-              : '#f59e0b25'}; background: {narrativeVerdict.agreesWithScorecard
+              : '#f59e0b25'}; background: {verdictAgreesWithScorecard
               ? '#7c6af708'
               : '#f59e0b08'}"
           >
             <div class="flex flex-col">
               <span
                 class="text-sm font-bold"
-                style="color: {narrativeVerdict.agreesWithScorecard
+                style="color: {verdictAgreesWithScorecard
                   ? '#c084fc'
                   : '#fbbf24'}"
               >
-                {narrativeVerdict.agreesWithScorecard
+                {verdictAgreesWithScorecard
                   ? "Narrative Verdict"
                   : "⚡ Narrative Arc Diverges"}
               </span>
