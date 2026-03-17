@@ -170,7 +170,7 @@
 
       {:else}
         <!-- Per-turn absolute scores -->
-        {@const scoredTurns = liveJudgeResults.filter((r) => r.absoluteScores)}
+        {@const scoredTurns = liveJudgeResults.filter((r) => r.absoluteScores).sort((a, b) => a.turnNumber - b.turnNumber)}
         <div class="flex flex-col gap-2">
           <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
             Turn Scores
