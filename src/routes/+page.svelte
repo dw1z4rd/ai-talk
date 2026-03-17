@@ -10,6 +10,7 @@
   import ChatPanel from "./ChatPanel.svelte";
   import ExportBar from "./ExportBar.svelte";
   import { flyInFromLeft, flyOutToRight } from "$lib/transitions";
+  import { splitDocumentIntoChunks } from "$lib/doc-chunker";
 
   let topic = $state("");
   let turns = $state(4);
@@ -21,6 +22,8 @@
   let chatEl = $state<HTMLElement | null>(null);
   let userScrolled = $state(false);
   let abortController = $state<AbortController | null>(null);
+  let docAnalysisMode = $state(false);
+  let documentText = $state("");
 
   $effect(() => {
     const el = chatEl;
@@ -224,6 +227,21 @@
     showLiveJudgePanel = true;
 
     try {
+      const chunks =
+        docAnalysisMode && documentText.trim()
+          ? splitDocumentIntoChunks(documentText)
+          : null;
+      // Sync turns state so the progress bar reflects actual chunk count.
+      if (chunks) turns = chunks.length;
+      const documentSegments = chunks
+        ? chunks.map((text) => ({
+            agentId: agentA,
+            agentName: "Document",
+            color: "#94a3b8",
+            text,
+          }))
+        : undefined;
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -234,6 +252,7 @@
           agentA,
           agentB,
           messages: resume ? messages : undefined,
+          documentSegments,
         }),
         signal: abortController.signal,
       });
@@ -508,7 +527,7 @@
   ondragover={(e) => e.preventDefault()}
   ondrop={(e) => e.preventDefault()}
 >
-  <DebateHeader />
+  <DebateHeader {docAnalysisMode} />
 
   <!-- ── Two-column desktop layout ─────────────────────────────────────────── -->
   <div class="main-two-col">
@@ -538,6 +557,8 @@
         bind:agentA
         bind:agentB
         bind:contextFiles
+        bind:docAnalysisMode
+        bind:documentText
         {running}
         {isPaused}
         {errorMsg}

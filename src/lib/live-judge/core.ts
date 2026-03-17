@@ -50,6 +50,7 @@ export function selectJudgeModel(_excludeModelIds: string[]): string {
 
 export class LiveJudgeSystem {
   private panel: LiveJudgePanel;
+  private mode: "debate" | "document_audit" = "debate";
 
   constructor(judgeModelId: string = "kimi-k2:1t-cloud") {
     this.panel = this.initializeJudgePanel(judgeModelId);
@@ -229,6 +230,7 @@ export class LiveJudgeSystem {
           roundNumber,
           controller.signal,
           openFlagsForPrev.length > 0 ? openFlagsForPrev : undefined,
+          this.mode,
         );
         const absoluteAnalysis = await analyzeTurn(
           judge,
@@ -1073,7 +1075,8 @@ export class LiveJudgeSystem {
     return { agentId: leader[0], control: leader[1] };
   }
 
-  reset(debaterModelIds?: string[]): void {
+  reset(debaterModelIds?: string[], mode: "debate" | "document_audit" = "debate"): void {
+    this.mode = mode;
     // Pick a new judge model if debater IDs provided
     const newJudgeModelId = debaterModelIds
       ? selectJudgeModel(debaterModelIds)
@@ -1131,9 +1134,9 @@ export function getLiveJudgeSystem(): LiveJudgeSystem {
   return liveJudgeSystem;
 }
 
-export function resetLiveJudgeSystem(debaterModelIds?: string[]): void {
+export function resetLiveJudgeSystem(debaterModelIds?: string[], mode: "debate" | "document_audit" = "debate"): void {
   if (!liveJudgeSystem) {
     liveJudgeSystem = new LiveJudgeSystem();
   }
-  liveJudgeSystem.reset(debaterModelIds);
+  liveJudgeSystem.reset(debaterModelIds, mode);
 }

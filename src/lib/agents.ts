@@ -3,6 +3,7 @@ import {
   createAnthropicProvider,
   withRetry,
 } from "$lib/llm-agent";
+export { makeDocumentAuditorPrompt } from "$lib/doc-audit-prompts";
 import type { LLMProvider } from "$lib/llm-agent";
 import {
   GEMINI_API_KEY,
@@ -1127,6 +1128,7 @@ export async function generateAdaptiveReply(
   context?: string,
   onToken?: (token: string) => void,
   onReply?: (reply: string) => void,
+  prebuiltReply?: string,
 ): Promise<{
   reply: string | null;
   judgePromise: Promise<LiveJudgeResult | undefined>;
@@ -1177,7 +1179,7 @@ export async function generateAdaptiveReply(
     ? `${systemPrompt}\n\n[REFERENCE MATERIAL]\nThe following documents have been provided. Draw on them where relevant to support or challenge arguments.\n\n${context}`
     : systemPrompt;
 
-  const reply = await agent.provider.generateText(prompt, {
+  const reply = prebuiltReply ?? await agent.provider.generateText(prompt, {
     systemPrompt: effectiveSystemPrompt,
     temperature: 0.9,
     maxTokens: 10000,
@@ -1185,7 +1187,7 @@ export async function generateAdaptiveReply(
   });
 
   if (!reply) {
-    return { reply, judgePromise: Promise.resolve(undefined) };
+    return { reply: reply ?? null, judgePromise: Promise.resolve(undefined) };
   }
 
   // Capture opponent's last message before onReply mutates history
@@ -1228,8 +1230,8 @@ export async function generateAdaptiveReply(
         ),
       ]);
 
-      // Only apply adaptive pressure if adaptive state exists
-      if (agent.adaptiveState) {
+      // Only apply adaptive pressure if adaptive state exists and not a prebuilt (document) turn
+      if (agent.adaptiveState && !prebuiltReply) {
         const evolutions = applyAdaptivePressure(
           agent.adaptiveState.personality,
           judgeResult.adaptivePressures,
@@ -1261,22 +1263,24 @@ export async function generateAdaptiveReply(
       }
 
       // Generate a hidden directive for the next turn based on aggregated scores.
-      // This is silently injected into the system prompt — the model never sees why.
-      const noCounterfactualYet =
-        turnNumber + 1 >= 4 &&
-        !judgeResult.scorecard?.counterfactualTrack?.[agent.id];
-      const mechanismFailureLastRound =
-        !!judgeResult.pairwiseRound?.mechanismFailures?.includes(agent.name);
-      const directive = generateHiddenDirective(
-        judgeResult.aggregatedScores,
-        turnNumber + 1,
-        {
-          noCounterfactualYet,
-          mechanismFailureLastRound,
-        },
-      );
-      if (directive) {
-        agent.hiddenDirective = directive;
+      // Not applied to document (prebuilt) turns — the document has no next-turn agency.
+      if (!prebuiltReply) {
+        const noCounterfactualYet =
+          turnNumber + 1 >= 4 &&
+          !judgeResult.scorecard?.counterfactualTrack?.[agent.id];
+        const mechanismFailureLastRound =
+          !!judgeResult.pairwiseRound?.mechanismFailures?.includes(agent.name);
+        const directive = generateHiddenDirective(
+          judgeResult.aggregatedScores,
+          turnNumber + 1,
+          {
+            noCounterfactualYet,
+            mechanismFailureLastRound,
+          },
+        );
+        if (directive) {
+          agent.hiddenDirective = directive;
+        }
       }
 
       const simplifiedResult: LiveJudgeResult = {
@@ -1350,8 +1354,8 @@ export async function generateDebateNarrativeVerdict(
  * Reset live judge system for new debate.
  * Passing debater model IDs allows the judge to pick a different model than the debaters.
  */
-export function resetLiveJudgeDebate(debaterModelIds?: string[]) {
-  resetLiveJudgeSystem(debaterModelIds);
+export function resetLiveJudgeDebate(debaterModelIds?: string[], mode: "debate" | "document_audit" = "debate") {
+  resetLiveJudgeSystem(debaterModelIds, mode);
 }
 
 /**

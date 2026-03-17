@@ -170,6 +170,7 @@ export async function compareTurns(
   roundNumber: number,
   signal?: AbortSignal,
   openFlags?: OpenFlag[],
+  mode?: "debate" | "document_audit",
 ): Promise<PairwiseRound> {
   const langCheck = detectLanguageMismatch(prevMessage, curMessage);
   if (!langCheck.isConsistent) {
@@ -202,6 +203,7 @@ export async function compareTurns(
         prevAgentName,
         curAgentName,
         domainNote,
+        mode,
       ),
       temperature: 0.3,
       maxTokens: 1200,
@@ -255,6 +257,7 @@ export function generatePairwiseSystemPrompt(
   nameA: string,
   nameB: string,
   domainNote: string = "",
+  mode?: "debate" | "document_audit",
 ): string {
   return `You are a comparative debate judge. Read two consecutive turns and pick the stronger one on three dimensions. No draws — you must choose one winner per dimension. Respond with a single JSON object only — no preamble, no markdown.
 
@@ -347,7 +350,13 @@ Each flag_update element MUST use exactly these keys:
   {"flag_id": "FLAG-T3-agentslug-1", "target_turn": 3, "delta_raw": 1, "update_type": "partial_restore", "reason": "Mechanism chain supplied in current turn"}
 Omitting target_turn or using wrong key names will silently discard the update. For every open flag you see, you MUST emit either a penalty or a partial_restore — do NOT leave flag_updates empty when open flags are present.
 
-CRITICAL: Open flags govern only retroactive adjustments to previous absolute scores. They do NOT influence the logic_winner decision, which is always determined by the two current turns' content only. Never let an open flag substitute for engaging with what the current turn actually said.`;
+CRITICAL: Open flags govern only retroactive adjustments to previous absolute scores. They do NOT influence the logic_winner decision, which is always determined by the two current turns' content only. Never let an open flag substitute for engaging with what the current turn actually said.
+${mode === "document_audit" ? `
+--- DOCUMENT AUDIT MODE ---
+${nameA}'s turns are verbatim excerpts from a source document. They are NOT the output of a live debater making rhetorical choices. Apply these adjustments for ${nameA} only:
+SUPPRESS: "argumentative stagnation" (a static document cannot adapt), "thesis drift" and "positional consistency" penalties (section-to-section variation in a document is expected), and all "not responding to opponent" deductions.
+FOCUS ${nameA} scoring on: whether each claim is supported by an explicit mechanism chain, whether specificity is grounded or hollow, and whether the section is internally logically coherent. All hollow-specificity and mechanism-chain rules apply in full.
+Apply ALL standard scoring rules to ${nameB} — they are a live auditor with complete agency over their argumentation choices.` : ""}`;
 }
 
 export function generatePairwisePrompt(

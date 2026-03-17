@@ -5,6 +5,7 @@ import {
   resetLiveJudgeDebate,
   generateDebateNarrativeVerdict,
   getDebateScorecard,
+  makeDocumentAuditorPrompt,
   MODEL_CATALOG,
 } from "$lib/agents";
 import type { Message } from "$lib/agents";
@@ -12,7 +13,7 @@ import type { Message } from "$lib/agents";
 // Each SSE event is JSON: { type: 'token' | 'message' | 'judgeResult' | 'narrativeVerdict' | 'finalScorecard' | 'done' | 'error', ... }
 
 export const POST: RequestHandler = async ({ request }) => {
-  const { topic, turns, context, agentA, agentB, messages } =
+  const { topic, turns, context, agentA, agentB, messages, documentSegments } =
     (await request.json()) as {
       topic: string;
       turns: number;
@@ -20,10 +21,14 @@ export const POST: RequestHandler = async ({ request }) => {
       agentA?: string;
       agentB?: string;
       messages?: Message[];
+      documentSegments?: { agentId: string; agentName: string; color: string; text: string }[];
     };
 
   const safeTopic = topic?.trim() || "What is consciousness?";
-  const totalTurns = Math.min(Number(turns) || 12, 30) * 2; // Multiply by 2 debaters
+  const isDocMode = !!documentSegments?.length;
+  const totalTurns = isDocMode
+    ? documentSegments!.length * 2
+    : Math.min(Number(turns) || 12, 30) * 2; // Multiply by 2 debaters
 
   const agentAId = agentA ?? "kimi-k2:1t-cloud";
   const agentBId = agentB ?? "nemotron-3-super-cloud";
@@ -37,7 +42,7 @@ export const POST: RequestHandler = async ({ request }) => {
       try {
         // Reset live judge system, passing debater IDs so the judge
         // model can be selected to differ from the debaters.
-        resetLiveJudgeDebate([agentAId, agentBId]);
+        resetLiveJudgeDebate([agentAId, agentBId], isDocMode ? "document_audit" : "debate");
 
         const history: Message[] = (messages || []).map((m: any) => {
           if (m.agentId === "moderator") {
@@ -52,9 +57,12 @@ export const POST: RequestHandler = async ({ request }) => {
 
         // When resuming, derive agent ordering from the first speaker so
         // turn parity is preserved; on a fresh debate, randomize.
-        const firstSpeakerId = history.find(
-          (m) => m.agentId !== "moderator",
-        )?.agentId;
+        // In doc mode, always start with agentA (the document) as first speaker.
+        const firstSpeakerId = isDocMode
+          ? agentAId
+          : history.find(
+              (m) => m.agentId !== "moderator",
+            )?.agentId;
         const agents = buildAdaptiveAgents(
           agentAId,
           agentBId,
@@ -62,6 +70,22 @@ export const POST: RequestHandler = async ({ request }) => {
           undefined,
           firstSpeakerId,
         );
+
+        // Doc mode: rename the document agent and lock the auditor into its role.
+        if (isDocMode) {
+          const docAgent = agents.find((a) => a.id === agentAId);
+          const auditorAgent = agents.find((a) => a.id !== agentAId);
+          if (docAgent) {
+            docAgent.name = "Document";
+            docAgent.color = "#94a3b8";
+          }
+          if (auditorAgent) {
+            auditorAgent.systemPrompt = makeDocumentAuditorPrompt(
+              docAgent?.name ?? "Document",
+              auditorAgent.name,
+            );
+          }
+        }
 
         const aiMessagesCount = history.filter(
           (m) => m.agentId !== "moderator",
@@ -167,6 +191,10 @@ export const POST: RequestHandler = async ({ request }) => {
                 text: reply,
               });
             },
+            // In doc mode, Agent A turns use a pre-built document chunk (no LLM call).
+            isDocMode && agent.id === agentAId
+              ? documentSegments![Math.floor(turn / 2)]?.text
+              : undefined,
           );
 
           if (!reply) {

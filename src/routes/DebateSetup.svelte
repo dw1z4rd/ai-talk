@@ -9,6 +9,8 @@
     agentA: string;
     agentB: string;
     contextFiles: ContextFile[];
+    docAnalysisMode: boolean;
+    documentText: string;
     running: boolean;
     isPaused: boolean;
     errorMsg: string;
@@ -25,6 +27,8 @@
     agentA = $bindable(),
     agentB = $bindable(),
     contextFiles = $bindable(),
+    docAnalysisMode = $bindable(),
+    documentText = $bindable(),
     running,
     isPaused,
     errorMsg,
@@ -77,18 +81,40 @@
       type="text"
       bind:value={topic}
       onkeydown={onTopicKeydown}
-      placeholder="What should they debate?"
+      placeholder={docAnalysisMode ? "What is this document arguing?" : "What should they debate?"}
       disabled={running}
       autofocus
       class="w-full bg-[--color-surface] border border-[--color-border] rounded-xl px-4 py-4 text-base text-white placeholder:text-[--color-muted] outline-none transition-all focus:border-[--color-accent] focus:shadow-[0_0_0_3px_#7c6af722] disabled:opacity-40 disabled:cursor-not-allowed"
     />
   </div>
 
-  <!-- Agents row -->
-  <AgentSelector bind:agentA bind:agentB {running} />
+  {#if !docAnalysisMode}
+    <!-- Agents row -->
+    <AgentSelector bind:agentA bind:agentB {running} />
+  {/if}
+
+  {#if docAnalysisMode}
+    <!-- Document paste area -->
+    <div class="flex flex-col gap-1.5">
+      <label
+        for="documentText"
+        class="text-[11px] font-semibold uppercase tracking-widest text-[#ef4444]"
+        >Document</label
+      >
+      <textarea
+        id="documentText"
+        bind:value={documentText}
+        placeholder="Paste your document here — articles, reports, policy papers, opinion pieces..."
+        rows="8"
+        disabled={running}
+        class="w-full bg-[--color-surface] border border-[--color-border] rounded-xl px-4 py-3 text-sm text-white placeholder:text-[--color-muted] outline-none transition-all focus:border-[#ef4444] focus:shadow-[0_0_0_3px_#ef444422] disabled:opacity-40 disabled:cursor-not-allowed resize-y"
+      ></textarea>
+    </div>
+  {/if}
 
   <!-- Bottom row: turns + context toggle + actions -->
   <div class="flex items-center gap-3 flex-wrap">
+  {#if !docAnalysisMode}
     <div
       class="flex items-center gap-2 bg-[--color-surface] border border-[--color-border] rounded-xl px-3 py-2"
     >
@@ -107,6 +133,7 @@
         class="w-12 bg-transparent text-sm text-white outline-none disabled:opacity-40 disabled:cursor-not-allowed text-center"
       />
     </div>
+  {/if}
 
     <button
       type="button"
@@ -138,6 +165,33 @@
     </button>
 
     <div class="flex-1"></div>
+
+    <button
+      type="button"
+      onclick={() => {
+        docAnalysisMode = !docAnalysisMode;
+      }}
+      disabled={running}
+      class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest px-3 py-2 rounded-xl border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed
+{docAnalysisMode
+        ? 'border-[#ef4444] text-[#ef4444] bg-[#ef4444]/5'
+        : 'border-[--color-border] text-[--color-muted] hover:border-[--color-muted] bg-[--color-surface]'}"
+    >
+      <svg
+        class="w-3.5 h-3.5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="1.5"
+          d="M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"
+        />
+      </svg>
+      BS Detect
+    </button>
 
     {#if running}
       <button
@@ -178,7 +232,7 @@
         }}
         disabled={!topic.trim()}
         class="bg-[--color-accent] hover:bg-[--color-accent-hover] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold text-sm px-7 py-2.5 rounded-xl transition-all cursor-pointer shadow-[0_0_24px_#7c6af740] hover:shadow-[0_0_32px_#7c6af760]"
-        >Start debate</button
+        >{docAnalysisMode ? 'Analyse' : 'Start debate'}</button
       >
     {/if}
   </div>
