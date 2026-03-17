@@ -193,9 +193,14 @@ export async function compareTurns(
     openFlags,
   );
 
-  const judgeProvider = createJudgeProvider(
+  const baseProvider = createJudgeProvider(
     judge.modelId || "kimi-k2-thinking:cloud",
   );
+  const judgeProvider = withRetry(baseProvider, {
+    maxRetries: 3,
+    initialDelayMs: 800,
+    backoffFactor: 2,
+  });
   const start = Date.now();
 
   try {
@@ -668,9 +673,9 @@ function createFallbackPairwiseRound(
       agentName: curAgentName,
       message: curMessage,
     },
-    logicWinner: prevAgentId,
-    tacticsWinner: curAgentId,
-    rhetoricWinner: prevAgentId,
+    logicWinner: "tie",
+    tacticsWinner: "tie",
+    rhetoricWinner: "tie",
     logicDelta: "Fallback — judge analysis unavailable for this round.",
     tacticsDelta: "Fallback — judge analysis unavailable for this round.",
     rhetoricDelta: "Fallback — judge analysis unavailable for this round.",

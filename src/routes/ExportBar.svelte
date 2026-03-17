@@ -44,7 +44,8 @@
 
   function exportDebate(format: "md" | "txt") {
     const date = new Date().toISOString().slice(0, 10);
-    const safeTitle = topic
+    const displayTopic = topic || "Document Analysis";
+    const safeTitle = displayTopic
       .slice(0, 60)
       .replace(/[^a-z0-9]+/gi, "-")
       .toLowerCase();
@@ -57,7 +58,7 @@
     const agentBInfo = resolveAgent(agentB);
 
     if (format === "md") {
-      content = `# Debate: ${topic || "Document Analysis"}\n\n_Exported ${date}_\n\n---\n\n`;
+      content = `# Debate: ${displayTopic}\n\n_Exported ${date}_\n\n---\n\n`;
       content += messages
         .map((m) => `### ${m.agentName}\n\n${m.text}`)
         .join("\n\n---\n\n");
@@ -158,7 +159,7 @@
       mime = "text/markdown";
       ext = "md";
     } else {
-      content = `DEBATE: ${topic}\nExported: ${date}\n${"─".repeat(40)}\n\n`;
+      content = `DEBATE: ${displayTopic}\nExported: ${date}\n${"─".repeat(40)}\n\n`;
       content += messages.map((m) => `[${m.agentName}]\n${m.text}`).join("\n\n");
 
       if (pairwiseRounds.length > 0) {
@@ -255,7 +256,8 @@
 
   function exportDebatePdf() {
     const date = new Date().toISOString().slice(0, 10);
-    const safeTitle = topic
+    const displayTopic = topic || "Document Analysis";
+    const safeTitle = displayTopic
       .slice(0, 60)
       .replace(/[^a-z0-9]+/gi, "-")
       .toLowerCase();
@@ -371,7 +373,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Debate: ${escapeHtml(topic)}</title>
+<title>Debate: ${escapeHtml(displayTopic)}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Georgia, 'Times New Roman', serif; color: #1a1a2e; background: #fff; padding: 2.5rem 3rem; max-width: 820px; margin: 0 auto; }
@@ -390,7 +392,7 @@
 </style>
 </head>
 <body>
-<h1>Debate: ${escapeHtml(topic)}</h1>
+<h1>Debate: ${escapeHtml(displayTopic)}</h1>
 <p style="font-size:0.8rem;color:#888;margin-bottom:2rem">Exported ${date}</p>
 <hr style="margin-bottom:2rem;border:none;border-top:2px solid #eee">
 ${body}${scoreHtml}${verdictHtml}${scoresHtml}
