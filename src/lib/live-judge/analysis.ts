@@ -1171,9 +1171,13 @@ function parseNarrativeVerdict(
   if (allVerdictMatches.length > 0) {
     const verdictName =
       allVerdictMatches[allVerdictMatches.length - 1][1].trim();
-    if (verdictName.toLowerCase().includes(agentAName.toLowerCase())) {
+    const vn = verdictName.toLowerCase();
+    const aN = agentAName.toLowerCase();
+    const bN = agentBName.toLowerCase();
+    // Bidirectional: handles LLMs that abbreviate names (e.g. "Kimi" for "Kimi K2.5").
+    if (vn.includes(aN) || aN.includes(vn)) {
       favouredAgentId = agentAId;
-    } else if (verdictName.toLowerCase().includes(agentBName.toLowerCase())) {
+    } else if (vn.includes(bN) || bN.includes(vn)) {
       favouredAgentId = agentBId;
     }
   }
