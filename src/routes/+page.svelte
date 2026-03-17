@@ -601,6 +601,7 @@
         {leftAgentId}
         {agentA}
         {agentB}
+        {docAnalysisMode}
         bind:chatEl
       />
     </div>

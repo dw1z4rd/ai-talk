@@ -16,6 +16,7 @@
     leftAgentId: string;
     agentA: string;
     agentB: string;
+    docAnalysisMode?: boolean;
     chatEl: HTMLElement | null;
   }
 
@@ -31,6 +32,7 @@
     leftAgentId,
     agentA,
     agentB,
+    docAnalysisMode = false,
     chatEl = $bindable(null),
   }: Props = $props();
 </script>
@@ -77,7 +79,47 @@
         class="flex flex-col items-center justify-center gap-8 flex-1 py-16 px-6"
       >
         <div class="flex items-center gap-8">
-          <div class="flex flex-col items-center gap-2.5">
+          {#if docAnalysisMode}
+            <!-- Doc mode: document icon + auditor -->
+            <div class="flex flex-col items-center gap-2.5">
+              <div
+                class="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg border border-[--color-border]"
+                style="background: #94a3b822"
+              >
+                <svg class="w-7 h-7 text-[#94a3b8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <span class="text-xs font-semibold text-center max-w-[100px] leading-snug text-[#94a3b8]"
+                >Document</span
+              >
+            </div>
+
+            <div class="flex flex-col items-center gap-1">
+              <span class="text-[11px] font-bold uppercase tracking-[0.4em] text-[#ef4444]/60">audit</span>
+              <div class="flex gap-1">
+                <span class="w-1 h-1 rounded-full bg-[--color-border]"></span>
+                <span class="w-1 h-1 rounded-full bg-[--color-border]"></span>
+                <span class="w-1 h-1 rounded-full bg-[--color-border]"></span>
+              </div>
+            </div>
+
+            <div class="flex flex-col items-center gap-2.5">
+              <div
+                class="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg"
+                style="background: linear-gradient(135deg, {getModelInfo(agentB).color}22, {getModelInfo(agentB).color}08); color: {getModelInfo(agentB).color}; border: 1px solid {getModelInfo(agentB).color}30"
+              >
+                {getModelInfo(agentB).name[0]}
+              </div>
+              <span
+                class="text-xs font-semibold text-center max-w-[100px] leading-snug"
+                style="color: {getModelInfo(agentB).color}"
+                >{getModelInfo(agentB).name}</span
+              >
+            </div>
+          {:else}
+            <div class="flex flex-col items-center gap-2.5">
             <div
               class="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg"
               style="background: linear-gradient(135deg, {getModelInfo(
@@ -124,10 +166,15 @@
               >{getModelInfo(agentB).name}</span
             >
           </div>
+          {/if}
         </div>
         <p class="text-sm text-[--color-muted] text-center">
-          Hit <span class="text-white font-semibold">Start debate</span> to begin
-          · Ctrl+Enter
+          {#if docAnalysisMode}
+            Hit <span class="text-white font-semibold">Analyse</span> to begin · Ctrl+Enter
+          {:else}
+            Hit <span class="text-white font-semibold">Start debate</span> to begin
+            · Ctrl+Enter
+          {/if}
         </p>
       </div>
     {/if}
