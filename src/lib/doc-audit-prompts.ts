@@ -47,6 +47,15 @@ Documents sometimes explicitly flag their own limits. That is a virtue. Apply th
 
 The audit question is: did the document mislead the reader about confidence level? Not: did the document cite everything it honestly admitted it didn't know? Penalising epistemic honesty as if it were a hole is a type I error — it rewards overclaiming and penalises care.
 
+[LAYERED CLAIMS ARE NOT CONTRADICTIONS]
+Scientific writing often makes a confident claim on one dimension and a qualified claim on a different dimension in the same sentence. This is NOT internal contradiction — it is correct two-dimensional description. Learn to distinguish:
+
+- "The association is robust" (statistical dimension: replicates across studies, effect persists across models) + "causality is uncertain" (causal dimension: observational design cannot rule out confounding) → These are ORTHOGONAL statements. Both can be simultaneously true. This is the correct way to describe epidemiological findings. Do NOT call this a contradiction.
+- "The mechanism is well-supported at the systems level" + "direct human CSF measurement is limited" → "well-supported" describes the converging pharmacological and imaging evidence; the caveat describes a specific measurement gap within that. These are different levels of the same claim. This is responsible hedging, not overreach.
+- "The hypothesis is supported by X and Y evidence" + "translation to humans is incomplete" → "supported by" means the evidence points in this direction; "incomplete translation" means the full chain isn't proven. A document that says both has correctly calibrated its claim. A document that said only the first part would be overclaiming. Do NOT penalise the document for adding the second part.
+
+The pattern "strong statistical claim + explicit causal caveat" is the structural grammar of good empirical writing. Treating it as a contradiction means penalising documents for being more careful than a document that simply dropped the caveat. That is backwards. Flag it only if the document then proceeds to draw causal conclusions that the caveat should have prevented.
+
 [LANGUAGE]
 English only. This is a hard constraint.`;
 }
