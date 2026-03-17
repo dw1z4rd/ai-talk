@@ -15,6 +15,7 @@
     narrativeVerdict: any;
     liveJudgeResults: any[];
     scoreDeltas?: Record<number, number>;
+    agentOverrides?: Record<string, { name: string; color: string }>;
     onreset: () => void;
   }
 
@@ -30,8 +31,16 @@
     narrativeVerdict,
     liveJudgeResults,
     scoreDeltas = {},
+    agentOverrides = {},
     onreset,
   }: Props = $props();
+
+  function resolveAgent(id: string): { id: string; name: string; color: string } {
+    if (id === "tie") return { id: "tie", name: "Draw", color: "#6b7280" };
+    const override = agentOverrides[id];
+    if (override) return { id, ...override };
+    return getModelInfo(id);
+  }
 
   function exportDebate(format: "md" | "txt") {
     const date = new Date().toISOString().slice(0, 10);
@@ -44,8 +53,8 @@
     let mime: string;
     let ext: string;
 
-    const agentAInfo = getModelInfo(agentA);
-    const agentBInfo = getModelInfo(agentB);
+    const agentAInfo = resolveAgent(agentA);
+    const agentBInfo = resolveAgent(agentB);
 
     if (format === "md") {
       content = `# Debate: ${topic}\n\n_Exported ${date}_\n\n---\n\n`;
@@ -57,9 +66,9 @@
         content += "\n\n---\n\n## Live Judge Analysis\n\n";
         content += pairwiseRounds
           .map((round) => {
-            const logicWinnerName = getWinnerInfo(round.logicWinner).name;
-            const tacticsWinnerName = getWinnerInfo(round.tacticsWinner).name;
-            const rhetoricWinnerName = getWinnerInfo(round.rhetoricWinner).name;
+            const logicWinnerName = resolveAgent(round.logicWinner).name;
+            const tacticsWinnerName = resolveAgent(round.tacticsWinner).name;
+            const rhetoricWinnerName = resolveAgent(round.rhetoricWinner).name;
             let roundMd =
               `### Round ${round.roundNumber} · T${round.prevTurn.turnNumber} (${round.prevTurn.agentName}) vs T${round.curTurn.turnNumber} (${round.curTurn.agentName})\n\n` +
               `**Logic:** ${logicWinnerName} · **Tactics:** ${tacticsWinnerName} · **Rhetoric:** ${rhetoricWinnerName}\n\n` +
@@ -74,7 +83,7 @@
                   const leader =
                     f.absoluteScoreLeader === "tie"
                       ? "Draw"
-                      : getModelInfo(f.absoluteScoreLeader).name;
+                      : resolveAgent(f.absoluteScoreLeader).name;
                   return `⚠ **${f.dimension.charAt(0).toUpperCase() + f.dimension.slice(1)}**: absolute scores indicate ${leader} (gap ${f.divergenceMagnitude})`;
                 })
                 .join(" · ");
@@ -142,7 +151,7 @@
           const logicCell = delta
             ? `${s.logicalCoherence} _(${delta > 0 ? '+' : ''}${delta})_`
             : `${s.logicalCoherence}`;
-          content += `| T${r.turnNumber} | ${getModelInfo(r.agentId).name} | ${logicCell} | ${s.rhetoricalForce} | ${s.tacticalEffectiveness} | ${liveTotal} |\n`;
+          content += `| T${r.turnNumber} | ${resolveAgent(r.agentId).name} | ${logicCell} | ${s.rhetoricalForce} | ${s.tacticalEffectiveness} | ${liveTotal} |\n`;
         });
       }
 
@@ -158,7 +167,7 @@
           .map((round) => {
             let line =
               `[Round ${round.roundNumber}  T${round.prevTurn.turnNumber}:${round.prevTurn.agentName} vs T${round.curTurn.turnNumber}:${round.curTurn.agentName}]\n` +
-              `Logic: ${getWinnerInfo(round.logicWinner).name}  Tactics: ${getWinnerInfo(round.tacticsWinner).name}  Rhetoric: ${getWinnerInfo(round.rhetoricWinner).name}\n${round.logicDelta}`;
+              `Logic: ${resolveAgent(round.logicWinner).name}  Tactics: ${resolveAgent(round.tacticsWinner).name}  Rhetoric: ${resolveAgent(round.rhetoricWinner).name}\n${round.logicDelta}`;
             const dimFlags = (round.harmonizationFlags ?? []).filter(
               (f: any) => f.dimension !== "overall",
             );
@@ -170,7 +179,7 @@
                     const leader =
                       f.absoluteScoreLeader === "tie"
                         ? "Draw"
-                        : getModelInfo(f.absoluteScoreLeader).name;
+                        : resolveAgent(f.absoluteScoreLeader).name;
                     return `${f.dimension} → absolute: ${leader} (gap ${f.divergenceMagnitude})`;
                   })
                   .join(", ");
@@ -197,7 +206,7 @@
         const arcLabel = narrativeVerdict.agreesWithScorecard ? "NARRATIVE VERDICT" : "NARRATIVE VERDICT  ⚡ ARC DIVERGES";
         content += `${"═".repeat(40)}\n${arcLabel}\n\n${narrativeVerdict.text}\n`;
         if (narrativeVerdict.favouredAgentId) {
-          content += `\nVerdict: ${getModelInfo(narrativeVerdict.favouredAgentId).name}\n`;
+          content += `\nVerdict: ${resolveAgent(narrativeVerdict.favouredAgentId).name}\n`;
         }
         if (!narrativeVerdict.agreesWithScorecard && narrativeVerdict.conflictResolution) {
           const splitHeader = narrativeVerdict.scorecardInternallyConsistent === false
@@ -226,7 +235,7 @@
           const liveTotal = s.logicalCoherence + s.rhetoricalForce + s.tacticalEffectiveness;
           const delta = scoreDeltas[r.turnNumber];
           const logicStr = delta ? `${s.logicalCoherence}(${delta > 0 ? '+' : ''}${delta})` : `${s.logicalCoherence}`;
-          content += `T${r.turnNumber}  ${getModelInfo(r.agentId).name}  Logic:${logicStr}/40  Rhetoric:${s.rhetoricalForce}/30  Tactics:${s.tacticalEffectiveness}/30  Score:${liveTotal}\n`;
+          content += `T${r.turnNumber}  ${resolveAgent(r.agentId).name}  Logic:${logicStr}/40  Rhetoric:${s.rhetoricalForce}/30  Tactics:${s.tacticalEffectiveness}/30  Score:${liveTotal}\n`;
         });
         content += "\n";
       }
@@ -283,9 +292,9 @@
       scoreHtml += `<hr style="margin:2rem 0;border:none;border-top:1px solid #ddd">`;
       scoreHtml += `<h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem;letter-spacing:0.05em">Live Judge Analysis</h2>`;
       for (const round of pairwiseRounds) {
-        const logicW = getWinnerInfo(round.logicWinner).name;
-        const tacW = getWinnerInfo(round.tacticsWinner).name;
-        const rhetW = getWinnerInfo(round.rhetoricWinner).name;
+        const logicW = resolveAgent(round.logicWinner).name;
+        const tacW = resolveAgent(round.tacticsWinner).name;
+        const rhetW = resolveAgent(round.rhetoricWinner).name;
         scoreHtml += `<div style="margin-bottom:1rem;padding:0.75rem;background:#f7f7fb;border-radius:6px;font-size:0.82rem">`;
         scoreHtml += `<div style="font-weight:700;margin-bottom:0.4rem">Round ${round.roundNumber} · T${round.prevTurn.turnNumber} (${escapeHtml(round.prevTurn.agentName)}) vs T${round.curTurn.turnNumber} (${escapeHtml(round.curTurn.agentName)})</div>`;
         scoreHtml += `<div style="margin-bottom:0.3rem"><strong>Logic:</strong> ${escapeHtml(logicW)} &nbsp;·&nbsp; <strong>Tactics:</strong> ${escapeHtml(tacW)} &nbsp;·&nbsp; <strong>Rhetoric:</strong> ${escapeHtml(rhetW)}</div>`;

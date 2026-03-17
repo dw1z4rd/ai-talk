@@ -805,6 +805,10 @@ export class LiveJudgeSystem {
         controller.signal,
       ).finally(() => clearTimeout(timer));
 
+      // Strip CJK characters that may leak through from non-English judge models.
+      const cjkPattern = /[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g;
+      verdict.text = verdict.text.replace(cjkPattern, "").replace(/  +/g, " ").trim();
+
       // Compute scorecard internal consistency unconditionally — the round-count leader
       // (overallWinner) and cumulative-points leader may differ even when the narrative
       // agrees with the round-count winner. Both splits must always be surfaced.
@@ -873,9 +877,9 @@ export class LiveJudgeSystem {
             claimedOverridePattern,
             adjController.signal,
           ).finally(() => clearTimeout(adjTimer));
-          const trimmedConflictResolution = conflictResolutionText.trim();
-          if (trimmedConflictResolution.length > 0) {
-            verdict.conflictResolution = trimmedConflictResolution;
+          const cjkClean = conflictResolutionText.replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, "").replace(/  +/g, " ").trim();
+          if (cjkClean.length > 0) {
+            verdict.conflictResolution = cjkClean;
           }
         } catch {
           // Adjudication failed — non-critical

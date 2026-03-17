@@ -351,7 +351,8 @@
             ];
 
             if (data.pairwiseRound) {
-              pairwiseRounds = [...pairwiseRounds, data.pairwiseRound];
+              pairwiseRounds = [...pairwiseRounds, data.pairwiseRound]
+                .sort((a, b) => a.roundNumber - b.roundNumber);
             }
 
             if (
@@ -613,6 +614,7 @@
     {narrativeVerdict}
     {liveJudgeResults}
     {scoreDeltas}
+    agentOverrides={docAnalysisMode ? { [agentA]: { name: "Document", color: "#94a3b8" } } : {}}
     onreset={resetConversation}
   />
 {/if}
