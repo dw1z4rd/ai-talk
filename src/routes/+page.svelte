@@ -218,6 +218,13 @@
     done = false;
     isPaused = false;
     errorMsg = "";
+
+    // Guard: doc mode requires document content
+    if (docAnalysisMode && !documentText.trim()) {
+      errorMsg = "Paste or upload a document before analysing.";
+      return;
+    }
+
     running = true;
     typingAgentName = "";
     typingAgentColor = "";
