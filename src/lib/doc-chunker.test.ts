@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitDocumentIntoChunks } from "./doc-chunker";
+import { splitDocumentIntoChunks, stripBackmatter } from "./doc-chunker";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -154,5 +154,74 @@ describe("splitDocumentIntoChunks — heading section exceeds ceiling", () => {
     const result = splitDocumentIntoChunks(bigSection, 30);
     // Should be more than one chunk since section exceeds 30 words
     expect(result.length).toBeGreaterThan(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Backmatter stripping (References, Bibliography, Works Cited)
+// ---------------------------------------------------------------------------
+
+describe("stripBackmatter", () => {
+  it("strips a ## References section and everything after it", () => {
+    const text = `## Introduction\nSome content.\n\n## References\nAuthor (2020). Journal.`;
+    const result = stripBackmatter(text);
+    expect(result).toContain("Introduction");
+    expect(result).not.toContain("References");
+    expect(result).not.toContain("Author (2020)");
+  });
+
+  it("strips a plain 'References' line (no heading markers)", () => {
+    const text = `Body text here.\n\nReferences\nSmith et al. (2019).`;
+    const result = stripBackmatter(text);
+    expect(result).toContain("Body text here");
+    expect(result).not.toContain("Smith et al");
+  });
+
+  it("strips a Bibliography section", () => {
+    const text = `Content.\n\n## Bibliography\nEntry one.`;
+    const result = stripBackmatter(text);
+    expect(result).not.toContain("Bibliography");
+    expect(result).not.toContain("Entry one");
+  });
+
+  it("strips a Works Cited section", () => {
+    const text = `Content.\n\n## Works Cited\nEntry one.`;
+    const result = stripBackmatter(text);
+    expect(result).not.toContain("Works Cited");
+  });
+
+  it("is case-insensitive", () => {
+    const text = `Content.\n\n## REFERENCES\nEntry.`;
+    expect(stripBackmatter(text)).not.toContain("REFERENCES");
+  });
+
+  it("returns the original text unchanged when no backmatter is present", () => {
+    const text = `Section one.\n\nSection two.`;
+    expect(stripBackmatter(text)).toBe(text);
+  });
+
+  it("does not strip 'references' embedded mid-sentence", () => {
+    const text = `This study references prior work.\n\nConclusion here.`;
+    // "references" here is a verb mid-sentence preceded by a non-newline char
+    // The regex matches only after a newline — so this should be untouched
+    expect(stripBackmatter(text)).toBe(text);
+  });
+});
+
+describe("splitDocumentIntoChunks — backmatter excluded from chunks", () => {
+  it("does not produce a chunk for the references section", () => {
+    const text = `## Introduction\nSome substantive claim here.\n\n## References\nSmith (2020). Journal of Things.`;
+    const chunks = splitDocumentIntoChunks(text);
+    const hasRefChunk = chunks.some(
+      (c) =>
+        c.includes("Smith (2020)") || c.toLowerCase().includes("## references"),
+    );
+    expect(hasRefChunk).toBe(false);
+  });
+
+  it("retains the content sections before the references", () => {
+    const text = `## Findings\nKey result A.\n\n## References\nAuthor (2021).`;
+    const chunks = splitDocumentIntoChunks(text);
+    expect(chunks.some((c) => c.includes("Key result A"))).toBe(true);
   });
 });

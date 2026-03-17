@@ -8,6 +8,18 @@
  *   3. Word ceiling (default 600 words) with sentence-boundary guard —
  *      never cuts mid-sentence; finds the nearest period before the ceiling
  */
+/**
+ * Strips backmatter sections (References, Bibliography, Works Cited, etc.)
+ * from a document string. These sections contain no auditable claims and
+ * should not be fed into the scoring pipeline.
+ */
+export function stripBackmatter(text: string): string {
+  const backmatterRe =
+    /\n#{0,3}\s*(references|bibliography|works\s+cited|sources|further\s+reading)\b/i;
+  const idx = text.search(backmatterRe);
+  return idx >= 0 ? text.slice(0, idx) : text;
+}
+
 export function splitDocumentIntoChunks(
   text: string,
   maxWords = 600,
@@ -15,14 +27,17 @@ export function splitDocumentIntoChunks(
   // Normalize line endings (CRLF → LF) so Windows uploads split correctly
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
+  // Strip backmatter (References, Bibliography, etc.) — not auditable claims
+  const body = stripBackmatter(normalized);
+
   // Step 1: try section headings (# / ## / ###)
   let sections: string[] = [];
-  if (/\n#{1,3} /.test(normalized)) {
-    sections = normalized.split(/\n(?=#{1,3} )/).filter((s) => s.trim());
+  if (/\n#{1,3} /.test(body)) {
+    sections = body.split(/\n(?=#{1,3} )/).filter((s) => s.trim());
   }
   // Step 2: fall back to double-newline paragraph splits
   if (sections.length <= 1) {
-    sections = normalized.split(/\n{2,}/).filter((s) => s.trim());
+    sections = body.split(/\n{2,}/).filter((s) => s.trim());
   }
 
   // Step 3: apply word ceiling with sentence-boundary guard
