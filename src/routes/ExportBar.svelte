@@ -112,7 +112,7 @@
           "\n\n---\n\n## Narrative Verdict\n_Arc-level: rewards cumulative thesis coherence_\n\n";
         content += narrativeVerdict.text + "\n";
         if (narrativeVerdict.favouredAgentId) {
-          content += `\n**Verdict: ${getModelInfo(narrativeVerdict.favouredAgentId).name}**\n`;
+          content += `\n**Verdict: ${resolveAgent(narrativeVerdict.favouredAgentId).name}**\n`;
         }
         if (!narrativeVerdict.agreesWithScorecard && narrativeVerdict.favouredAgentId && finalScorecard?.overallWinner && narrativeVerdict.favouredAgentId !== finalScorecard.overallWinner) {
           content += `\n> ⚡ Narrative verdict disagrees with the round-by-round scorecard.\n`;
