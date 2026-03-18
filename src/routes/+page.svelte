@@ -53,6 +53,24 @@
     return () => ro.disconnect();
   });
 
+  let rightColEl = $state<HTMLElement | null>(null);
+  let rightColTop = $state(0);
+  $effect(() => {
+    const el = rightColEl;
+    if (!el) return;
+    const measure = () => { rightColTop = el.getBoundingClientRect().top + window.scrollY; };
+    measure();
+    window.addEventListener('resize', measure, { passive: true });
+    return () => window.removeEventListener('resize', measure);
+  });
+
+  let rightColStyle = $derived(
+    [
+      rightColTop > 0 ? `min-height: calc(100dvh - ${rightColTop}px)` : 'min-height: 32rem',
+      showLiveJudgePanel && leftColHeight > 0 ? `height: ${leftColHeight}px` : '',
+    ].filter(Boolean).join('; ')
+  );
+
   let agentA = $state("kimi-k2.5:cloud");
   let agentB = $state("qwen3-next:80b-cloud");
   let leftAgentId = $state("qwen3-next:80b-cloud");
@@ -581,7 +599,7 @@
     {/if}
 
     <!-- RIGHT COLUMN: debate setup + live chat -->
-    <div class="right-col" style={showLiveJudgePanel && leftColHeight > 0 ? `height: ${leftColHeight}px` : ''}>
+    <div class="right-col" bind:this={rightColEl} style={rightColStyle}>
       <DebateSetup
         bind:topic
         bind:turns
@@ -673,7 +691,6 @@
     width: 45vw;
     max-width: 760px;
     min-width: min(280px, 100%);
-    min-height: 32rem;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
