@@ -70,8 +70,8 @@
   <!-- Chat body -->
   <div
     bind:this={chatEl}
-    class="flex flex-col overflow-y-auto scroll-smooth"
-    style="min-height: 24rem; max-height: 68vh"
+    class="flex flex-col overflow-y-auto scroll-smooth flex-1"
+    style="min-height: 24rem"
   >
     <!-- Empty state -->
     {#if messages.length === 0 && !running}

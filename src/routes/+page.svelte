@@ -643,7 +643,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 1.25rem;
-    align-items: start;
+    align-items: stretch;
     justify-content: center;
   }
 
