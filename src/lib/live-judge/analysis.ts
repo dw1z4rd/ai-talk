@@ -268,7 +268,7 @@ export function generatePairwiseSystemPrompt(
   return `You are a comparative debate judge. Read two consecutive turns and pick the stronger one on three dimensions. No draws — you must choose one winner per dimension. Respond with a single JSON object only — no preamble, no markdown.
 
 Required format (use exact agent names as shown):
-{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn. For missing causal mechanisms, name which element was absent — e.g. 'stated how X produces Y but omitted why the mechanism holds under competitive markets' or 'gave mechanism but no measurable consequence.' For timeline violations, name the technology/concept and note it clearly postdates the phenomenon. Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn was more persuasive across all four components and why.","mechanism_delta":"1-2 sentences on mechanism quality for BOTH turns. For each, state which elements of the cause→process→measurable consequence chain were present or absent.","mechanism_failures":[],"suspect_claims":[],"epistemic_note":null,"counterfactual_agent":null,"counterfactual_summary":null,"resolved_flags":[],"flag_updates":[]}
+{"logic_winner":"${nameA}","tactics_winner":"${nameB}","rhetoric_winner":"${nameA}","logic_delta":"2-3 sentences. Name the SPECIFIC logical failure in the weaker turn. For missing causal mechanisms, name which element was absent — e.g. 'stated how X produces Y but omitted why the mechanism holds under competitive markets' or 'gave mechanism but no measurable consequence.' For timeline violations, name the technology/concept and note it clearly postdates the phenomenon. Do NOT write vague phrases like 'unsupported premise' — articulate the gap.","tactics_delta":"1-2 sentences on which turn controlled the exchange and why.","rhetoric_delta":"1 sentence on which turn was more persuasive across all four components and why.","mechanism_delta":"1-2 sentences on mechanism quality for BOTH turns. For each, state which elements of the cause→process→measurable consequence chain were present or absent.","mechanism_failures":[],"suspect_claims":[],"fabricated_claims":[],"epistemic_note":null,"counterfactual_agent":null,"counterfactual_summary":null,"resolved_flags":[],"flag_updates":[]}
 
 --- LOGIC (forced choice) ---
 Start each turn from 8. Apply deductions:
@@ -341,12 +341,25 @@ HYPOTHETICAL FIGURES IN COUNTERFACTUALS: A specific number or percentage used to
 --- CLAIM AUDITABILITY ---
 For every concrete factual or empirical assertion in either turn that you considered penalizing for hollow specificity — whether or not you ultimately docked a point — add an entry to suspect_claims using the format "AgentName: [exact or close quote of the claim]". This creates an auditable record that can be reviewed independently of the scoring decision. Empty array if no such claims appeared in either turn.
 
+--- FABRICATION AUDIT ---
+fabricated_claims is a strict subset of suspect_claims reserved for claims that are demonstrably false in a specific, documentable way — not merely unverified or ungrounded:
+- Historically inverted: the claim presents X as causing Y, but X was formalized or discovered AFTER Y was already observed (e.g. claiming a mathematical formalism caused the natural phenomenon it was later derived to describe)
+- Causally backwards: the effect is presented as the cause (e.g. claiming shell geometry proves mathematical governance when the geometry is what led to the mathematical description)
+- Inverted study/result: the claim attributes a conclusion to a body of research that demonstrates the opposite
+
+Distinction:
+  suspect_claims = "this claim is unverified or mechanistically hollow — may be true but lacks a grounding chain"
+  fabricated_claims = "this claim is factually false in a specific, nameable way"
+
+Any entry in fabricated_claims MUST also appear in suspect_claims. Use the same "AgentName: claim text" format.
+In the OPEN FLAGS system: unverified/hollow claims → -1 retroactive penalty. Fabricated claims → mandatory -2 retroactive penalty (or -3 when the false claim is the load-bearing premise of the turn's entire argument).
+
 --- EPISTEMIC DISCIPLINE ---
 Set epistemic_note to a 1-sentence observation if either agent made strong empirical claims without appropriately acknowledging evidentiary limits — for example, stating contested statistics as settled fact, invoking unnamed research as authoritative, or asserting causal relationships as proven without hedging. This field is non-scoring: it is a qualitative flag for arc-level narrative analysis. Set to null if both agents reasoned responsibly about uncertainty.
 
 --- OPEN FLAGS (retroactive correction) ---
 If an OPEN FLAGS block appears in the prompt, it lists hollow claims from prior turns that have not yet been penalized on the originating turn's absolute score.
-(a) For each open flag attributed to TURN A (the prevTurn): if the claim remains unsubstantiated, emit a flag_update. Set delta_raw to -1 (or -2 for severe cases: fabricated statistic, named study with zero mechanism). Always use negative values for penalties. Set update_type to "penalty". Set target_turn to the originating turn number shown in the flag entry (e.g. T3 → target_turn: 3).
+(a) For each open flag attributed to TURN A (the prevTurn): if the claim remains unsubstantiated, emit a flag_update. For FABRICATED flags (marked [FABRICATED] in the OPEN FLAGS block), set delta_raw to -2. For UNVERIFIED flags, set delta_raw to -1. Severe fabrications that are the load-bearing premise of the turn may use -3. Always use negative values for penalties. Set update_type to "penalty". Set target_turn to the originating turn number shown in the flag entry (e.g. T3 → target_turn: 3).
 (b) If TURN B (curTurn) explicitly substantiates a previously-flagged claim — supplying the missing mechanism chain — emit a flag_update with delta_raw +1, update_type "partial_restore". Set target_turn to the ORIGINATING turn number. Partial restore is capped at half the original penalty magnitude: if penalty was -2, the maximum restore is +1.
 (c) Include flag_id exactly as given (no brackets) so the register can reconcile the entry.
 (d) If a flag was resolved (partial restore applied or the agent clearly addressed it), add the flag_id to resolved_flags.
@@ -402,7 +415,17 @@ export function generatePairwisePrompt(
     ) ?? [];
   const openFlagsNote =
     prevTurnFlags.length > 0
-      ? `\n\nOPEN FLAGS (unresolved hollow claims from prior turns by ${nameA}):\n${prevTurnFlags.map((f) => `- [${f.flagId}] T${f.originTurn}: "${f.claim}" — mechanism absent [UNRESOLVED]`).join("\n")}\nSee OPEN FLAGS section in the system prompt for instructions on how to handle these.`
+      ? `\n\nOPEN FLAGS (unresolved hollow claims from prior turns by ${nameA}):\n${prevTurnFlags
+          .map((f) => {
+            const tag =
+              f.claimType === "fabricated"
+                ? "[FABRICATED: mandatory -2]"
+                : "[UNVERIFIED: -1]";
+            return `- [${f.flagId}] T${f.originTurn} ${tag}: "${f.claim}" — mechanism absent [UNRESOLVED]`;
+          })
+          .join(
+            "\n",
+          )}\nSee OPEN FLAGS section in the system prompt for instructions on how to handle these.`
       : "";
 
   return `DEBATE TOPIC: ${topic}${openingNote}${previousDeltaNote}${openFlagsNote}
@@ -560,6 +583,12 @@ function parsePairwiseResponse(
             .map((x: string) => x.trim())
             .filter((x: string) => x.length > 0)
         : undefined,
+      fabricatedClaims: Array.isArray(data.fabricated_claims)
+        ? data.fabricated_claims
+            .filter((x: unknown) => typeof x === "string")
+            .map((x: string) => x.trim())
+            .filter((x: string) => x.length > 0)
+        : undefined,
       epistemicNote:
         typeof data.epistemic_note === "string" &&
         data.epistemic_note.trim() !== "null" &&
@@ -610,7 +639,8 @@ function parsePairwiseResponse(
               const agentId = prevAgentId;
               if (!flagId || targetTurn === null || deltaRaw === null)
                 return null;
-              // Clamp: penalties must be negative, restores positive, raw magnitude ≤ 3
+              // Clamp: penalties must be negative, restores positive, raw magnitude ≤ 3.
+              // For penalties, allow -2 and -3 (fabricated/severe claims) — do not cap at -1.
               const clampedDelta =
                 updateType === "penalty"
                   ? Math.max(-3, Math.min(-1, deltaRaw))
@@ -682,6 +712,7 @@ function createFallbackPairwiseRound(
     mechanismDelta: undefined,
     mechanismFailures: undefined,
     suspectClaims: undefined,
+    fabricatedClaims: undefined,
     epistemicNote: undefined,
     counterfactualDetected: undefined,
     languageWarning,
@@ -825,28 +856,58 @@ export function reconcileRoundWinners(
   const rawTactics = round.tacticsWinnerRaw ?? round.tacticsWinner;
   const rawRhetoric = round.rhetoricWinnerRaw ?? round.rhetoricWinner;
 
-  const reconcile = (rawWinner: string, curScore: number, prevScore: number) =>
-    curScore === prevScore ? "tie" : rawWinner;
+  const prevId = round.prevTurn.agentId;
+  const curId = round.curTurn.agentId;
+
+  /**
+   * Reconciliation decision for one dimension:
+   * - Equal absolute scores → "tie" (no win counted for either agent)
+   * - Absolute gap ≥ threshold AND absolute leader ≠ pairwise winner → use absolute leader
+   *   (prevents the two scoring systems from publicly contradicting each other)
+   * - Otherwise → retain the pairwise winner's judgment
+   */
+  const reconcile = (
+    rawWinner: string,
+    curScore: number,
+    prevScore: number,
+    threshold: number,
+  ): string => {
+    if (curScore === prevScore) return "tie";
+    const gap = Math.abs(curScore - prevScore);
+    const absoluteLeader = curScore > prevScore ? curId : prevId;
+    if (rawWinner !== absoluteLeader && gap >= threshold) {
+      console.warn(
+        `[Reconcile] R${round.roundNumber}: absolute gap ${gap} ≥ ${threshold} overrides pairwise winner ${rawWinner} → ${absoluteLeader}`,
+      );
+      return absoluteLeader;
+    }
+    return rawWinner;
+  };
 
   return {
     ...round,
     logicWinnerRaw: rawLogic,
     tacticsWinnerRaw: rawTactics,
     rhetoricWinnerRaw: rawRhetoric,
+    // Logic scale 0-40: threshold 8 (≥20% of scale — meaningful signal, not noise)
     logicWinner: reconcile(
       rawLogic,
       curAbsolute.logicalCoherence,
       prevAbsolute.logicalCoherence,
+      8,
     ),
+    // Tactics/Rhetoric scale 0-30: threshold 5 (≥16% of scale)
     tacticsWinner: reconcile(
       rawTactics,
       curAbsolute.tacticalEffectiveness,
       prevAbsolute.tacticalEffectiveness,
+      5,
     ),
     rhetoricWinner: reconcile(
       rawRhetoric,
       curAbsolute.rhetoricalForce,
       prevAbsolute.rhetoricalForce,
+      5,
     ),
   };
 }
@@ -1138,7 +1199,9 @@ Rules:
 - Do not be diplomatic. Pick a winner and explain why.
 - In your verdict paragraph, explicitly reference at least one specific argument failure named in the PAIRWISE REASONING section — quote or closely paraphrase the finding. Do not invent failures that do not appear there.
 - The EPISTEMIC NOTES document patterns of unhedged empirical assertion across rounds. If one agent shows a consistent pattern of confident factual claims without evidential acknowledgment, treat this as a material quality signal at arc-level — it should inform your coherence assessment in Paragraph 1 even if individual rounds were not penalized.
-- The pairwise scorecard is the authoritative record of turn-by-turn argument quality. Treat it as presumptively correct. You may diverge with your arc-level verdict only if you identify and explicitly name one of three specific patterns: COHERENCE COLLAPSE (a debater won pairwise rounds but accumulated contradictions that hollow out the position), RECOVERY ARC (a debater fell behind on the scorecard but drove a decisive reframe that resolved the debate's core tension), or ASYMMETRIC DEPTH (one debater's wins were concentrated in logic while the other's were purely tactical or rhetorical — and the debate's motion rewards one over the other). If none of these patterns is present, your verdict must agree with the scorecard leader. When invoking an override pattern, name it explicitly in Paragraph 3.
+- Your narrative verdict is the primary arc verdict — write it based on your independent assessment of argumentative arc quality, position coherence under pressure, and whether core claims survived scrutiny. The pairwise scorecard documents turn-by-turn wins and is a key input, but it is not presumptively correct as arc-level evidence.
+- If your verdict diverges from the scorecard leader, name the override pattern that explains why the scorecard alone is an incomplete picture: COHERENCE COLLAPSE (the scorecard winner accumulated contradictions that hollow out the position across the arc), RECOVERY ARC (the scorecard loser drove a late decisive reframe that resolved the debate's core tension), or ASYMMETRIC DEPTH (one debater's wins were concentrated in logic while the other's were purely tactical or rhetorical — and the debate's motion rewards logic depth over tactical breadth). Name the pattern explicitly in Paragraph 3.
+- If the divergence does not fit one of these named patterns exactly but the arc evidence still points away from the scorecard leader — for example, a consistent pattern of mechanism failures across winning rounds that the pairwise judge noted but did not penalize sufficiently, or an epistemic pattern of confident unhedged assertion that was present in the EPISTEMIC NOTES throughout — state this explicitly rather than forcing agreement with the scorecard.
 - At the very end, on its own line with nothing after, write exactly: VERDICT: ${nameA} OR VERDICT: ${nameB}`;
 }
 
@@ -1287,9 +1350,9 @@ export async function generateConflictResolution(
   let systemPrompt: string;
   if (claimedOverridePattern) {
     const def = patternDefinitions[claimedOverridePattern];
-    systemPrompt = `You are a meta-analyst adjudicating a conflict between two debate judging systems. The narrative verdict has invoked the ${claimedOverridePattern} override pattern to favour ${narrativeFavouredName} over the scorecard result. Your task is to assess whether that specific pattern is genuinely present. Write exactly 3 sentences: (1) Assess whether ${claimedOverridePattern} is actually evidenced in this debate — ${def}. State clearly whether the evidence supports or refutes this specific claim. (2) Which verdict is better supported given your assessment: if ${claimedOverridePattern} is confirmed, the narrative verdict stands; if it is not substantiated by the scorecard evidence, the scorecard result should stand. (3) What the losing verdict captured correctly despite the disagreement. Be specific. Do not hedge.`;
+    systemPrompt = `You are a meta-analyst examining a conflict between narrative arc judgment and the pairwise scorecard. The narrative verdict is the primary arc assessment; the scorecard is turn-by-turn evidence. The narrative has invoked the ${claimedOverridePattern} override pattern to favour ${narrativeFavouredName}. Write exactly 3 sentences: (1) Assess whether ${claimedOverridePattern} is actually evidenced — ${def}. State clearly whether the scorecard evidence supports or refutes this specific claim. (2) If the pattern is confirmed, the narrative verdict stands; if the scorecard evidence strongly and specifically contradicts the narrative at every point it cites, the scorecard result may be more reliable. (3) What the losing verdict captured correctly despite the disagreement. Be specific. Do not hedge.`;
   } else {
-    systemPrompt = `You are a meta-analyst adjudicating a conflict between two debate judging systems. The pairwise scorecard is the primary authoritative record of systematic turn-by-turn assessment. The narrative verdict may override it only when a specific arc-level pattern is present. Write exactly 3 sentences: (1) Identify which of the three valid override patterns applies — COHERENCE COLLAPSE (winner accumulated contradictions), RECOVERY ARC (loser drove a late decisive reframe), or ASYMMETRIC DEPTH (wins were concentrated in a single dimension misaligned with the motion) — or state that none is present. (2) Which verdict is better supported: if a named override pattern is present, the narrative verdict may stand; if none is present, the scorecard winner should stand. (3) What the losing verdict captured correctly despite picking the wrong winner. Be specific. Do not hedge.`;
+    systemPrompt = `You are a meta-analyst examining a conflict between narrative arc judgment and the pairwise scorecard. The narrative verdict is the primary arc assessment; the scorecard documents turn-by-turn wins. Write exactly 3 sentences: (1) Identify which of the three documentary patterns best explains the conflict — COHERENCE COLLAPSE (scorecard winner accumulated arc-level contradictions), RECOVERY ARC (scorecard loser drove a late decisive reframe), or ASYMMETRIC DEPTH (scorecard wins concentrated in a dimension misaligned with the motion) — or state that none is present, in which case identify whether the turn-level evidence specifically contradicts each claim the narrative makes or merely disagrees on aggregate. (2) If a pattern is confirmed, or if the narrative's specific arc-level observations are not contradicted by the per-round record, the narrative verdict stands; only override the narrative if the scorecard evidence directly rebuts each specific arc claim the narrative makes. (3) What the losing verdict captured correctly despite picking the wrong winner. Be specific. Do not hedge.`;
   }
 
   const prompt = `SCORECARD WINNER: ${scorecardWinnerName}
@@ -1554,6 +1617,12 @@ Evaluate on four equally-weighted components in aggregate:
 ANTI-PUNCHINESS: Expression quality carries ONE vote out of four. Do not reward stylistic energy as a proxy for persuasive quality.
 SERVICE TEST: Do this turn's rhetorical choices make the argument clearer, more defensible, and more compelling — or do they substitute for argument structure? Vivid delivery that doesn't advance the core claim scores below plain expression that directly develops it.
 EXPRESSION CAP: If Expression quality alone (Component 1) would push the score above 6, but both Framing quality (Component 4) AND Structural clarity (Component 2) are weak, the overall score cannot exceed 6. Stylistic energy cannot override structural failure.
+
+--- RHETORIC CALIBRATION ANCHORS ---
+HIGH (8–9): All four components clearly above average. Strong structural signposting that makes the argument's sequence intuitive + concrete audience-facing stakes framing + a genuine reframe of the central question + clear, concise language. Requires at least 3 of 4 clearly strong. A score of 9 requires all four. A score of 10 is near-impossible — reserve for historically exceptional oratory.
+MID (5–6): Two or three components above baseline, one or two weak. Generic academic phrasing, functional structure, stakes mentioned but vague. Expression quality is good but framing is weak → 6. Framing is sharp but delivery is flat → 6. No component is notably strong → 5.
+LOW (3–4): One or zero components above average. Vague framing, no audience awareness, academic padding without structure. A score of 4 still finds something worth noting; a score of 3 is for turns that fail on all four components.
+ANTI-CLUSTERING: A rhetoric score of 7 across three or more consecutive turns is a reliable sign of anchoring bias — not analytical accuracy. If you find yourself at 7 repeatedly, perform the SERVICE TEST on each component individually. Assign 8+ only when at least 3 of 4 components earn it; assign 5–6 as the natural resting point for competent-but-unremarkable rhetoric. Identical scores across turns from different agents with different rhetorical profiles are a red flag — logic, tactics, and rhetoric are orthogonal dimensions and should vary independently.
 
 --- TACTICS (1–10) ---
 Opening turn: score on framing quality, min 5. Other turns: 9–10 targets a specific gap with a named move; 5–6 mostly restates position; 1–2 ignores opponent.

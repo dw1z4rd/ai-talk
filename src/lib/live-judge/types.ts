@@ -96,6 +96,13 @@ export interface PairwiseRound {
    */
   suspectClaims?: string[];
   /**
+   * Subset of suspectClaims that are demonstrably false — historically inverted, causally backwards,
+   * or citing a study whose conclusion is the reverse of what is claimed.
+   * These receive a mandatory -2 retroactive penalty instead of -1 for unverified claims.
+   * Attributed as "AgentName: claim text"; must also appear in suspectClaims.
+   */
+  fabricatedClaims?: string[];
+  /**
    * 1-sentence non-scoring note on epistemic responsibility: did either agent make confident
    * empirical claims without acknowledging evidentiary limits? undefined/null if both performed normally.
    */
@@ -135,6 +142,12 @@ export interface OpenFlag {
   originTurn: number;
   claim: string; // the hollow claim text
   status: "unresolved" | "penalized" | "resolved";
+  /**
+   * "fabricated" = demonstrably false (historically inverted, causally backwards, inverted study conclusion).
+   * "unverified" = hollow specificity without mechanism — claim may be true but is ungrounded.
+   * Fabricated claims receive a mandatory -2 retroactive penalty; unverified claims receive -1.
+   */
+  claimType?: "unverified" | "fabricated";
 }
 
 export type ClaimFlagRegister = OpenFlag[];
@@ -340,6 +353,12 @@ export interface LiveJudgePanel {
   claimFlagRegister: ClaimFlagRegister;
   /** Per-turn retroactive score adjustments accumulated across all rounds. */
   retroactiveDeltas: { [turnNumber: number]: Partial<JudgeScores> };
+  /**
+   * Turn number where mid-debate convergence was first detected (heuristic).
+   * Set once; never reset. The next processTurn call after this is set will
+   * emit a convergenceWarning in JudgeAnalysisResult.
+   */
+  convergenceDetectedTurn?: number;
 }
 
 export interface JudgeAnalysisResult {
@@ -375,6 +394,13 @@ export interface JudgeAnalysisResult {
    * Keyed by turn number; values are partial JudgeScores deltas (not absolute values).
    */
   retroactiveDeltas?: { [turnNumber: number]: Partial<JudgeScores> };
+  /**
+   * Set when mid-debate convergence is suspected: both debaters appear to have
+   * converged toward the same position, collapsing the motion into a definitional
+   * dispute. Consumers should surface this message prominently and may use it to
+   * signal the debate should re-anchor or conclude.
+   */
+  convergenceWarning?: string;
 }
 
 // Judge specialization configurations

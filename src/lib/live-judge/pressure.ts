@@ -306,6 +306,12 @@ const MECHANISM_DIRECTIVES = [
   "OVERRIDE: Your arguments are being penalized for hollow causal leaps. This turn: no claim without all three elements — what causes it, through what mechanism it occurs, and what you would measure as evidence. One tight mechanistic argument beats three incomplete ones.",
 ];
 
+const CONVERGENCE_DIRECTIVES = [
+  "DEBATE CONVERGENCE ALERT: The judge has detected that both debaters have converged toward similar positions, collapsing the motion into a definitional dispute. This turn, you must either (a) return explicitly to your original position on the core motion and defend it directly, or (b) acknowledge the convergence and concede the definitional ground while staking a substantive claim the motion still requires. Do not continue arguing tangential sub-questions.",
+  "POSITIONAL CONVERGENCE DETECTED: Both debaters are now arguing the same side of the core motion. The motion cannot be resolved if neither side defends it. This turn is your final opportunity to either re-anchor your position to the original motion or formally concede. The judges will score a failure to do either as a forfeit of the affected rounds.",
+  "JUDGE ALERT — MOTION COLLAPSE: The debate has drifted into a definitional dispute that does not resolve the original motion. Your next turn must directly address the core question — not reframe it, not concede sub-claims, but answer it. Name your position on the motion explicitly in your first sentence.",
+];
+
 function pickDirective(pool: string[], turnNumber: number): string {
   return pool[turnNumber % pool.length];
 }
@@ -316,15 +322,25 @@ function pickDirective(pool: string[], turnNumber: number): string {
  * Thresholds mirror pressure.ts calibration: logicalCoherence 0-40, rhetoricalForce 0-30,
  * tacticalEffectiveness 0-30, overallScore 0-100.
  *
- * @param opts.noCounterfactualYet   - Agent has not submitted a counterfactual and turn >= 4
- * @param opts.mechanismFailureLastRound - Agent was in mechanismFailures array last round
+ * @param opts.noCounterfactualYet        - Agent has not submitted a counterfactual and turn >= 4
+ * @param opts.mechanismFailureLastRound  - Agent was in mechanismFailures array last round
+ * @param opts.convergenceDetected        - Mid-debate convergence heuristic fired
  */
 export function generateHiddenDirective(
   scores: JudgeScores,
   turnNumber: number,
-  opts?: { noCounterfactualYet?: boolean; mechanismFailureLastRound?: boolean },
+  opts?: {
+    noCounterfactualYet?: boolean;
+    mechanismFailureLastRound?: boolean;
+    convergenceDetected?: boolean;
+  },
 ): string | undefined {
   // Severe logic weakness — highest priority
+  // Convergence detected — highest priority, overrides all other directives
+  if (opts?.convergenceDetected) {
+    return pickDirective(CONVERGENCE_DIRECTIVES, turnNumber);
+  }
+  // Severe logic weakness — highest remaining priority
   if (scores.logicalCoherence < 12) {
     return pickDirective(LOGIC_SEVERE_DIRECTIVES, turnNumber);
   }

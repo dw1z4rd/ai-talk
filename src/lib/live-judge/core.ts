@@ -100,6 +100,7 @@ export class LiveJudgeSystem {
       absoluteScoreHistory: {},
       claimFlagRegister: [],
       retroactiveDeltas: {},
+      convergenceDetectedTurn: undefined,
     };
   }
 
@@ -260,6 +261,23 @@ export class LiveJudgeSystem {
         // hollow claims still receive a penalty. The existing deduplication logic
         // prevents double-seeding when the next round re-encounters the same claim.
         if (pairwiseResult.suspectClaims && !pairwiseResult.isFallback) {
+          // Build a fast-lookup set of fabricated claim texts (format: "AgentName: text")
+          // so we can mark flags with claimType: "fabricated" when seeding.
+          const fabricatedClaimTexts = new Set<string>(
+            (pairwiseResult.fabricatedClaims ?? [])
+              .map((e) => {
+                const colonIdx = e.indexOf(":");
+                return colonIdx === -1
+                  ? ""
+                  : e
+                      .slice(colonIdx + 1)
+                      .trim()
+                      .toLowerCase()
+                      .slice(0, 80);
+              })
+              .filter((t) => t.length > 0),
+          );
+
           // ── Prev-turn agent flags ────────────────────────────────────────────
           let newFlagsSeeded = 0;
           // Filter to only prevAgent claims for the denominator displayed in the log.
@@ -293,6 +311,9 @@ export class LiveJudgeSystem {
                   f.agentId === prevAgentId && f.originTurn === prevTurnNumber,
               ).length;
               const flagId = `FLAG-T${prevTurnNumber}-${prevAgentId.replace(/[^a-z0-9]/gi, "").slice(0, 12)}-${claimIndex}`;
+              const isFabricated =
+                fabricatedClaimTexts.has(prefix80) ||
+                fabricatedClaimTexts.has(claimText.slice(0, 80).toLowerCase());
               this.panel.claimFlagRegister.push({
                 flagId,
                 agentId: prevAgentId,
@@ -300,7 +321,13 @@ export class LiveJudgeSystem {
                 originTurn: prevTurnNumber,
                 claim: claimText,
                 status: "unresolved",
+                claimType: isFabricated ? "fabricated" : "unverified",
               });
+              if (isFabricated) {
+                console.warn(
+                  `[Claim Flags] Fabricated claim flagged for ${prevAgentName} T${prevTurnNumber}: "${claimText.slice(0, 80)}"`,
+                );
+              }
               newFlagsSeeded++;
             }
           }
@@ -342,6 +369,10 @@ export class LiveJudgeSystem {
                 (f) => f.agentId === agent.id && f.originTurn === turnNumber,
               ).length;
               const flagId = `FLAG-T${turnNumber}-${agent.id.replace(/[^a-z0-9]/gi, "").slice(0, 12)}-${claimIndex}`;
+              const prefix80cur = claimText.slice(0, 80).toLowerCase();
+              const isFabricatedCur =
+                fabricatedClaimTexts.has(prefix80cur) ||
+                fabricatedClaimTexts.has(claimText.slice(0, 80).toLowerCase());
               this.panel.claimFlagRegister.push({
                 flagId,
                 agentId: agent.id,
@@ -349,6 +380,7 @@ export class LiveJudgeSystem {
                 originTurn: turnNumber,
                 claim: claimText,
                 status: "unresolved",
+                claimType: isFabricatedCur ? "fabricated" : "unverified",
               });
               curFlagsSeeded++;
             }
@@ -395,6 +427,12 @@ export class LiveJudgeSystem {
               const maxRestore = Math.abs(existingDelta) / 2;
               effectiveDelta = Math.min(deltaRaw, maxRestore);
               if (effectiveDelta <= 0) continue; // no meaningful restore
+            }
+
+            // For penalties on fabricated claims, enforce a minimum of -2 (on the 1-10 raw scale).
+            // The LLM is instructed to use -2 for fabricated flags, but clamp defensively here.
+            if (updateType === "penalty" && flag?.claimType === "fabricated") {
+              effectiveDelta = Math.min(effectiveDelta, -2); // ensure at least -2 severity
             }
 
             // Accumulate in retroactiveDeltas (values are deltas on the 0-40 scale)
@@ -691,12 +729,69 @@ export class LiveJudgeSystem {
       !this.panel.scorecard.counterfactualTrack?.[agent.id];
     const mechanismFailureLastRound =
       !!pairwiseRound?.mechanismFailures?.includes(agent.name);
+
+    // ── Mid-debate convergence heuristic ─────────────────────────────────────
+    // After turn 12, check whether the debate has collapsed into a definitional
+    // dispute by looking at the balance of wins across the last 8 non-fallback
+    // rounds. When neither agent has won a majority (balanced within 15% of total
+    // possible dimension wins) AND both agents have recent mechanism failures,
+    // convergence is suspected.
+    // Fire at most once per debate (convergenceDetectedTurn guards re-fire).
+    let convergenceDetectedNow = false;
+    let convergenceWarning: string | undefined;
+    if (
+      turnNumber >= 12 &&
+      !this.panel.convergenceDetectedTurn &&
+      this.panel.scorecard.rounds.length >= 8
+    ) {
+      const recentRounds = this.panel.scorecard.rounds
+        .filter((r) => !r.isFallback)
+        .slice(-8);
+      if (recentRounds.length >= 6) {
+        const agentIds = Object.keys(this.panel.scorecard.winTallies);
+        if (agentIds.length === 2) {
+          // Count dimension wins across recent rounds for each agent
+          const winCounts: Record<string, number> = {
+            [agentIds[0]]: 0,
+            [agentIds[1]]: 0,
+          };
+          let totalWins = 0;
+          for (const r of recentRounds) {
+            for (const winner of [
+              r.logicWinner,
+              r.tacticsWinner,
+              r.rhetoricWinner,
+            ]) {
+              if (agentIds.includes(winner)) {
+                winCounts[winner]++;
+                totalWins++;
+              }
+            }
+          }
+          const maxWins = Math.max(...Object.values(winCounts));
+          const balance = totalWins > 0 ? maxWins / totalWins : 0.5;
+          // Both agents have recent mechanism failures (both stuck)
+          const bothHaveMechanismFailures =
+            recentRounds.flatMap((r) => r.mechanismFailures ?? []).length >=
+            recentRounds.length; // at least one failure per round on average
+          // Convergence: neither agent dominates (< 60% of recent wins) AND both struggling
+          if (balance < 0.6 && bothHaveMechanismFailures) {
+            convergenceDetectedNow = true;
+            this.panel.convergenceDetectedTurn = turnNumber;
+            convergenceWarning = `⚠ CONVERGENCE DETECTED (Turn ${turnNumber}): Neither debater holds a sustained positional advantage across the last ${recentRounds.length} rounds, and both have recent mechanism failures. The debate appears to have collapsed into a definitional or degree dispute. The next turn should re-anchor to the original motion or acknowledge the convergence.`;
+            console.warn(`[Convergence] ${convergenceWarning}`);
+          }
+        }
+      }
+    }
+
     const hiddenDirective = generateHiddenDirective(
       aggregatedScores,
       turnNumber + 1,
       {
         noCounterfactualYet,
         mechanismFailureLastRound,
+        convergenceDetected: convergenceDetectedNow,
       },
     );
     if (hiddenDirective) {
@@ -734,6 +829,7 @@ export class LiveJudgeSystem {
         pairwiseRound?.flagUpdates && pairwiseRound.flagUpdates.length > 0
           ? { ...this.panel.retroactiveDeltas }
           : undefined,
+      convergenceWarning,
     };
   }
 
@@ -807,7 +903,10 @@ export class LiveJudgeSystem {
 
       // Strip CJK characters that may leak through from non-English judge models.
       const cjkPattern = /[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g;
-      verdict.text = verdict.text.replace(cjkPattern, "").replace(/  +/g, " ").trim();
+      verdict.text = verdict.text
+        .replace(cjkPattern, "")
+        .replace(/  +/g, " ")
+        .trim();
 
       // Compute scorecard internal consistency unconditionally — the round-count leader
       // (overallWinner) and cumulative-points leader may differ even when the narrative
@@ -877,7 +976,10 @@ export class LiveJudgeSystem {
             claimedOverridePattern,
             adjController.signal,
           ).finally(() => clearTimeout(adjTimer));
-          const cjkClean = conflictResolutionText.replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, "").replace(/  +/g, " ").trim();
+          const cjkClean = conflictResolutionText
+            .replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, "")
+            .replace(/  +/g, " ")
+            .trim();
           if (cjkClean.length > 0) {
             verdict.conflictResolution = cjkClean;
           }
@@ -1079,7 +1181,10 @@ export class LiveJudgeSystem {
     return { agentId: leader[0], control: leader[1] };
   }
 
-  reset(debaterModelIds?: string[], mode: "debate" | "document_audit" = "debate"): void {
+  reset(
+    debaterModelIds?: string[],
+    mode: "debate" | "document_audit" = "debate",
+  ): void {
     this.mode = mode;
     // Pick a new judge model if debater IDs provided
     const newJudgeModelId = debaterModelIds
@@ -1138,7 +1243,10 @@ export function getLiveJudgeSystem(): LiveJudgeSystem {
   return liveJudgeSystem;
 }
 
-export function resetLiveJudgeSystem(debaterModelIds?: string[], mode: "debate" | "document_audit" = "debate"): void {
+export function resetLiveJudgeSystem(
+  debaterModelIds?: string[],
+  mode: "debate" | "document_audit" = "debate",
+): void {
   if (!liveJudgeSystem) {
     liveJudgeSystem = new LiveJudgeSystem();
   }
