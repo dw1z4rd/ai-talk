@@ -28,9 +28,16 @@
   $effect(() => {
     const el = chatEl;
     if (!el) return;
+    let prevScrollTop = el.scrollTop;
     const onScroll = () => {
       const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-      userScrolled = !atBottom;
+      const scrolledUp = el.scrollTop < prevScrollTop;
+      prevScrollTop = el.scrollTop;
+      if (atBottom) {
+        userScrolled = false;
+      } else if (scrolledUp) {
+        userScrolled = true;
+      }
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
