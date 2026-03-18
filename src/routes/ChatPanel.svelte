@@ -71,7 +71,7 @@
   <div
     bind:this={chatEl}
     class="flex flex-col overflow-y-auto scroll-smooth flex-1"
-    style="min-height: 24rem"
+    style="min-height: 0"
   >
     <!-- Empty state -->
     {#if messages.length === 0 && !running}

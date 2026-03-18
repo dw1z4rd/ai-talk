@@ -42,6 +42,17 @@
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   });
+
+  let leftColEl = $state<HTMLElement | null>(null);
+  let leftColHeight = $state(0);
+  $effect(() => {
+    const el = leftColEl;
+    if (!el) return;
+    const ro = new ResizeObserver(() => { leftColHeight = el.offsetHeight; });
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+
   let agentA = $state("kimi-k2.5:cloud");
   let agentB = $state("qwen3-next:80b-cloud");
   let leftAgentId = $state("qwen3-next:80b-cloud");
@@ -552,6 +563,7 @@
     {#if showLiveJudgePanel}
       <div
         class="left-col"
+        bind:this={leftColEl}
         in:flyInFromLeft={{ duration: 400 }}
         out:flyOutToRight={{ duration: 300 }}
       >
@@ -569,7 +581,7 @@
     {/if}
 
     <!-- RIGHT COLUMN: debate setup + live chat -->
-    <div class="right-col">
+    <div class="right-col" style={showLiveJudgePanel && leftColHeight > 0 ? `height: ${leftColHeight}px` : ''}>
       <DebateSetup
         bind:topic
         bind:turns
@@ -643,7 +655,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 1.25rem;
-    align-items: stretch;
+    align-items: start;
     justify-content: center;
   }
 
@@ -665,6 +677,7 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    overflow: hidden;
   }
 
   @media (max-width: 1023px) {

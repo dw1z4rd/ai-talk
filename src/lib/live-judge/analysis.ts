@@ -1185,7 +1185,7 @@ Write your verdict now:`;
 }
 
 function generateNarrativeSystemPrompt(nameA: string, nameB: string): string {
-  return `You are a senior debate analyst writing a post-match verdict for a sophisticated audience. Write exactly 2-3 paragraphs of prose.
+  return `You are a senior debate analyst writing a post-match verdict for a sophisticated audience. Write exactly 3 paragraphs of prose.
 
 Paragraph 1: Coherence of the cumulative case. Did either debater build a coherent, evolving argument across turns — setups that paid off, positions that held under pressure? Or did one keep retreating and reframing while the other drove consistent pressure?
 
