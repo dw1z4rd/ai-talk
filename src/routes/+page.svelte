@@ -673,6 +673,7 @@
     width: 45vw;
     max-width: 760px;
     min-width: min(280px, 100%);
+    min-height: 32rem;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
