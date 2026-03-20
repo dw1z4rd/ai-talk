@@ -1179,6 +1179,9 @@ export async function generateAdaptiveReply(
     ? `${systemPrompt}\n\n[REFERENCE MATERIAL]\nThe following documents have been provided. Draw on them where relevant to support or challenge arguments.\n\n${context}`
     : systemPrompt;
 
+  if (!prebuiltReply) {
+    console.log(`[Turn ${turnNumber}] ${agent.name} is thinking...`);
+  }
   const reply =
     prebuiltReply ??
     (await agent.provider.generateText(prompt, {
@@ -1190,6 +1193,11 @@ export async function generateAdaptiveReply(
 
   if (!reply) {
     return { reply: reply ?? null, judgePromise: Promise.resolve(undefined) };
+  }
+  if (!prebuiltReply) {
+    console.log(
+      `[Turn ${turnNumber}] ${agent.name} done (${reply.length} chars)`,
+    );
   }
 
   // Capture opponent's last message before onReply mutates history
