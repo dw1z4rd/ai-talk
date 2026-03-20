@@ -237,7 +237,11 @@ export class LiveJudgeSystem {
               dimension === "Rhetoric"
                 ? ` Use the four-component method: count above-average components (A) and below-average components (B); score = 5+A−B. A clear win (A≥2, B=0) should score 7–8; a dominant win (A≥3) should score 8–9. Scoring exactly ${winFloor} every time signals anchoring — name the components that justify the actual score.`
                 : "";
-            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${agent.name} (this turn). Your ${dim}_score should be ≥ ${winFloor}.${rhetoricNote} Scoring below ${winFloor} would directly contradict the comparative judge's finding — only do so if you identify a specific failure the comparative judge explicitly overlooked.`;
+            const logicNote =
+              dimension === "Logic"
+                ? ` Use a graduated scale: 9 = decisive win (complete cause→process→consequence chain with explicit refutation of opponent's mechanism); 7–8 = clear win (own mechanism present and opponent's gap named); 6–7 = narrow win (both argued, one clearly stronger). Scoring exactly ${winFloor} every time signals anchoring — name the specific mechanism quality that justifies the actual score.`
+                : "";
+            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${agent.name} (this turn). Your ${dim}_score should be ≥ ${winFloor}.${rhetoricNote}${logicNote} Scoring below ${winFloor} would directly contradict the comparative judge's finding — only do so if you identify a specific failure the comparative judge explicitly overlooked.`;
           } else if (winner === "tie") {
             const rhetoricNote =
               dimension === "Rhetoric"
@@ -249,7 +253,11 @@ export class LiveJudgeSystem {
               dimension === "Rhetoric"
                 ? ` Since ${prevAgentName} won this dimension, ${agent.name}'s rhetoric was comparatively weaker. Use the four-component method: a turn with no above-average and one below-average component scores 4; no above-average and no below-average scores 5. A rhetoric loss should rarely score above 5 — scoring 6 requires naming one above-average component despite losing overall; scoring 7 directly contradicts the pairwise verdict and is only valid with explicit reconciliation.`
                 : "";
-            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${prevAgentName} (opponent). ${agent.name}'s ${dim}_score may be below average — apply the normal rubric, but note that a score ≥ 7 here would imply ${agent.name} actually outperformed ${prevAgentName} on ${dimension}, contradicting the pairwise verdict.${rhetoricNote}`;
+            const logicNote =
+              dimension === "Logic"
+                ? ` On a logic loss, 3 or below is appropriate when the argument is circular, incomplete, or wholly unsubstantiated; scoring 4–5 requires naming one genuine mechanism element that was present despite losing overall; scoring ≥ 6 here would imply ${agent.name} matched or exceeded ${prevAgentName} on Logic, directly contradicting the pairwise verdict.`
+                : "";
+            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${prevAgentName} (opponent). ${agent.name}'s ${dim}_score may be below average — apply the normal rubric, but note that a score ≥ 7 here would imply ${agent.name} actually outperformed ${prevAgentName} on ${dimension}, contradicting the pairwise verdict.${rhetoricNote}${logicNote}`;
           }
         };
         const pairwiseCalibration = pairwiseResult.isFallback
@@ -477,6 +485,15 @@ export class LiveJudgeSystem {
             const flag = this.panel.claimFlagRegister.find(
               (f) => f.flagId === flagId,
             );
+
+            // Guard: discard updates where the LLM echoed the current turn number
+            // instead of the flag's originating turn (Turn N+1 misattribution bug).
+            if (flag && flag.originTurn !== targetTurn) {
+              console.warn(
+                `[Claim Flags] target_turn mismatch on ${flagId}: flag originates at T${flag.originTurn} but update targets T${targetTurn} — discarding`,
+              );
+              continue;
+            }
 
             // For partial restores: cap magnitude at 50% of accumulated penalties
             // so the agent can never fully undo a docking just by citing late.
@@ -909,11 +926,19 @@ export class LiveJudgeSystem {
           const maxWins = Math.max(...Object.values(winCounts));
           const balance = totalWins > 0 ? maxWins / totalWins : 0.5;
           // Both agents have recent mechanism failures (both stuck)
-          const bothHaveMechanismFailures =
-            recentRounds.flatMap((r) => r.mechanismFailures ?? []).length >=
-            recentRounds.length; // at least one failure per round on average
-          // Convergence: neither agent dominates (< 60% of recent wins) AND both struggling
-          if (balance < 0.6 && bothHaveMechanismFailures) {
+          // Both agents must individually appear in mechanismFailures — total count alone
+          // is insufficient because one agent could contribute all entries.
+          const mechanismFailureNames = new Set<string>(
+            recentRounds.flatMap((r) => r.mechanismFailures ?? []),
+          );
+          const agentNames = agentIds.map(
+            (id) => this.panel.scorecard.winTallies[id]?.agentName ?? id,
+          );
+          const bothHaveMechanismFailures = agentNames.every((name) =>
+            mechanismFailureNames.has(name),
+          );
+          // Convergence: neither agent dominates (≤ 55% of recent wins) AND both struggling
+          if (balance <= 0.55 && bothHaveMechanismFailures) {
             convergenceDetectedNow = true;
             this.panel.convergenceDetectedTurn = turnNumber;
             convergenceWarning = `⚠ CONVERGENCE DETECTED (Turn ${turnNumber}): Neither debater holds a sustained positional advantage across the last ${recentRounds.length} rounds, and both have recent mechanism failures. The debate appears to have collapsed into a definitional or degree dispute. The next turn should re-anchor to the original motion or acknowledge the convergence.`;
