@@ -49,7 +49,8 @@ export function splitDocumentIntoChunks(
     let wc = 0;
     for (let i = 1; i < s.length; i++) {
       // Word boundary: previous char non-whitespace, current char whitespace
-      if (s.charCodeAt(i - 1) > 32 && s.charCodeAt(i) <= 32) {
+      // Use /\s/ for Unicode-aware whitespace detection (covers NBSP, etc.)
+      if (!/\s/.test(s[i - 1]) && /\s/.test(s[i])) {
         wc++;
         if (wc >= maxWords) return i;
       }
@@ -64,7 +65,7 @@ export function splitDocumentIntoChunks(
     // Quick word count: number of whitespace→non-whitespace transitions + 1
     let wordCount = trimmed.length > 0 ? 1 : 0;
     for (let i = 1; i < trimmed.length; i++) {
-      if (trimmed.charCodeAt(i - 1) <= 32 && trimmed.charCodeAt(i) > 32) wordCount++;
+      if (/\s/.test(trimmed[i - 1]) && !/\s/.test(trimmed[i])) wordCount++;
     }
     if (wordCount <= maxWords) {
       chunks.push(trimmed);

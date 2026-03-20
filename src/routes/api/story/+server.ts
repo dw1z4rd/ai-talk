@@ -11,7 +11,15 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	const safePremise = premise?.trim() || 'Once upon a time, in a city that never slept,';
 	const totalRounds = Math.min(Number(rounds) || 6, 20);
-	const safeAgentIds = Array.isArray(agentIds) && agentIds.length >= 2 ? agentIds : agentIds?.slice(0, 4);
+	const defaultAgentIds: string[] = ['kimi-k2:1t-cloud', 'nemotron-3-super-cloud'];
+
+	let safeAgentIds: string[] = [];
+	if (Array.isArray(agentIds)) {
+		safeAgentIds = agentIds.filter((id) => typeof id === 'string').slice(0, 4);
+	}
+	if (safeAgentIds.length < 2) {
+		safeAgentIds = defaultAgentIds;
+	}
 
 	const stream = new ReadableStream({
 		async start(controller) {

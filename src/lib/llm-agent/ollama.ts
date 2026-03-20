@@ -21,9 +21,8 @@ function filterThinkingTags(text: string): string {
     .replace(/\s*<reasoning>[\s\S]*?<\/reasoning>\s*/gi, " ")
     .replace(/\s*<thought>[\s\S]*?<\/thought>\s*/gi, " ")
     .replace(/\s*<analysis>[\s\S]*?<\/analysis>\s*/gi, " ")
-    // Remove any remaining lone angle-bracket tags (e.g. GLM-4.6 partial tags)
-    .replace(/<[^>]*>/g, "")
-    .replace(/[<>]/g, "");
+    // Remove any remaining stray thinking/reasoning tags, even if malformed or missing '>'
+    .replace(/\s*<\/?\s*(thinking|think|reasoning|thought|analysis)[^>]*>?/gi, "");
 
   // Clean up extra whitespace introduced by block removal (double spaces, leading/trailing)
   return filtered
