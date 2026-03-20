@@ -486,9 +486,18 @@ export class LiveJudgeSystem {
               (f) => f.flagId === flagId,
             );
 
+            // Guard: discard updates for unknown flagIds (LLM hallucinated an ID not in
+            // the register). Without this, a phantom flagId causes flag===undefined,
+            // short-circuits the originTurn check, and lets the penalty land unchecked.
+            if (!flag) {
+              console.warn(
+                `[Claim Flags] Unknown flagId "${flagId}" in update for T${targetTurn} (Turn ${turnNumber}) — discarding`,
+              );
+              continue;
+            }
             // Guard: discard updates where the LLM echoed the current turn number
             // instead of the flag's originating turn (Turn N+1 misattribution bug).
-            if (flag && flag.originTurn !== targetTurn) {
+            if (flag.originTurn !== targetTurn) {
               console.warn(
                 `[Claim Flags] target_turn mismatch on ${flagId}: flag originates at T${flag.originTurn} but update targets T${targetTurn} — discarding`,
               );
@@ -928,14 +937,22 @@ export class LiveJudgeSystem {
           // Both agents have recent mechanism failures (both stuck)
           // Both agents must individually appear in mechanismFailures — total count alone
           // is insufficient because one agent could contribute all entries.
-          const mechanismFailureNames = new Set<string>(
-            recentRounds.flatMap((r) => r.mechanismFailures ?? []),
-          );
+          const mechanismFailureCounts = new Map<string, number>();
+          for (const name of recentRounds.flatMap(
+            (r) => r.mechanismFailures ?? [],
+          )) {
+            mechanismFailureCounts.set(
+              name,
+              (mechanismFailureCounts.get(name) ?? 0) + 1,
+            );
+          }
           const agentNames = agentIds.map(
             (id) => this.panel.scorecard.winTallies[id]?.agentName ?? id,
           );
-          const bothHaveMechanismFailures = agentNames.every((name) =>
-            mechanismFailureNames.has(name),
+          // Require ≥2 appearances each to avoid false-positives from a single
+          // shared-vocabulary round (e.g. consciousness / epistemic debates).
+          const bothHaveMechanismFailures = agentNames.every(
+            (name) => (mechanismFailureCounts.get(name) ?? 0) >= 2,
           );
           // Convergence: neither agent dominates (≤ 55% of recent wins) AND both struggling
           if (balance <= 0.55 && bothHaveMechanismFailures) {
@@ -1067,7 +1084,7 @@ export class LiveJudgeSystem {
       // Strip CJK characters that may leak through from non-English judge models.
       const cjkPattern = /[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g;
       verdict.text = verdict.text
-        .replace(cjkPattern, "")
+        .replace(cjkPattern, " ") // space not empty-string to prevent word-boundary merges
         .replace(/  +/g, " ")
         .trim();
 
@@ -1140,7 +1157,7 @@ export class LiveJudgeSystem {
             adjController.signal,
           ).finally(() => clearTimeout(adjTimer));
           const cjkClean = conflictResolutionText
-            .replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, "")
+            .replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, " ") // space not empty-string
             .replace(/  +/g, " ")
             .trim();
           if (cjkClean.length > 0) {
