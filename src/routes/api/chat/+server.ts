@@ -47,6 +47,16 @@ export const POST: RequestHandler = async ({ request }) => {
         controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
       };
 
+      // Send SSE comment keep-alives every 10 s so HTTP/2 doesn't drop the
+      // stream while a thinking model is silent (no tokens yet).
+      const keepAlive = setInterval(() => {
+        try {
+          controller.enqueue(": keep-alive\n\n");
+        } catch {
+          clearInterval(keepAlive);
+        }
+      }, 10_000);
+
       try {
         // Reset live judge system, passing debater IDs so the judge
         // model can be selected to differ from the debaters.
@@ -309,6 +319,7 @@ export const POST: RequestHandler = async ({ request }) => {
       } catch (err) {
         send({ type: "error", message: String(err) });
       } finally {
+        clearInterval(keepAlive);
         controller.close();
       }
     },
