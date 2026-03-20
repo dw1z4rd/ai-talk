@@ -23,6 +23,7 @@ import {
   compareTurns,
   updateScorecard,
   synthScoresFromPairwise,
+  applyPairwiseFloors,
   generateNarrativeVerdictText,
   generateConflictResolution,
   extractClaimedOverridePattern,
@@ -226,15 +227,29 @@ export class LiveJudgeSystem {
         const buildDimAnchor = (
           dimension: string,
           scaleMax: number,
-          floor: number,
+          winFloor: number,
           winner: string,
         ): string => {
+          const dim = dimension.toLowerCase();
           if (winner === agent.id) {
-            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${agent.name} (this turn). Your ${dimension.toLowerCase()}_score should be ≥ ${floor}. Scoring below ${floor} would directly contradict the comparative judge's finding — only do so if you identify a specific failure the comparative judge explicitly overlooked.`;
+            // curTurn wins: floor raised for the winner to push the absolute score above midpoint
+            const rhetoricNote =
+              dimension === "Rhetoric"
+                ? ` Use the four-component method and name at least TWO above-average components to justify ${winFloor}+; if you can only name one, score 6.`
+                : "";
+            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${agent.name} (this turn). Your ${dim}_score should be ≥ ${winFloor}.${rhetoricNote} Scoring below ${winFloor} would directly contradict the comparative judge's finding — only do so if you identify a specific failure the comparative judge explicitly overlooked.`;
           } else if (winner === "tie") {
-            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge called this a DRAW. Your ${dimension.toLowerCase()}_score should reflect a genuinely competitive turn — a score below 4 would contradict the draw verdict unless you find a specific failure the comparative judge missed.`;
+            const rhetoricNote =
+              dimension === "Rhetoric"
+                ? ` Both turns competed evenly on rhetoric — neither should score dramatically above or below 5–6.`
+                : "";
+            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge called this a DRAW. Your ${dim}_score should reflect a genuinely competitive turn — a score below 4 would contradict the draw verdict unless you find a specific failure the comparative judge missed.${rhetoricNote}`;
           } else {
-            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${prevAgentName} (opponent). ${agent.name}'s ${dimension.toLowerCase()}_score may be below average, but apply the normal rubric independently.`;
+            const rhetoricNote =
+              dimension === "Rhetoric"
+                ? ` Since ${prevAgentName} won this dimension, ${agent.name}'s rhetoric was comparatively weaker — consider whether the score should reflect that (5 or below if clearly outclassed).`
+                : "";
+            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${prevAgentName} (opponent). ${agent.name}'s ${dim}_score may be below average — apply the normal rubric, but note that a score ≥ 7 here would imply ${agent.name} actually outperformed ${prevAgentName} on ${dimension}, contradicting the pairwise verdict.${rhetoricNote}`;
           }
         };
         const pairwiseCalibration = pairwiseResult.isFallback
@@ -242,7 +257,7 @@ export class LiveJudgeSystem {
           : [
               buildDimAnchor("Logic", 40, 6, pairwiseResult.logicWinner),
               buildDimAnchor("Tactics", 30, 6, pairwiseResult.tacticsWinner),
-              buildDimAnchor("Rhetoric", 30, 6, pairwiseResult.rhetoricWinner),
+              buildDimAnchor("Rhetoric", 30, 7, pairwiseResult.rhetoricWinner),
             ].join("\n");
 
         const absoluteAnalysis = await analyzeTurn(
@@ -663,6 +678,47 @@ export class LiveJudgeSystem {
 
         if (absoluteAnalysis) {
           absoluteScores = absoluteAnalysis.scores;
+
+          // ── Pairwise-calibrated floor enforcement ──────────────────────────
+          // After the absolute LLM scorer runs, enforce structural consistency
+          // against the pairwise verdict as a code-level backstop.  This
+          // prevents the "14/40 on a Draw" class of bugs where the absolute
+          // scorer independently produces a score that inverts or grossly
+          // contradicts the pairwise judgment.
+          //
+          // Only curTurn's scores are modified.  PrevTurn's scores are frozen
+          // (they were set in a prior processTurn call and may carry retroactive
+          // penalties that we must not silently undo here).
+          if (!pairwiseRound.isFallback) {
+            const prevAbsForClamp =
+              this.panel.absoluteScoreHistory[
+                pairwiseRound.prevTurn.turnNumber
+              ];
+            if (prevAbsForClamp) {
+              const clamped = applyPairwiseFloors(
+                pairwiseRound.logicWinner,
+                pairwiseRound.tacticsWinner,
+                pairwiseRound.rhetoricWinner,
+                agent.id,
+                pairwiseRound.prevTurn.agentId,
+                absoluteScores,
+                prevAbsForClamp,
+              );
+              if (clamped !== absoluteScores) {
+                console.log(
+                  `[Floor Calibration] R${pairwiseRound.roundNumber} T${turnNumber} ` +
+                    `(${agent.name}) — Logic: ${absoluteScores.logicalCoherence}→${clamped.logicalCoherence} ` +
+                    `Tactics: ${absoluteScores.tacticalEffectiveness}→${clamped.tacticalEffectiveness} ` +
+                    `Rhetoric: ${absoluteScores.rhetoricalForce}→${clamped.rhetoricalForce} ` +
+                    `[pairwise L:${pairwiseRound.logicWinner === agent.id ? "WIN" : pairwiseRound.logicWinner === "tie" ? "DRAW" : "LOSS"} ` +
+                    `T:${pairwiseRound.tacticsWinner === agent.id ? "WIN" : pairwiseRound.tacticsWinner === "tie" ? "DRAW" : "LOSS"} ` +
+                    `R:${pairwiseRound.rhetoricWinner === agent.id ? "WIN" : pairwiseRound.rhetoricWinner === "tie" ? "DRAW" : "LOSS"}]`,
+                );
+                absoluteScores = clamped;
+              }
+            }
+          }
+
           // Persist for next round's harmonization check and retroactive re-reconciliation
           this.panel.lastAbsoluteScores[agent.id] = absoluteScores;
           this.panel.absoluteScoreHistory[turnNumber] = absoluteScores;

@@ -794,6 +794,122 @@ export function updateScorecard(
   return updated;
 }
 
+// ── Pairwise floor enforcement ────────────────────────────────────────────────
+
+/**
+ * Clamp one absolute score dimension for the CURRENT turn (curVal) so it is
+ * structurally consistent with the pairwise verdict for that dimension.
+ *
+ *   Win   (curTurn)  → cur ≥ winFloor  AND  cur ≥ prev + winGap
+ *   Win   (prevTurn) → cur ≤ prev − winGap  (cur pulled down if needed)
+ *   Draw             → cur clamped to [max(drawFloor, prev−maxDrawGap),
+ *                                      min(drawCeil,  prev+maxDrawGap)]
+ *
+ * Only the current turn's score is modified; prevTurn's score is never mutated
+ * here (it was set in a prior processTurn call and may carry retroactive penalties).
+ */
+function clampAbsDim(
+  winner: string,
+  curId: string,
+  prevId: string,
+  curVal: number,
+  prevVal: number,
+  winFloor: number,
+  winGap: number,
+  drawFloor: number,
+  drawCeil: number,
+  maxDrawGap: number,
+): number {
+  if (winner === curId) {
+    // curTurn wins: cur ≥ winFloor and cur > prev by at least winGap
+    return Math.max(curVal, winFloor, prevVal + winGap);
+  } else if (winner === prevId) {
+    // prevTurn wins: cur must be below prev by at least winGap
+    return Math.min(curVal, Math.max(0, prevVal - winGap));
+  } else {
+    // Draw: cur within [max(drawFloor, prev−maxDrawGap), min(drawCeil, prev+maxDrawGap)]
+    const lo = Math.max(drawFloor, prevVal - maxDrawGap);
+    const hi = Math.min(drawCeil, prevVal + maxDrawGap);
+    return Math.max(lo, Math.min(hi, curVal));
+  }
+}
+
+/**
+ * Apply pairwise-verdict floors to the current turn's absolute scores.
+ * Returns a (possibly new) JudgeScores object; returns the same reference if
+ * no value changed so callers can skip logging.
+ *
+ * Scale parameters used:
+ *   Logic    (0–40): winFloor=24, winGap=4, drawFloor=16, drawCeil=32, maxDrawGap=8
+ *   Tactics  (0–30): winFloor=18, winGap=3, drawFloor=12, drawCeil=24, maxDrawGap=6
+ *   Rhetoric (0–30): winFloor=18, winGap=3, drawFloor=12, drawCeil=24, maxDrawGap=6
+ */
+export function applyPairwiseFloors(
+  logicWinner: string,
+  tacticsWinner: string,
+  rhetoricWinner: string,
+  curId: string,
+  prevId: string,
+  curScores: JudgeScores,
+  prevScores: JudgeScores,
+): JudgeScores {
+  const newLogic = clampAbsDim(
+    logicWinner,
+    curId,
+    prevId,
+    curScores.logicalCoherence,
+    prevScores.logicalCoherence,
+    24,
+    4,
+    16,
+    32,
+    8,
+  );
+  const newTactics = clampAbsDim(
+    tacticsWinner,
+    curId,
+    prevId,
+    curScores.tacticalEffectiveness,
+    prevScores.tacticalEffectiveness,
+    18,
+    3,
+    12,
+    24,
+    6,
+  );
+  const newRhetoric = clampAbsDim(
+    rhetoricWinner,
+    curId,
+    prevId,
+    curScores.rhetoricalForce,
+    prevScores.rhetoricalForce,
+    18,
+    3,
+    12,
+    24,
+    6,
+  );
+
+  if (
+    newLogic === curScores.logicalCoherence &&
+    newTactics === curScores.tacticalEffectiveness &&
+    newRhetoric === curScores.rhetoricalForce
+  ) {
+    return curScores; // no change — return same reference
+  }
+
+  const newTotal = newLogic + newTactics + newRhetoric;
+  return {
+    ...curScores,
+    logicalCoherence: newLogic,
+    tacticalEffectiveness: newTactics,
+    rhetoricalForce: newRhetoric,
+    overallScore: newTotal,
+    frameControl: newTotal,
+    credibilityScore: newTotal,
+  };
+}
+
 /**
  * Convert pairwise win/loss result into synthetic JudgeScores for the adaptive
  * pressure system. Maps binary wins to values that sit above/below the pressure
@@ -946,6 +1062,7 @@ export function computeHarmonizationFlags(
     prevScore: number,
     curScore: number,
     threshold: number,
+    drawThreshold: number = 4,
   ) => {
     const gap = Math.abs(curScore - prevScore);
 
@@ -967,6 +1084,27 @@ export function computeHarmonizationFlags(
           note: `${dimension} pairwise winner (${winnerName}) assigned when absolute scores were equal (prev=${prevScore}, cur=${curScore})`,
         });
       }
+      return;
+    }
+
+    // Draw with a non-trivial absolute gap: the two scoring systems agree on
+    // "tie" overall, but the absolute scores indicate a meaningful leader.
+    // This fires independently of the directional-inversion check below so
+    // that rounds like "Tactics Draw but absolute gap = 5" are surfaced.
+    if (pairwiseWinnerId === "tie" && gap > drawThreshold) {
+      const absoluteLeaderId = curScore > prevScore ? curId : prevId;
+      const leaderName =
+        absoluteLeaderId === prevId
+          ? round.prevTurn.agentName
+          : round.curTurn.agentName;
+      flags.push({
+        roundNumber: round.roundNumber,
+        dimension,
+        pairwiseWinner: "tie",
+        absoluteScoreLeader: absoluteLeaderId,
+        divergenceMagnitude: gap,
+        note: `${dimension} pairwise Draw but absolute scores indicate ${leaderName} by ${gap} (prev=${prevScore}, cur=${curScore})`,
+      });
       return;
     }
 
@@ -1636,6 +1774,7 @@ ABOVE-MID (7): Exactly two components are clearly above average. This is the cor
 MID (5–6): One component above average (→6) or none (→5). Generic phrasing, functional structure, stakes mentioned but vague. THIS IS THE CORRECT DEFAULT for a competent-but-unremarkable debate turn. Most turns should land here.
 LOW (3–4): No components above average; one or two are actively weak. A score of 4 still finds something worth noting; 3 is for turns that fail across the board.
 ANTI-CLUSTERING: Rhetoric must show real spread across the debate — different turns from different agents with different rhetorical profiles should rarely produce the same score. 5 is the natural resting point for a merely competent turn; 6 requires one named above-average component; 7 requires two. Turns with one clearly weak component should score 4 regardless of other components. Scoring 6–7 repeatedly for consecutive turns without naming distinct components each time is anchoring, not analysis.
+LOSER CALIBRATION: If a PAIRWISE ANCHOR indicates this turn LOST rhetoric, its score should reflect that disadvantage: 4–5 is appropriate unless you identify a specific above-average component that partially redeems the turn. Scoring 7 on a rhetoric loss produces a direct contradiction — it implies the turn outperformed when the pairwise judge concluded otherwise. A loss score of 7 is only defensible if you explicitly name a component where the losing turn was genuinely superior AND reconcile why the pairwise result still went the other way.
 
 --- TACTICS (1–10) ---
 Opening turn: score on framing quality, min 5.
@@ -1648,7 +1787,7 @@ Other turns — apply this explicit scale:
 Most competent debate turns score 5–7. Reserve 8+ for turns that do something genuinely notable — and name it explicitly.
 Undefined comparative/superlative: if the motion has an undefined superlative and this turn argues toward it without establishing a metric, −1 tactics.
 
-COMPRESSION AUDIT: Before outputting scores, run this self-check. (1) Are all three scores within 1 point of each other (e.g. 7/7/7 or 7/8/7)? Logic, rhetoric, and tactics measure orthogonal qualities — a turn with tight reasoning but weak framing should show a gap, not a cluster. (2) Is every score 7 or higher? 5–6 is the correct baseline for a competent turn on any dimension; scoring everything ≥7 means you inflated something. (3) Is this score pattern near-identical to the previous turn from a different agent? Independent turns rarely produce identical profiles. (4) rhetoric_score=7: can you name exactly two components that are clearly above average AND zero below average? (5) rhetoric_score=6: can you name exactly one above-average component AND zero below-average? If not, the score is 5. (6) rhetoric_score≤4: can you name at least one clearly below-average component? If not, the floor is 5. (7) tactics_score≥8: can you name the specific tactical move and why it was effective? If not, lower to 7.
+COMPRESSION AUDIT: Before outputting scores, run this self-check. (1) Are all three scores within 1 point of each other (e.g. 7/7/7 or 7/8/7)? Logic, rhetoric, and tactics measure orthogonal qualities — a turn with tight reasoning but weak framing should show a gap, not a cluster. (2) Is every score 7 or higher? 5–6 is the correct baseline for a competent turn on any dimension; scoring everything ≥7 means you inflated something. (3) Is this score pattern near-identical to the previous turn from a different agent? Independent turns rarely produce identical profiles. (4) rhetoric_score=7: can you name exactly two components that are clearly above average AND zero below average? (5) rhetoric_score=6: can you name exactly one above-average component AND zero below-average? If not, the score is 5. (6) rhetoric_score≤4: can you name at least one clearly below-average component? If not, the floor is 5. (7) tactics_score≥8: can you name the specific tactical move and why it was effective? If not, lower to 7. (8) If a PAIRWISE ANCHOR says this turn LOST rhetoric and your rhetoric_score is 7, reconcile this explicitly in the analysis field — otherwise lower to 5 or 6.
 
 --- DOMAIN CONTEXT ---
 ${domainNote}
