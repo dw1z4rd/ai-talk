@@ -373,12 +373,24 @@ export class LiveJudgeSystem {
           // that even if the debate ends before this agent speaks again as prevTurn,
           // the claim is in the register and its status is tracked.
           //
-          // EXCEPTION: if the pairwise gave curTurn the Logic WIN, their mechanism
-          // was credited as adequate — seeding those claims as open flags would
-          // cause a future round to retroactively penalise a praised turn.
+          // EXCEPTION — skip seeding when curTurn WIN or DRAW on Logic:
+          //   WIN:  mechanism was credited as adequate — seeding would retroactively
+          //         penalise a praised turn.
+          //   DRAW: the argument was contested, not established. Seeding Draw-round
+          //         claims causes the same "penalty on praised turns" failure mode
+          //         when the agent continues developing the same argument next round.
+          //         TODO: track Draw-round suspects in a contestedClaims structure
+          //         (separate from claimFlagRegister) so convergence detection can
+          //         read them without triggering penalties.
           let curFlagsSeeded = 0;
-          const curTurnWonLogic = pairwiseResult.logicWinner === agent.id;
-          if (!curTurnWonLogic) {
+          const curTurnLogicResult =
+            pairwiseResult.logicWinner === agent.id
+              ? "win"
+              : pairwiseResult.logicWinner === "tie"
+                ? "draw"
+                : "loss";
+          const curTurnLogicLost = curTurnLogicResult === "loss";
+          if (curTurnLogicLost) {
             for (const entry of pairwiseResult.suspectClaims) {
               const colonIdx = entry.indexOf(":");
               if (colonIdx === -1) continue;
@@ -428,15 +440,15 @@ export class LiveJudgeSystem {
                 `[Claim Flags] Round ${roundNumber} early-registered ${curFlagsSeeded}/${curAgentSuspectClaims.length} flag(s) for ${agent.name} T${turnNumber}`,
               );
             }
-          } // end if (!curTurnWonLogic)
+          } // end if (curTurnLogicLost)
           if (
-            curTurnWonLogic &&
+            curTurnLogicResult !== "loss" &&
             pairwiseResult.suspectClaims.some((c) =>
               c.toLowerCase().startsWith(agent.name.toLowerCase() + ":"),
             )
           ) {
             console.log(
-              `[Claim Flags] Round ${roundNumber}: skipping early-register for ${agent.name} T${turnNumber} — pairwise gave this agent Logic WIN (mechanism credited)`,
+              `[Claim Flags] Round ${roundNumber}: skipping early-register for ${agent.name} T${turnNumber} — pairwise Logic ${curTurnLogicResult === "win" ? "WIN (mechanism credited)" : "DRAW (argument contested, not established)"}`,
             );
           }
         } else if (!pairwiseResult.isFallback) {
@@ -690,32 +702,25 @@ export class LiveJudgeSystem {
           // (they were set in a prior processTurn call and may carry retroactive
           // penalties that we must not silently undo here).
           if (!pairwiseRound.isFallback) {
-            const prevAbsForClamp =
-              this.panel.absoluteScoreHistory[
-                pairwiseRound.prevTurn.turnNumber
-              ];
-            if (prevAbsForClamp) {
-              const clamped = applyPairwiseFloors(
-                pairwiseRound.logicWinner,
-                pairwiseRound.tacticsWinner,
-                pairwiseRound.rhetoricWinner,
-                agent.id,
-                pairwiseRound.prevTurn.agentId,
-                absoluteScores,
-                prevAbsForClamp,
+            const clamped = applyPairwiseFloors(
+              pairwiseRound.logicWinner,
+              pairwiseRound.tacticsWinner,
+              pairwiseRound.rhetoricWinner,
+              agent.id,
+              pairwiseRound.prevTurn.agentId,
+              absoluteScores,
+            );
+            if (clamped !== absoluteScores) {
+              console.log(
+                `[Floor Calibration] R${pairwiseRound.roundNumber} T${turnNumber} ` +
+                  `(${agent.name}) — Logic: ${absoluteScores.logicalCoherence}→${clamped.logicalCoherence} ` +
+                  `Tactics: ${absoluteScores.tacticalEffectiveness}→${clamped.tacticalEffectiveness} ` +
+                  `Rhetoric: ${absoluteScores.rhetoricalForce}→${clamped.rhetoricalForce} ` +
+                  `[pairwise L:${pairwiseRound.logicWinner === agent.id ? "WIN" : pairwiseRound.logicWinner === "tie" ? "DRAW" : "LOSS"} ` +
+                  `T:${pairwiseRound.tacticsWinner === agent.id ? "WIN" : pairwiseRound.tacticsWinner === "tie" ? "DRAW" : "LOSS"} ` +
+                  `R:${pairwiseRound.rhetoricWinner === agent.id ? "WIN" : pairwiseRound.rhetoricWinner === "tie" ? "DRAW" : "LOSS"}]`,
               );
-              if (clamped !== absoluteScores) {
-                console.log(
-                  `[Floor Calibration] R${pairwiseRound.roundNumber} T${turnNumber} ` +
-                    `(${agent.name}) — Logic: ${absoluteScores.logicalCoherence}→${clamped.logicalCoherence} ` +
-                    `Tactics: ${absoluteScores.tacticalEffectiveness}→${clamped.tacticalEffectiveness} ` +
-                    `Rhetoric: ${absoluteScores.rhetoricalForce}→${clamped.rhetoricalForce} ` +
-                    `[pairwise L:${pairwiseRound.logicWinner === agent.id ? "WIN" : pairwiseRound.logicWinner === "tie" ? "DRAW" : "LOSS"} ` +
-                    `T:${pairwiseRound.tacticsWinner === agent.id ? "WIN" : pairwiseRound.tacticsWinner === "tie" ? "DRAW" : "LOSS"} ` +
-                    `R:${pairwiseRound.rhetoricWinner === agent.id ? "WIN" : pairwiseRound.rhetoricWinner === "tie" ? "DRAW" : "LOSS"}]`,
-                );
-                absoluteScores = clamped;
-              }
+              absoluteScores = clamped;
             }
           }
 
@@ -756,13 +761,15 @@ export class LiveJudgeSystem {
         // maps win→24 / loss→10 for these dimensions, which produces the
         // floor-clustering problem observed in long debates. absoluteScores
         // uses the 1–10 model signal mapped to 3–30, giving proper spread.
-        // logicalCoherence stays binary (14/30 validated) and overallScore
+        // logicalCoherence stays binary (14/22/30 for loss/draw/win) and overallScore
         // stays win-count-mapped (30/45/65/82) to keep momentum calibration intact.
+        // logicQuality carries the real continuous LLM Logic score for display.
         if (absoluteScores) {
           aggregatedScores = {
             ...aggregatedScores,
             rhetoricalForce: absoluteScores.rhetoricalForce,
             tacticalEffectiveness: absoluteScores.tacticalEffectiveness,
+            logicQuality: absoluteScores.logicalCoherence,
           };
         }
 

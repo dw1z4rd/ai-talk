@@ -822,57 +822,58 @@ export function updateScorecard(
  * Clamp one absolute score dimension for the CURRENT turn (curVal) so it is
  * structurally consistent with the pairwise verdict for that dimension.
  *
- *   Win   (curTurn)  → cur ≥ winFloor  AND  cur ≥ prev + winGap  (capped at scaleCeil)
- *   Win   (prevTurn) → cur ≤ prev − winGap  (cur pulled down if needed)
- *   Draw             → cur clamped to [max(drawFloor, prev−maxDrawGap),
- *                                      min(drawCeil,  prev+maxDrawGap)]
+ *   Win  (curTurn)  → cur within [winFloor,  scaleCeil]
+ *   Loss (prevTurn) → cur within [lossFloor, lossCeil]
+ *   Draw            → cur within [drawFloor, drawCeil]
  *
- * Only the current turn's score is modified; prevTurn's score is never mutated
- * here (it was set in a prior processTurn call and may carry retroactive penalties).
+ * Bands are fixed fractions of scaleCeil — they do NOT reference the previous
+ * turn's score. This eliminates the historical "counter bug" where consecutive
+ * wins via prevVal + winGap drove the floor past scaleCeil, locking every
+ * subsequent WIN turn at exactly scaleCeil.
  *
- * scaleCeil is the hard upper bound for the dimension (40 for Logic, 30 for
- * Tactics/Rhetoric). Without this cap, consecutive winning turns accumulate
- * via prevVal + winGap with no upper limit, producing scores that exceed the
- * column maximum (the "Tactics counter bug" where scores reached 54/30).
+ * Overlapping bands are intentional: a close win can numerically resemble a
+ * strong draw, and a strong-draw can resemble a narrow loss. Non-overlapping
+ * bands are the defect — a WIN turn scoring below a LOSS ceiling is the
+ * contradiction class this function prevents.
+ *
+ * Scale parameters:
+ *   Logic    (0–40): WIN [24,40]  DRAW [18,30]  LOSS [10,22]
+ *   Tactics  (0–30): WIN [18,30]  DRAW [13,22]  LOSS [ 7,16]
+ *   Rhetoric (0–30): WIN [18,30]  DRAW [13,22]  LOSS [ 7,16]
  */
 function clampAbsDim(
   winner: string,
   curId: string,
   prevId: string,
   curVal: number,
-  prevVal: number,
   winFloor: number,
-  winGap: number,
   drawFloor: number,
   drawCeil: number,
-  maxDrawGap: number,
+  lossFloor: number,
+  lossCeil: number,
   scaleCeil: number,
 ): number {
   if (winner === curId) {
-    // curTurn wins: cur ≥ winFloor and cur > prev by at least winGap, but never
-    // above scaleCeil — without this ceiling, a streak of wins drives prevVal
-    // up each round, making prevVal + winGap exceed the column maximum.
-    return Math.min(scaleCeil, Math.max(curVal, winFloor, prevVal + winGap));
+    // WIN: ensure the score sits in the win band [winFloor, scaleCeil]
+    return Math.max(winFloor, Math.min(scaleCeil, curVal));
   } else if (winner === prevId) {
-    // prevTurn wins: cur must be below prev by at least winGap
-    return Math.min(curVal, Math.max(0, prevVal - winGap));
+    // LOSS: constrain to the loss band [lossFloor, lossCeil]
+    return Math.max(lossFloor, Math.min(lossCeil, curVal));
   } else {
-    // Draw: cur within [max(drawFloor, prev−maxDrawGap), min(drawCeil, prev+maxDrawGap)]
-    const lo = Math.max(drawFloor, prevVal - maxDrawGap);
-    const hi = Math.min(drawCeil, prevVal + maxDrawGap);
-    return Math.max(lo, Math.min(hi, curVal));
+    // DRAW: constrain to the draw band [drawFloor, drawCeil]
+    return Math.max(drawFloor, Math.min(drawCeil, curVal));
   }
 }
 
 /**
- * Apply pairwise-verdict floors to the current turn's absolute scores.
+ * Apply pairwise-verdict bands to the current turn's absolute scores.
  * Returns a (possibly new) JudgeScores object; returns the same reference if
  * no value changed so callers can skip logging.
  *
- * Scale parameters used:
- *   Logic    (0–40): winFloor=24, winGap=4, drawFloor=16, drawCeil=32, maxDrawGap=8,  scaleCeil=40
- *   Tactics  (0–30): winFloor=18, winGap=3, drawFloor=12, drawCeil=24, maxDrawGap=6,  scaleCeil=30
- *   Rhetoric (0–30): winFloor=18, winGap=3, drawFloor=12, drawCeil=24, maxDrawGap=6,  scaleCeil=30
+ * Scale parameters used (WIN/DRAW/LOSS bands as [floor, ceil]):
+ *   Logic    (0–40): WIN [24,40]  DRAW [18,30]  LOSS [10,22]
+ *   Tactics  (0–30): WIN [18,30]  DRAW [13,22]  LOSS [ 7,16]
+ *   Rhetoric (0–30): WIN [18,30]  DRAW [13,22]  LOSS [ 7,16]
  */
 export function applyPairwiseFloors(
   logicWinner: string,
@@ -881,46 +882,42 @@ export function applyPairwiseFloors(
   curId: string,
   prevId: string,
   curScores: JudgeScores,
-  prevScores: JudgeScores,
 ): JudgeScores {
   const newLogic = clampAbsDim(
     logicWinner,
     curId,
     prevId,
     curScores.logicalCoherence,
-    prevScores.logicalCoherence,
-    24,
-    4,
-    16,
-    32,
-    8,
-    40,
+    24, // winFloor
+    18, // drawFloor
+    30, // drawCeil
+    10, // lossFloor
+    22, // lossCeil
+    40, // scaleCeil
   );
   const newTactics = clampAbsDim(
     tacticsWinner,
     curId,
     prevId,
     curScores.tacticalEffectiveness,
-    prevScores.tacticalEffectiveness,
-    18,
-    3,
-    12,
-    24,
-    6,
-    30,
+    18, // winFloor
+    13, // drawFloor
+    22, // drawCeil
+    7, // lossFloor
+    16, // lossCeil
+    30, // scaleCeil
   );
   const newRhetoric = clampAbsDim(
     rhetoricWinner,
     curId,
     prevId,
     curScores.rhetoricalForce,
-    prevScores.rhetoricalForce,
-    18,
-    3,
-    12,
-    24,
-    6,
-    30,
+    18, // winFloor
+    13, // drawFloor
+    22, // drawCeil
+    7, // lossFloor
+    16, // lossCeil
+    30, // scaleCeil
   );
 
   if (
@@ -960,9 +957,22 @@ export function synthScoresFromPairwise(
   //   logicalCoherence: high > 28, low < 16  (4-40 scale)
   //   rhetoricalForce: high > 21, low < 12   (3-30 scale)
   //   tacticalEffectiveness: high > 21, low < 12 (3-30 scale)
-  const logicScore = logicWon ? 30 : 14;
-  const rhetoricScore = rhetoricWon ? 24 : 10;
-  const tacticsScore = tacticsWon ? 24 : 10;
+  //
+  // Three-value mapping for each dimension:
+  //   WIN  → high signal   (triggers positive pressure cascade)
+  //   DRAW → neutral zone  (no pressure trigger in either direction)
+  //   LOSS → low signal    (triggers corrective pressure)
+  const logicScore = logicWon ? 30 : round.logicWinner === "tie" ? 22 : 14;
+  const rhetoricScore = rhetoricWon
+    ? 24
+    : round.rhetoricWinner === "tie"
+      ? 17
+      : 10;
+  const tacticsScore = tacticsWon
+    ? 24
+    : round.tacticsWinner === "tie"
+      ? 17
+      : 10;
 
   const wins =
     (logicWon ? 1 : 0) + (tacticsWon ? 1 : 0) + (rhetoricWon ? 1 : 0);

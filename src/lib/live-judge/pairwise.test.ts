@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   updateScorecard,
   synthScoresFromPairwise,
+  applyPairwiseFloors,
   calculateMomentumShift,
   calculateFrameControlShift,
   detectLanguageMismatch,
@@ -431,6 +432,213 @@ describe("synthScoresFromPairwise", () => {
       expect(typeof v).toBe("number");
     }
   });
+
+  // ── Tie (Draw) mapping ──────────────────────────────────────────────────
+
+  it("returns neutral-zone scores when all three dimensions are draws", () => {
+    const round = makeRound(
+      "a",
+      "Agent A",
+      "b",
+      "Agent B",
+      "tie",
+      "tie",
+      "tie",
+    );
+    const scoresB = synthScoresFromPairwise(round, "b");
+    // Logic draw → 22 (neutral zone: 16 < 22 < 28)
+    expect(scoresB.logicalCoherence).toBe(22);
+    expect(scoresB.logicalCoherence).toBeGreaterThan(16); // above low threshold
+    expect(scoresB.logicalCoherence).toBeLessThan(28); // below high threshold
+    // Tactics/Rhetoric draw → 17 (neutral zone: 12 < 17 < 21)
+    expect(scoresB.tacticalEffectiveness).toBe(17);
+    expect(scoresB.tacticalEffectiveness).toBeGreaterThan(12);
+    expect(scoresB.tacticalEffectiveness).toBeLessThan(21);
+    expect(scoresB.rhetoricalForce).toBe(17);
+    expect(scoresB.rhetoricalForce).toBeGreaterThan(12);
+    expect(scoresB.rhetoricalForce).toBeLessThan(21);
+  });
+
+  it("produces identical neutral scores for both agents on all-tie round", () => {
+    const round = makeRound(
+      "a",
+      "Agent A",
+      "b",
+      "Agent B",
+      "tie",
+      "tie",
+      "tie",
+    );
+    const forA = synthScoresFromPairwise(round, "a");
+    const forB = synthScoresFromPairwise(round, "b");
+    expect(forA.logicalCoherence).toBe(forB.logicalCoherence);
+    expect(forA.tacticalEffectiveness).toBe(forB.tacticalEffectiveness);
+    expect(forA.rhetoricalForce).toBe(forB.rhetoricalForce);
+  });
+
+  it("draw Logic is strictly between win and loss Logic values", () => {
+    const winRound = makeRound("a", "A", "b", "B", "b", "b", "b");
+    const drawRound = makeRound("a", "A", "b", "B", "tie", "b", "b");
+    const lossRound = makeRound("a", "A", "b", "B", "a", "b", "b");
+    const winScore = synthScoresFromPairwise(winRound, "b").logicalCoherence;
+    const drawScore = synthScoresFromPairwise(drawRound, "b").logicalCoherence;
+    const lossScore = synthScoresFromPairwise(lossRound, "b").logicalCoherence;
+    expect(winScore).toBeGreaterThan(drawScore);
+    expect(drawScore).toBeGreaterThan(lossScore);
+  });
+
+  it("draw Tactics/Rhetoric is strictly between win and loss values", () => {
+    const winRound = makeRound("a", "A", "b", "B", "b", "b", "b");
+    const drawRound = makeRound("a", "A", "b", "B", "b", "tie", "tie");
+    const lossRound = makeRound("a", "A", "b", "B", "b", "a", "a");
+    const winT = synthScoresFromPairwise(winRound, "b").tacticalEffectiveness;
+    const drawT = synthScoresFromPairwise(drawRound, "b").tacticalEffectiveness;
+    const lossT = synthScoresFromPairwise(lossRound, "b").tacticalEffectiveness;
+    expect(winT).toBeGreaterThan(drawT);
+    expect(drawT).toBeGreaterThan(lossT);
+  });
+
+  it("overallScore is still monotonic over win count with draws treated correctly", () => {
+    // overallScore uses win count (0-3); draw dimensions don't count as wins
+    const allWin = makeRound("a", "A", "b", "B", "b", "b", "b");
+    const twoWin = makeRound("a", "A", "b", "B", "b", "b", "tie");
+    const oneWin = makeRound("a", "A", "b", "B", "b", "tie", "tie");
+    const noWin = makeRound("a", "A", "b", "B", "a", "a", "a");
+    const s3 = synthScoresFromPairwise(allWin, "b").overallScore;
+    const s2 = synthScoresFromPairwise(twoWin, "b").overallScore;
+    const s1 = synthScoresFromPairwise(oneWin, "b").overallScore;
+    const s0 = synthScoresFromPairwise(noWin, "b").overallScore;
+    expect(s3).toBeGreaterThan(s2);
+    expect(s2).toBeGreaterThan(s1);
+    expect(s1).toBeGreaterThan(s0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applyPairwiseFloors
+// ---------------------------------------------------------------------------
+
+describe("applyPairwiseFloors", () => {
+  const makeScores = (
+    l: number,
+    t: number,
+    r: number,
+  ): import("./types").JudgeScores => ({
+    logicalCoherence: l,
+    tacticalEffectiveness: t,
+    rhetoricalForce: r,
+    frameControl: 50,
+    credibilityScore: 50,
+    overallScore: l + t + r,
+  });
+
+  it("returns same reference when curVal is already within all bands", () => {
+    // WIN bands: Logic [24,40], Tactics [18,30], Rhetoric [18,30]
+    const cur = makeScores(28, 22, 20);
+    const result = applyPairwiseFloors("b", "b", "b", "b", "a", cur);
+    expect(result).toBe(cur); // same reference — no mutation
+  });
+
+  it("WIN path: raises Logic below winFloor (24) to 24", () => {
+    const cur = makeScores(20, 22, 20);
+    const result = applyPairwiseFloors("b", "b", "b", "b", "a", cur);
+    expect(result.logicalCoherence).toBe(24);
+  });
+
+  it("WIN path: Logic at exactly scaleCeil (40) is preserved, never exceeds 40", () => {
+    const cur = makeScores(40, 22, 20);
+    const result = applyPairwiseFloors("b", "b", "b", "b", "a", cur);
+    expect(result.logicalCoherence).toBe(40);
+  });
+
+  it("WIN path consecutive: three successive WIN clamps never lock at scaleCeil", () => {
+    // Each call is independent — no prevVal to accumulate — so the result
+    // is exactly what the LLM returned (or winFloor if too low).
+    const scores = [
+      makeScores(26, 20, 20), // round 1 — LLM gave 26
+      makeScores(28, 22, 21), // round 2 — LLM gave 28
+      makeScores(24, 19, 18), // round 3 — LLM gave 24 (minimum)
+    ];
+    const results = scores.map((s) =>
+      applyPairwiseFloors("b", "b", "b", "b", "a", s),
+    );
+    // None should be locked at the same value due to accumulation
+    expect(results[0].logicalCoherence).toBe(26);
+    expect(results[1].logicalCoherence).toBe(28);
+    expect(results[2].logicalCoherence).toBe(24); // floor, not ceiling
+    // All unique — no counter-lock
+    const unique = new Set(results.map((r) => r.logicalCoherence));
+    expect(unique.size).toBeGreaterThan(1);
+  });
+
+  it("DRAW path: Logic above drawCeil (30) is clamped down to 30", () => {
+    // LLM returned 36 on a draw — that would contradict a win result, clamp it
+    const cur = makeScores(36, 17, 17);
+    const result = applyPairwiseFloors("tie", "tie", "tie", "b", "a", cur);
+    expect(result.logicalCoherence).toBe(30);
+  });
+
+  it("DRAW path: Logic below drawFloor (18) is raised to 18", () => {
+    const cur = makeScores(10, 17, 17);
+    const result = applyPairwiseFloors("tie", "tie", "tie", "b", "a", cur);
+    expect(result.logicalCoherence).toBe(18);
+  });
+
+  it("DRAW path: any curVal lands in [drawFloor, drawCeil] regardless of starting value", () => {
+    const lowCur = makeScores(0, 13, 13);
+    const highCur = makeScores(40, 30, 30);
+    const midCur = makeScores(24, 18, 18);
+    for (const cur of [lowCur, highCur, midCur]) {
+      const r = applyPairwiseFloors("tie", "tie", "tie", "b", "a", cur);
+      expect(r.logicalCoherence).toBeGreaterThanOrEqual(18); // drawFloor
+      expect(r.logicalCoherence).toBeLessThanOrEqual(30); // drawCeil
+    }
+  });
+
+  it("LOSS path: Logic above lossCeil (22) is clamped down to 22", () => {
+    const cur = makeScores(32, 14, 14);
+    const result = applyPairwiseFloors("a", "a", "a", "b", "a", cur);
+    expect(result.logicalCoherence).toBe(22);
+  });
+
+  it("LOSS path: Logic below lossFloor (10) is raised to 10", () => {
+    const cur = makeScores(4, 10, 10);
+    const result = applyPairwiseFloors("a", "a", "a", "b", "a", cur);
+    expect(result.logicalCoherence).toBe(10);
+  });
+
+  it("LOSS path: any curVal lands in [lossFloor, lossCeil] regardless of starting value", () => {
+    for (const v of [0, 5, 22, 30, 40]) {
+      const cur = makeScores(v, 10, 10);
+      const r = applyPairwiseFloors("a", "a", "a", "b", "a", cur);
+      expect(r.logicalCoherence).toBeGreaterThanOrEqual(10); // lossFloor
+      expect(r.logicalCoherence).toBeLessThanOrEqual(22); // lossCeil
+    }
+  });
+
+  it("WIN band floor > LOSS band ceil (non-overlapping invariant NOT required, but WIN must never be ≤ LOSS max)", () => {
+    // The win floor (24) must be above the loss ceil (22) for Logic — validate constants
+    // by exercising both ends.
+    const atLossMax = makeScores(22, 16, 16);
+    const atWinMin = makeScores(24, 18, 18);
+    const lossResult = applyPairwiseFloors("a", "a", "a", "b", "a", atLossMax);
+    const winResult = applyPairwiseFloors("b", "b", "b", "b", "a", atWinMin);
+    expect(winResult.logicalCoherence).toBeGreaterThanOrEqual(
+      lossResult.logicalCoherence,
+    );
+  });
+
+  it("dimensions are clamped independently — one WIN, one DRAW, one LOSS", () => {
+    const cur = makeScores(36, 26, 8);
+    // Logic WIN (b wins), Tactics DRAW, Rhetoric LOSS (a wins)
+    const result = applyPairwiseFloors("b", "tie", "a", "b", "a", cur);
+    // Logic 36: WIN band [24,40] → 36 (unchanged)
+    expect(result.logicalCoherence).toBe(36);
+    // Tactics 26: DRAW band [13,22] → clamped down to 22
+    expect(result.tacticalEffectiveness).toBe(22);
+    // Rhetoric 8: LOSS band [7,16] → 8 (unchanged, within band)
+    expect(result.rhetoricalForce).toBe(8);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -618,19 +826,43 @@ describe("computeHarmonizationFlags", () => {
     const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "b");
 
     // Pre-penalty scores: 'a' (prev) leads on logic
-    const prePenaltyPrev = makeAbsScores({ logicalCoherence: 30, overallScore: 60 });
-    const prePenaltyCur = makeAbsScores({ logicalCoherence: 22, overallScore: 52 });
-    const prePenaltyFlags = computeHarmonizationFlags(round, prePenaltyCur, prePenaltyPrev);
-    const prePenaltyLogicFlag = prePenaltyFlags.find((f) => f.dimension === "logic");
+    const prePenaltyPrev = makeAbsScores({
+      logicalCoherence: 30,
+      overallScore: 60,
+    });
+    const prePenaltyCur = makeAbsScores({
+      logicalCoherence: 22,
+      overallScore: 52,
+    });
+    const prePenaltyFlags = computeHarmonizationFlags(
+      round,
+      prePenaltyCur,
+      prePenaltyPrev,
+    );
+    const prePenaltyLogicFlag = prePenaltyFlags.find(
+      (f) => f.dimension === "logic",
+    );
     expect(prePenaltyLogicFlag).toBeDefined();
     expect(prePenaltyLogicFlag?.absoluteScoreLeader).toBe("a"); // 'a' led before penalty
 
     // Post-penalty scores: 'b' (cur) now leads on logic
-    const postPenaltyPrev = makeAbsScores({ logicalCoherence: 22, overallScore: 52 });
-    const postPenaltyCur = makeAbsScores({ logicalCoherence: 30, overallScore: 60 });
-    const postPenaltyFlags = computeHarmonizationFlags(round, postPenaltyCur, postPenaltyPrev);
+    const postPenaltyPrev = makeAbsScores({
+      logicalCoherence: 22,
+      overallScore: 52,
+    });
+    const postPenaltyCur = makeAbsScores({
+      logicalCoherence: 30,
+      overallScore: 60,
+    });
+    const postPenaltyFlags = computeHarmonizationFlags(
+      round,
+      postPenaltyCur,
+      postPenaltyPrev,
+    );
     // 'b' wins pairwise AND 'b' leads absolutely → no logic flag
-    expect(postPenaltyFlags.find((f) => f.dimension === "logic")).toBeUndefined();
+    expect(
+      postPenaltyFlags.find((f) => f.dimension === "logic"),
+    ).toBeUndefined();
   });
 });
 
@@ -718,8 +950,16 @@ describe("reconcileRoundWinners", () => {
       rhetoricWinnerRaw: "b",
     };
     // After a retroactive penalty, cur (Agent B) logic score drops: no longer equal.
-    const prev = makeAbsScores({ logicalCoherence: 26, tacticalEffectiveness: 15, rhetoricalForce: 20 });
-    const cur = makeAbsScores({ logicalCoherence: 14, tacticalEffectiveness: 15, rhetoricalForce: 20 });
+    const prev = makeAbsScores({
+      logicalCoherence: 26,
+      tacticalEffectiveness: 15,
+      rhetoricalForce: 20,
+    });
+    const cur = makeAbsScores({
+      logicalCoherence: 14,
+      tacticalEffectiveness: 15,
+      rhetoricalForce: 20,
+    });
     const reconciled = reconcileRoundWinners(tiedRound, cur, prev);
     // Logic diverged → restore to raw pairwise winner
     expect(reconciled.logicWinner).toBe("a");

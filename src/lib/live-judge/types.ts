@@ -15,6 +15,14 @@ export interface JudgeScores {
   credibilityScore: number; // 0-100
   tacticalEffectiveness: number; // 0-100
   overallScore: number; // Weighted composite
+  /**
+   * Real LLM absolute Logic score (0–40), after pairwise-floor clamping.
+   * Kept separate from logicalCoherence, which is the synth binary pressure
+   * signal (14 loss / 22 draw / 30 win). logicQuality is the continuous
+   * per-turn measurement for display and future pressure weighting.
+   * Undefined for opening turns and fallback rounds.
+   */
+  logicQuality?: number;
 }
 
 export interface TacticAnalysis {
