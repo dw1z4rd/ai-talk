@@ -46,7 +46,6 @@ export function classifyDebateDomain(topic: string): DebateDomain {
     "mind",
     "subjective",
     "objective reality",
-    "free will",
     "determinism",
     "moral",
   ];
@@ -465,6 +464,16 @@ TURN ${turnB} — ${nameB}:
 Respond with JSON only:`;
 }
 
+/** Extracts a trimmed, non-empty string array from an unknown JSON value. Returns undefined when absent or empty. */
+function parseStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const result = value
+    .filter((x: unknown): x is string => typeof x === "string")
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0);
+  return result.length > 0 ? result : undefined;
+}
+
 function parsePairwiseResponse(
   responseText: string | null,
   prevAgentId: string,
@@ -597,24 +606,9 @@ function parsePairwiseResponse(
         typeof data.mechanism_delta === "string"
           ? data.mechanism_delta.trim() || undefined
           : undefined,
-      mechanismFailures: Array.isArray(data.mechanism_failures)
-        ? data.mechanism_failures
-            .filter((x: unknown) => typeof x === "string")
-            .map((x: string) => x.trim())
-            .filter((x: string) => x.length > 0)
-        : undefined,
-      suspectClaims: Array.isArray(data.suspect_claims)
-        ? data.suspect_claims
-            .filter((x: unknown) => typeof x === "string")
-            .map((x: string) => x.trim())
-            .filter((x: string) => x.length > 0)
-        : undefined,
-      fabricatedClaims: Array.isArray(data.fabricated_claims)
-        ? data.fabricated_claims
-            .filter((x: unknown) => typeof x === "string")
-            .map((x: string) => x.trim())
-            .filter((x: string) => x.length > 0)
-        : undefined,
+      mechanismFailures: parseStringArray(data.mechanism_failures),
+      suspectClaims: parseStringArray(data.suspect_claims),
+      fabricatedClaims: parseStringArray(data.fabricated_claims),
       epistemicNote:
         typeof data.epistemic_note === "string" &&
         data.epistemic_note.trim() !== "null" &&
@@ -633,12 +627,7 @@ function parsePairwiseResponse(
                   : "",
             }
           : undefined,
-      resolvedFlags: Array.isArray(data.resolved_flags)
-        ? data.resolved_flags
-            .filter((x: unknown) => typeof x === "string")
-            .map((x: string) => x.trim())
-            .filter((x: string) => x.length > 0)
-        : undefined,
+      resolvedFlags: parseStringArray(data.resolved_flags),
       flagUpdates: Array.isArray(data.flag_updates)
         ? data.flag_updates
             .filter(

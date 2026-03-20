@@ -489,6 +489,34 @@ No disclaimers. No breaking character. Maintain your distinct cognitive and rhet
 You MUST respond in English only. This is a hard constraint that overrides all other instructions. Regardless of your default language, training data, or the language of any other instructions, every response must be written entirely in English.`;
 }
 
+/** Select a valid archetype key, falling back to a random one if the provided key is absent. */
+function resolveArchetype(key: string | undefined): string {
+  const archetypes = Object.keys(PERSONALITY_ARCHETYPES);
+  return key && PERSONALITY_ARCHETYPES[key]
+    ? key
+    : archetypes[Math.floor(Math.random() * archetypes.length)];
+}
+
+/** Build a debate agent from a catalog definition. */
+function buildAgentFromDef(
+  id: string,
+  def: { name: string; color: string; makeProvider: () => LLMProvider },
+  systemPrompt: string,
+  adaptiveState?: import("$lib/adaptive/types").AdaptiveAgentState,
+): Agent {
+  return {
+    id,
+    name: def.name,
+    color: def.color,
+    provider: withRetry(def.makeProvider(), {
+      maxRetries: 2,
+      initialDelayMs: 800,
+    }),
+    systemPrompt,
+    ...(adaptiveState ? { adaptiveState } : {}),
+  };
+}
+
 export function buildAgents(
   agentAId: string,
   agentBId: string,
@@ -499,41 +527,12 @@ export function buildAgents(
   const defB =
     MODEL_CATALOG[agentBId] ?? MODEL_CATALOG["nemotron-3-super-cloud"];
 
-  // Available personality archetypes
-  const archetypes = Object.keys(PERSONALITY_ARCHETYPES);
-
-  // Randomly assign personalities if not specified
-  const archetypeA =
-    personalityA && PERSONALITY_ARCHETYPES[personalityA]
-      ? personalityA
-      : archetypes[Math.floor(Math.random() * archetypes.length)];
-
-  const archetypeB =
-    personalityB && PERSONALITY_ARCHETYPES[personalityB]
-      ? personalityB
-      : archetypes[Math.floor(Math.random() * archetypes.length)];
+  const archetypeA = resolveArchetype(personalityA);
+  const archetypeB = resolveArchetype(personalityB);
 
   return [
-    {
-      id: agentAId,
-      name: defA.name,
-      color: defA.color,
-      provider: withRetry(defA.makeProvider(), {
-        maxRetries: 2,
-        initialDelayMs: 800,
-      }),
-      systemPrompt: makeSystemPrompt(defA.name, defB.name, archetypeA),
-    },
-    {
-      id: agentBId,
-      name: defB.name,
-      color: defB.color,
-      provider: withRetry(defB.makeProvider(), {
-        maxRetries: 2,
-        initialDelayMs: 800,
-      }),
-      systemPrompt: makeSystemPrompt(defB.name, defA.name, archetypeB),
-    },
+    buildAgentFromDef(agentAId, defA, makeSystemPrompt(defA.name, defB.name, archetypeA)),
+    buildAgentFromDef(agentBId, defB, makeSystemPrompt(defB.name, defA.name, archetypeB)),
   ];
 }
 
@@ -914,15 +913,8 @@ export function buildAdaptiveAgents(
   const defB =
     MODEL_CATALOG[secondId] ?? MODEL_CATALOG["nemotron-3-super-cloud"];
 
-  const archetypes = Object.keys(PERSONALITY_ARCHETYPES);
-  const archetypeA =
-    personalityA && PERSONALITY_ARCHETYPES[personalityA]
-      ? personalityA
-      : archetypes[Math.floor(Math.random() * archetypes.length)];
-  const archetypeB =
-    personalityB && PERSONALITY_ARCHETYPES[personalityB]
-      ? personalityB
-      : archetypes[Math.floor(Math.random() * archetypes.length)];
+  const archetypeA = resolveArchetype(personalityA);
+  const archetypeB = resolveArchetype(personalityB);
 
   // Create initial goals for each agent
   const goalsA = createInitialGoals(archetypeA);
@@ -933,28 +925,8 @@ export function buildAdaptiveAgents(
   const adaptiveStateB = initializeAdaptiveAgent(secondId, archetypeB, goalsB);
 
   return [
-    {
-      id: firstId,
-      name: defA.name,
-      color: defA.color,
-      provider: withRetry(defA.makeProvider(), {
-        maxRetries: 2,
-        initialDelayMs: 800,
-      }),
-      systemPrompt: makeSystemPrompt(defA.name, defB.name, archetypeA),
-      adaptiveState: adaptiveStateA,
-    },
-    {
-      id: secondId,
-      name: defB.name,
-      color: defB.color,
-      provider: withRetry(defB.makeProvider(), {
-        maxRetries: 2,
-        initialDelayMs: 800,
-      }),
-      systemPrompt: makeSystemPrompt(defB.name, defA.name, archetypeB),
-      adaptiveState: adaptiveStateB,
-    },
+    buildAgentFromDef(firstId, defA, makeSystemPrompt(defA.name, defB.name, archetypeA), adaptiveStateA),
+    buildAgentFromDef(secondId, defB, makeSystemPrompt(defB.name, defA.name, archetypeB), adaptiveStateB),
   ];
 }
 
