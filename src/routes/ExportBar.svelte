@@ -65,7 +65,8 @@
 
       if (pairwiseRounds.length > 0) {
         content += "\n\n---\n\n## Live Judge Analysis\n\n";
-        content += pairwiseRounds
+        content += [...pairwiseRounds]
+          .sort((a, b) => a.roundNumber - b.roundNumber)
           .map((round) => {
             const logicWinnerName = resolveAgent(round.logicWinner).name;
             const tacticsWinnerName = resolveAgent(round.tacticsWinner).name;
@@ -164,7 +165,8 @@
 
       if (pairwiseRounds.length > 0) {
         content += `\n\n${"═".repeat(40)}\nPAIRWISE SCORECARD\n\n`;
-        content += pairwiseRounds
+        content += [...pairwiseRounds]
+          .sort((a, b) => a.roundNumber - b.roundNumber)
           .map((round) => {
             let line =
               `[Round ${round.roundNumber}  T${round.prevTurn.turnNumber}:${round.prevTurn.agentName} vs T${round.curTurn.turnNumber}:${round.curTurn.agentName}]\n` +

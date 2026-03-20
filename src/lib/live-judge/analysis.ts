@@ -148,6 +148,28 @@ export function detectLanguageMismatch(
       warning: `⚠ LANGUAGE MISMATCH: One turn appears to be in a non-English language. Comparison scores may be unreliable. Check debater system prompts for language enforcement.`,
     };
   }
+
+  // Secondary check: catch mid-sentence code-switching where the overall CJK
+  // ratio is below the mismatch threshold but isolated CJK characters appear
+  // inside an otherwise Latin-script message. This catches patterns like
+  // "Your stimulation证据 is impressive" where a single Chinese word is
+  // embedded in an English sentence — a debater-side rendering artefact distinct
+  // from a full-language mismatch.
+  const inlineSwitchA = !aIsNonLatin && cjkA > 0;
+  const inlineSwitchB = !bIsNonLatin && cjkB > 0;
+  if (inlineSwitchA || inlineSwitchB) {
+    const who =
+      inlineSwitchA && inlineSwitchB
+        ? "both turns"
+        : inlineSwitchA
+          ? "Turn A"
+          : "Turn B";
+    return {
+      isConsistent: true, // language profiles still match; this is a content artefact
+      warning: `⚠ INLINE CODE-SWITCH: ${who} contain isolated CJK characters inside an otherwise Latin-script message. This is a model word-boundary artefact. Affected text may contain garbled or language-switched words — treat those passages as unreliable.`,
+    };
+  }
+
   return { isConsistent: true };
 }
 
@@ -800,13 +822,18 @@ export function updateScorecard(
  * Clamp one absolute score dimension for the CURRENT turn (curVal) so it is
  * structurally consistent with the pairwise verdict for that dimension.
  *
- *   Win   (curTurn)  → cur ≥ winFloor  AND  cur ≥ prev + winGap
+ *   Win   (curTurn)  → cur ≥ winFloor  AND  cur ≥ prev + winGap  (capped at scaleCeil)
  *   Win   (prevTurn) → cur ≤ prev − winGap  (cur pulled down if needed)
  *   Draw             → cur clamped to [max(drawFloor, prev−maxDrawGap),
  *                                      min(drawCeil,  prev+maxDrawGap)]
  *
  * Only the current turn's score is modified; prevTurn's score is never mutated
  * here (it was set in a prior processTurn call and may carry retroactive penalties).
+ *
+ * scaleCeil is the hard upper bound for the dimension (40 for Logic, 30 for
+ * Tactics/Rhetoric). Without this cap, consecutive winning turns accumulate
+ * via prevVal + winGap with no upper limit, producing scores that exceed the
+ * column maximum (the "Tactics counter bug" where scores reached 54/30).
  */
 function clampAbsDim(
   winner: string,
@@ -819,10 +846,13 @@ function clampAbsDim(
   drawFloor: number,
   drawCeil: number,
   maxDrawGap: number,
+  scaleCeil: number,
 ): number {
   if (winner === curId) {
-    // curTurn wins: cur ≥ winFloor and cur > prev by at least winGap
-    return Math.max(curVal, winFloor, prevVal + winGap);
+    // curTurn wins: cur ≥ winFloor and cur > prev by at least winGap, but never
+    // above scaleCeil — without this ceiling, a streak of wins drives prevVal
+    // up each round, making prevVal + winGap exceed the column maximum.
+    return Math.min(scaleCeil, Math.max(curVal, winFloor, prevVal + winGap));
   } else if (winner === prevId) {
     // prevTurn wins: cur must be below prev by at least winGap
     return Math.min(curVal, Math.max(0, prevVal - winGap));
@@ -840,9 +870,9 @@ function clampAbsDim(
  * no value changed so callers can skip logging.
  *
  * Scale parameters used:
- *   Logic    (0–40): winFloor=24, winGap=4, drawFloor=16, drawCeil=32, maxDrawGap=8
- *   Tactics  (0–30): winFloor=18, winGap=3, drawFloor=12, drawCeil=24, maxDrawGap=6
- *   Rhetoric (0–30): winFloor=18, winGap=3, drawFloor=12, drawCeil=24, maxDrawGap=6
+ *   Logic    (0–40): winFloor=24, winGap=4, drawFloor=16, drawCeil=32, maxDrawGap=8,  scaleCeil=40
+ *   Tactics  (0–30): winFloor=18, winGap=3, drawFloor=12, drawCeil=24, maxDrawGap=6,  scaleCeil=30
+ *   Rhetoric (0–30): winFloor=18, winGap=3, drawFloor=12, drawCeil=24, maxDrawGap=6,  scaleCeil=30
  */
 export function applyPairwiseFloors(
   logicWinner: string,
@@ -864,6 +894,7 @@ export function applyPairwiseFloors(
     16,
     32,
     8,
+    40,
   );
   const newTactics = clampAbsDim(
     tacticsWinner,
@@ -876,6 +907,7 @@ export function applyPairwiseFloors(
     12,
     24,
     6,
+    30,
   );
   const newRhetoric = clampAbsDim(
     rhetoricWinner,
@@ -888,6 +920,7 @@ export function applyPairwiseFloors(
     12,
     24,
     6,
+    30,
   );
 
   if (
@@ -1090,8 +1123,10 @@ export function computeHarmonizationFlags(
     // Draw with a non-trivial absolute gap: the two scoring systems agree on
     // "tie" overall, but the absolute scores indicate a meaningful leader.
     // This fires independently of the directional-inversion check below so
-    // that rounds like "Tactics Draw but absolute gap = 5" are surfaced.
-    if (pairwiseWinnerId === "tie" && gap > drawThreshold) {
+    // that rounds like "Tactics Draw but absolute gap = 4" are surfaced.
+    // Uses >= so a gap exactly at the threshold triggers (previously > meant
+    // only gap ≥ threshold+1 would fire, silently missing the boundary case).
+    if (pairwiseWinnerId === "tie" && gap >= drawThreshold) {
       const absoluteLeaderId = curScore > prevScore ? curId : prevId;
       const leaderName =
         absoluteLeaderId === prevId
@@ -1775,6 +1810,7 @@ MID (5–6): One component above average (→6) or none (→5). Generic phrasing
 LOW (3–4): No components above average; one or two are actively weak. A score of 4 still finds something worth noting; 3 is for turns that fail across the board.
 ANTI-CLUSTERING: Rhetoric must show real spread across the debate — different turns from different agents with different rhetorical profiles should rarely produce the same score. 5 is the natural resting point for a merely competent turn; 6 requires one named above-average component; 7 requires two. Turns with one clearly weak component should score 4 regardless of other components. Scoring 6–7 repeatedly for consecutive turns without naming distinct components each time is anchoring, not analysis.
 LOSER CALIBRATION: If a PAIRWISE ANCHOR indicates this turn LOST rhetoric, its score should reflect that disadvantage: 4–5 is appropriate unless you identify a specific above-average component that partially redeems the turn. Scoring 7 on a rhetoric loss produces a direct contradiction — it implies the turn outperformed when the pairwise judge concluded otherwise. A loss score of 7 is only defensible if you explicitly name a component where the losing turn was genuinely superior AND reconcile why the pairwise result still went the other way.
+Apply the four-component method to the losing turn independently: no above-average components AND no below-average → 5; one below-average → 4; two or more below-average → 3; one above-average despite overall loss → 6 (requires naming the component). Defaulting every rhetoric loss to 5 without component analysis is anchoring — the score must be earned the same way wins are.
 
 --- TACTICS (1–10) ---
 Opening turn: score on framing quality, min 5.

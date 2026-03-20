@@ -235,7 +235,7 @@ export class LiveJudgeSystem {
             // curTurn wins: floor raised for the winner to push the absolute score above midpoint
             const rhetoricNote =
               dimension === "Rhetoric"
-                ? ` Use the four-component method and name at least TWO above-average components to justify ${winFloor}+; if you can only name one, score 6.`
+                ? ` Use the four-component method: count above-average components (A) and below-average components (B); score = 5+A−B. A clear win (A≥2, B=0) should score 7–8; a dominant win (A≥3) should score 8–9. Scoring exactly ${winFloor} every time signals anchoring — name the components that justify the actual score.`
                 : "";
             return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${agent.name} (this turn). Your ${dim}_score should be ≥ ${winFloor}.${rhetoricNote} Scoring below ${winFloor} would directly contradict the comparative judge's finding — only do so if you identify a specific failure the comparative judge explicitly overlooked.`;
           } else if (winner === "tie") {
@@ -247,7 +247,7 @@ export class LiveJudgeSystem {
           } else {
             const rhetoricNote =
               dimension === "Rhetoric"
-                ? ` Since ${prevAgentName} won this dimension, ${agent.name}'s rhetoric was comparatively weaker — consider whether the score should reflect that (5 or below if clearly outclassed).`
+                ? ` Since ${prevAgentName} won this dimension, ${agent.name}'s rhetoric was comparatively weaker. Use the four-component method: a turn with no above-average and one below-average component scores 4; no above-average and no below-average scores 5. A rhetoric loss should rarely score above 5 — scoring 6 requires naming one above-average component despite losing overall; scoring 7 directly contradicts the pairwise verdict and is only valid with explicit reconciliation.`
                 : "";
             return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${prevAgentName} (opponent). ${agent.name}'s ${dim}_score may be below average — apply the normal rubric, but note that a score ≥ 7 here would imply ${agent.name} actually outperformed ${prevAgentName} on ${dimension}, contradicting the pairwise verdict.${rhetoricNote}`;
           }
