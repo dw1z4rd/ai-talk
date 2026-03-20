@@ -41,32 +41,42 @@ export function splitDocumentIntoChunks(
   }
 
   // Step 3: apply word ceiling with sentence-boundary guard
+  //
+  // findWordCeilingPos: single-pass scan that counts words and returns the
+  // character index after the maxWords-th word boundary. Avoids the separate
+  // split(/\s+/).length count + re-scan pattern that was O(2n) per iteration.
+  function findWordCeilingPos(s: string): number {
+    let wc = 0;
+    for (let i = 1; i < s.length; i++) {
+      // Word boundary: previous char non-whitespace, current char whitespace
+      if (s.charCodeAt(i - 1) > 32 && s.charCodeAt(i) <= 32) {
+        wc++;
+        if (wc >= maxWords) return i;
+      }
+    }
+    return s.length;
+  }
+
   const chunks: string[] = [];
   for (const section of sections) {
     const trimmed = section.trim();
     if (!trimmed) continue;
-    if (trimmed.split(/\s+/).length <= maxWords) {
+    // Quick word count: number of whitespace→non-whitespace transitions + 1
+    let wordCount = trimmed.length > 0 ? 1 : 0;
+    for (let i = 1; i < trimmed.length; i++) {
+      if (trimmed.charCodeAt(i - 1) <= 32 && trimmed.charCodeAt(i) > 32) wordCount++;
+    }
+    if (wordCount <= maxWords) {
       chunks.push(trimmed);
       continue;
     }
     let remaining = trimmed;
     while (remaining.length > 0) {
-      const words = remaining.split(/\s+/);
-      if (words.length <= maxWords) {
+      const charPos = findWordCeilingPos(remaining);
+      if (charPos >= remaining.length) {
+        // Remaining fits within ceiling
         chunks.push(remaining);
         break;
-      }
-      // Find the character position at the word ceiling
-      let charPos = 0;
-      let wc = 0;
-      for (let i = 1; i < remaining.length; i++) {
-        if (/\s/.test(remaining[i]) && /\S/.test(remaining[i - 1])) {
-          wc++;
-          if (wc >= maxWords) {
-            charPos = i;
-            break;
-          }
-        }
       }
       // Find nearest sentence end before that position (don't cut mid-sentence)
       const slice = remaining.slice(0, charPos);

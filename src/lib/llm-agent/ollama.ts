@@ -21,15 +21,9 @@ function filterThinkingTags(text: string): string {
     .replace(/\s*<reasoning>[\s\S]*?<\/reasoning>\s*/gi, " ")
     .replace(/\s*<thought>[\s\S]*?<\/thought>\s*/gi, " ")
     .replace(/\s*<analysis>[\s\S]*?<\/analysis>\s*/gi, " ")
-    // Remove GLM-4.6 specific thinking tags - handle various encodings
-    .replace(/<[\s\S]*?>/g, "") // HTML entity encoded tags
-    .replace(/\s*<thinking>[\s\S]*?<\/thinking>\s*/gi, " ") // Encoded thinking tags
-    .replace(/\s*<reasoning>[\s\S]*?<\/reasoning>\s*/gi, " ") // Encoded reasoning tags
-    .replace(/\s*<thought>[\s\S]*?<\/thought>\s*/gi, " ") // Encoded thought tags
-    .replace(/\s*<analysis>[\s\S]*?<\/analysis>\s*/gi, " ") // Encoded analysis tags
-    // Remove any remaining HTML entity patterns that might be GLM-4.6 specific
-    .replace(/<[^&]*>/g, "") // Any HTML entity tags
-    .replace(/<|>/g, ""); // Standalone encoded brackets
+    // Remove any remaining lone angle-bracket tags (e.g. GLM-4.6 partial tags)
+    .replace(/<[^>]*>/g, "")
+    .replace(/[<>]/g, "");
 
   // Clean up extra whitespace introduced by block removal (double spaces, leading/trailing)
   return filtered

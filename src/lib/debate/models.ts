@@ -64,12 +64,12 @@ export interface ContextFile {
   content: string;
 }
 
+const _modelMap: Map<string, ModelOption> = new Map(
+  MODEL_OPTIONS.flatMap((g) => g.options.map((o) => [o.id, o])),
+);
+
 export function getModelInfo(id: string): ModelOption {
-  for (const group of MODEL_OPTIONS) {
-    const found = group.options.find((o) => o.id === id);
-    if (found) return found;
-  }
-  return { id, name: id, color: "#7c6af7" };
+  return _modelMap.get(id) ?? { id, name: id, color: "#7c6af7" };
 }
 
 /** Resolves a dimension winner ID to a display-friendly object.

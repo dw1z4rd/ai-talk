@@ -100,6 +100,9 @@
   let currentLeader = $state<any>(null);
   let momentumLeader = $state<any>(null);
   let frameControlLeader = $state<any>(null);
+  // Incremental accumulators — updated in O(1) per judgeResult event
+  let _scoreTotals = $state<Record<string, number>>({});
+  let _momentumTotals = $state<Record<string, number>>({});
 
   // Judge activity indicator
   let judgeStatus = $state<'scoring' | 'writing_verdict' | null>(null);
@@ -197,6 +200,8 @@
     winnerScore = 0;
     showWinnerModal = false;
     judgeStatus = null;
+    _scoreTotals = {};
+    _momentumTotals = {};
   }
 
   function buildContext(): string | undefined {
@@ -252,6 +257,8 @@
       winnerScore = 0;
       showWinnerModal = false;
       scoreDeltas = {};
+      _scoreTotals = {};
+      _momentumTotals = {};
     }
     done = false;
     isPaused = false;
@@ -406,6 +413,16 @@
                 .sort((a, b) => a.roundNumber - b.roundNumber);
             }
 
+            // Incrementally update score/momentum accumulators (O(1) per event)
+            _scoreTotals = {
+              ..._scoreTotals,
+              [data.agentId]: (_scoreTotals[data.agentId] ?? 0) + (data.scores?.overallScore ?? 50),
+            };
+            _momentumTotals = {
+              ..._momentumTotals,
+              [data.agentId]: (_momentumTotals[data.agentId] ?? 0) + (data.momentumShift ?? 0),
+            };
+
             if (
               data.scorecard &&
               Object.keys(data.scorecard.winTallies || {}).length > 0
@@ -426,13 +443,7 @@
                 };
               }
             } else {
-              const scoreTotals: Record<string, number> = {};
-              for (const r of liveJudgeResults) {
-                scoreTotals[r.agentId] =
-                  (scoreTotals[r.agentId] || 0) +
-                  (r.scores?.overallScore ?? 50);
-              }
-              const topScorer = Object.entries(scoreTotals).sort(
+              const topScorer = Object.entries(_scoreTotals).sort(
                 (a, b) => b[1] - a[1],
               )[0];
               if (topScorer) {
@@ -445,12 +456,7 @@
               }
             }
 
-            const momentumTotals: Record<string, number> = {};
-            for (const r of liveJudgeResults) {
-              momentumTotals[r.agentId] =
-                (momentumTotals[r.agentId] || 0) + (r.momentumShift ?? 0);
-            }
-            const topMomentum = Object.entries(momentumTotals).sort(
+            const topMomentum = Object.entries(_momentumTotals).sort(
               (a, b) => b[1] - a[1],
             )[0];
             momentumLeader = topMomentum
