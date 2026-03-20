@@ -218,6 +218,28 @@ export class LiveJudgeSystem {
           openFlagsForPrev.length > 0 ? openFlagsForPrev : undefined,
           this.mode,
         );
+        // Build a calibration hint from the pairwise result so the absolute scorer
+        // doesn't produce a logic score that flatly contradicts what the comparative
+        // judge already concluded. The absolute scorer still evaluates independently —
+        // this only provides a directional anchor to prevent near-failure scores on turns
+        // the pairwise judge credited or treated as equal.
+        const pairwiseLogicWinnerName =
+          pairwiseResult.logicWinner === agent.id
+            ? agent.name
+            : pairwiseResult.logicWinner === "tie" ||
+                pairwiseResult.logicWinner === prevAgentId
+              ? pairwiseResult.logicWinner === "tie"
+                ? null
+                : prevAgentName
+              : null;
+        const pairwiseCalibration = pairwiseResult.isFallback
+          ? undefined
+          : pairwiseLogicWinnerName === null
+            ? `PAIRWISE ANCHOR — Logic: the comparative judge called this round a DRAW between ${agent.name} and ${prevAgentName}. Your logic_score should not be dramatically lower than a neutral baseline — a score below 4 would contradict the draw verdict unless you identify a specific failure the comparative judge missed.`
+            : pairwiseLogicWinnerName === agent.name
+              ? `PAIRWISE ANCHOR — Logic: the comparative judge gave the Logic WIN to ${agent.name} (this turn). Your logic_score should be ≥ 5 (≥20/40). Scoring below 5 would directly contradict the comparative judge's finding — only do so if you identify a clear logical failure that the comparative judge explicitly overlooked.`
+              : `PAIRWISE ANCHOR — Logic: the comparative judge gave the Logic WIN to ${prevAgentName} (opponent). ${agent.name}'s logic_score may be below average, but apply the normal scoring rubric independently.`;
+
         const absoluteAnalysis = await analyzeTurn(
           judge,
           agent,
@@ -230,6 +252,7 @@ export class LiveJudgeSystem {
           messageHistory,
           undefined,
           pairwiseResult.suspectClaims,
+          pairwiseCalibration,
         ).catch(() => null);
 
         pairwiseRound = pairwiseResult;
@@ -329,51 +352,71 @@ export class LiveJudgeSystem {
           // waiting for the next pairwise round to re-surface them. This ensures
           // that even if the debate ends before this agent speaks again as prevTurn,
           // the claim is in the register and its status is tracked.
+          //
+          // EXCEPTION: if the pairwise gave curTurn the Logic WIN, their mechanism
+          // was credited as adequate — seeding those claims as open flags would
+          // cause a future round to retroactively penalise a praised turn.
           let curFlagsSeeded = 0;
-          for (const entry of pairwiseResult.suspectClaims) {
-            const colonIdx = entry.indexOf(":");
-            if (colonIdx === -1) continue;
-            const claimedName = entry.slice(0, colonIdx).trim();
-            const claimText = entry.slice(colonIdx + 1).trim();
-            if (
-              claimedName.toLowerCase() !== agent.name.toLowerCase() ||
-              claimText.length === 0
-            )
-              continue;
-            const prefix80 = claimText.slice(0, 80).toLowerCase();
-            const alreadyExists = this.panel.claimFlagRegister.some(
-              (f) =>
-                f.claim === claimText ||
-                (prefix80.length >= 40 &&
-                  f.claim.slice(0, 80).toLowerCase() === prefix80),
-            );
-            if (!alreadyExists) {
-              const claimIndex = this.panel.claimFlagRegister.filter(
-                (f) => f.agentId === agent.id && f.originTurn === turnNumber,
-              ).length;
-              const flagId = `FLAG-T${turnNumber}-${agent.id.replace(/[^a-z0-9]/gi, "").slice(0, 12)}-${claimIndex}`;
-              const prefix80cur = claimText.slice(0, 80).toLowerCase();
-              const isFabricatedCur =
-                fabricatedClaimTexts.has(prefix80cur) ||
-                fabricatedClaimTexts.has(claimText.slice(0, 80).toLowerCase());
-              this.panel.claimFlagRegister.push({
-                flagId,
-                agentId: agent.id,
-                agentName: agent.name,
-                originTurn: turnNumber,
-                claim: claimText,
-                status: "unresolved",
-                claimType: isFabricatedCur ? "fabricated" : "unverified",
-              });
-              curFlagsSeeded++;
+          const curTurnWonLogic = pairwiseResult.logicWinner === agent.id;
+          if (!curTurnWonLogic) {
+            for (const entry of pairwiseResult.suspectClaims) {
+              const colonIdx = entry.indexOf(":");
+              if (colonIdx === -1) continue;
+              const claimedName = entry.slice(0, colonIdx).trim();
+              const claimText = entry.slice(colonIdx + 1).trim();
+              if (
+                claimedName.toLowerCase() !== agent.name.toLowerCase() ||
+                claimText.length === 0
+              )
+                continue;
+              const prefix80 = claimText.slice(0, 80).toLowerCase();
+              const alreadyExists = this.panel.claimFlagRegister.some(
+                (f) =>
+                  f.claim === claimText ||
+                  (prefix80.length >= 40 &&
+                    f.claim.slice(0, 80).toLowerCase() === prefix80),
+              );
+              if (!alreadyExists) {
+                const claimIndex = this.panel.claimFlagRegister.filter(
+                  (f) => f.agentId === agent.id && f.originTurn === turnNumber,
+                ).length;
+                const flagId = `FLAG-T${turnNumber}-${agent.id.replace(/[^a-z0-9]/gi, "").slice(0, 12)}-${claimIndex}`;
+                const prefix80cur = claimText.slice(0, 80).toLowerCase();
+                const isFabricatedCur =
+                  fabricatedClaimTexts.has(prefix80cur) ||
+                  fabricatedClaimTexts.has(
+                    claimText.slice(0, 80).toLowerCase(),
+                  );
+                this.panel.claimFlagRegister.push({
+                  flagId,
+                  agentId: agent.id,
+                  agentName: agent.name,
+                  originTurn: turnNumber,
+                  claim: claimText,
+                  status: "unresolved",
+                  claimType: isFabricatedCur ? "fabricated" : "unverified",
+                });
+                curFlagsSeeded++;
+              }
             }
-          }
-          if (curFlagsSeeded > 0) {
-            const curAgentSuspectClaims = pairwiseResult.suspectClaims.filter(
-              (c) => c.toLowerCase().startsWith(agent.name.toLowerCase() + ":"),
-            );
+            if (curFlagsSeeded > 0) {
+              const curAgentSuspectClaims = pairwiseResult.suspectClaims.filter(
+                (c) =>
+                  c.toLowerCase().startsWith(agent.name.toLowerCase() + ":"),
+              );
+              console.log(
+                `[Claim Flags] Round ${roundNumber} early-registered ${curFlagsSeeded}/${curAgentSuspectClaims.length} flag(s) for ${agent.name} T${turnNumber}`,
+              );
+            }
+          } // end if (!curTurnWonLogic)
+          if (
+            curTurnWonLogic &&
+            pairwiseResult.suspectClaims.some((c) =>
+              c.toLowerCase().startsWith(agent.name.toLowerCase() + ":"),
+            )
+          ) {
             console.log(
-              `[Claim Flags] Round ${roundNumber} early-registered ${curFlagsSeeded}/${curAgentSuspectClaims.length} flag(s) for ${agent.name} T${turnNumber}`,
+              `[Claim Flags] Round ${roundNumber}: skipping early-register for ${agent.name} T${turnNumber} — pairwise gave this agent Logic WIN (mechanism credited)`,
             );
           }
         } else if (!pairwiseResult.isFallback) {

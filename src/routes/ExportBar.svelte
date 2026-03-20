@@ -134,9 +134,9 @@
         }
       }
 
-      const scoredResults = liveJudgeResults.filter(
-        (r: any) => r.absoluteScores,
-      );
+      const scoredResults = liveJudgeResults
+        .filter((r: any) => r.absoluteScores)
+        .sort((a: any, b: any) => a.turnNumber - b.turnNumber);
       if (scoredResults.length > 0) {
         content +=
           "\n\n---\n\n## Per-Turn Absolute Scores\n_Turn-by-turn: Logic/40 · Rhetoric/30 · Tactics/30_\n\n";
@@ -226,9 +226,9 @@
         content += "\n";
       }
 
-      const scoredResultsTxt = liveJudgeResults.filter(
-        (r: any) => r.absoluteScores,
-      );
+      const scoredResultsTxt = liveJudgeResults
+        .filter((r: any) => r.absoluteScores)
+        .sort((a: any, b: any) => a.turnNumber - b.turnNumber);
       if (scoredResultsTxt.length > 0) {
         content += `${"═".repeat(40)}\nPER-TURN SCORES\n\n`;
         scoredResultsTxt.forEach((r: any) => {

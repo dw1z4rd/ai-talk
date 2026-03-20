@@ -12,24 +12,29 @@ import { redactKey } from "./utils";
  * and specific GLM-4.6 tags like </think> that should not appear in the final story text
  */
 function filterThinkingTags(text: string): string {
-  // First remove complete thinking/reasoning blocks with their content
+  // Remove complete thinking/reasoning blocks with their content.
+  // Replace with a single space (not empty string) so that surrounding words
+  // are not concatenated when the block appears mid-sentence or mid-line.
   let filtered = text
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
-    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
-    .replace(/<thought>[\s\S]*?<\/thought>/gi, "")
-    .replace(/<analysis>[\s\S]*?<\/analysis>/gi, "")
+    .replace(/\s*<thinking>[\s\S]*?<\/thinking>\s*/gi, " ")
+    .replace(/\s*<reasoning>[\s\S]*?<\/reasoning>\s*/gi, " ")
+    .replace(/\s*<thought>[\s\S]*?<\/thought>\s*/gi, " ")
+    .replace(/\s*<analysis>[\s\S]*?<\/analysis>\s*/gi, " ")
     // Remove GLM-4.6 specific thinking tags - handle various encodings
     .replace(/<[\s\S]*?>/g, "") // HTML entity encoded tags
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "") // Encoded thinking tags
-    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "") // Encoded reasoning tags
-    .replace(/<thought>[\s\S]*?<\/thought>/gi, "") // Encoded thought tags
-    .replace(/<analysis>[\s\S]*?<\/analysis>/gi, "") // Encoded analysis tags
+    .replace(/\s*<thinking>[\s\S]*?<\/thinking>\s*/gi, " ") // Encoded thinking tags
+    .replace(/\s*<reasoning>[\s\S]*?<\/reasoning>\s*/gi, " ") // Encoded reasoning tags
+    .replace(/\s*<thought>[\s\S]*?<\/thought>\s*/gi, " ") // Encoded thought tags
+    .replace(/\s*<analysis>[\s\S]*?<\/analysis>\s*/gi, " ") // Encoded analysis tags
     // Remove any remaining HTML entity patterns that might be GLM-4.6 specific
     .replace(/<[^&]*>/g, "") // Any HTML entity tags
     .replace(/<|>/g, ""); // Standalone encoded brackets
 
-  // Clean up any extra whitespace
-  return filtered.replace(/\n\s*\n/g, "\n\n").trim();
+  // Clean up extra whitespace introduced by block removal (double spaces, leading/trailing)
+  return filtered
+    .replace(/ {2,}/g, " ")
+    .replace(/\n\s*\n/g, "\n\n")
+    .trim();
 }
 
 const DEFAULT_MODEL = "llama3.2";
@@ -85,7 +90,12 @@ export const createOllamaProvider = (
     });
 
     try {
-      const response = await fetch(url, { method: "POST", headers, body, signal: options?.signal });
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body,
+        signal: options?.signal,
+      });
 
       if (!response.ok) {
         const text = await response.text();
@@ -147,6 +157,13 @@ export const createOllamaProvider = (
                 lowerToken.includes("</analysis>")
               ) {
                 isInThinkingBlock = false;
+                // Insert a space so that text before and after the stripped block
+                // is not concatenated (e.g. "corporate<think>...</think>Algorithms"
+                // must not become "corporateAlgorithms").
+                if (fullText.length > 0 && !/\s$/.test(fullText)) {
+                  fullText += " ";
+                  options?.onToken?.(" ");
+                }
                 return false; // Skip the closing tag
               }
 
@@ -213,11 +230,13 @@ export const createOllamaProvider = (
       return rawText;
     } catch (e: any) {
       // Check if the error is an AbortError
-      if (e.name === 'AbortError') {
-        console.log(`[Ollama] Request aborted for model ${config.model ?? DEFAULT_MODEL}`);
+      if (e.name === "AbortError") {
+        console.log(
+          `[Ollama] Request aborted for model ${config.model ?? DEFAULT_MODEL}`,
+        );
         return null;
       }
-      
+
       const msg = e.message || String(e);
       const safe = config.apiKey ? redactKey(msg, config.apiKey) : msg;
       console.error(

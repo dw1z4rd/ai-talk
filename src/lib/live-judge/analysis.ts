@@ -273,7 +273,7 @@ Required format (use exact agent names as shown):
 --- LOGIC (forced choice) ---
 Start each turn from 8. Apply deductions:
 -1  One unsupported assumption (empirical OR philosophical — asserting "X implies Y" as fact without defending why is as penalizable as a bare statistics claim)
-    Hollow specificity is penalizable: a specific number, percentage, named study, or allusion to unnamed research findings (e.g., "recent work shows...", "studies have found...", "it has been shown that...", "experiments demonstrate...") without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account. This penalty applies symmetrically regardless of which debater makes the claim — prior scoring history and positional advantage confer no leniency.
+    Hollow specificity is penalizable: a specific number, percentage, named study, named pilot program or location (e.g., "studies in Finland," "pilot programs across three countries," "the Kenya experiment," "trials at Stanford"), or allusion to unnamed research findings (e.g., "recent work shows...", "studies have found...", "it has been shown that...", "experiments demonstrate...") without naming the specific paper AND without supplying a mechanism explanation is a -1 unsupported assumption. Geographic or institutional specificity is not a substitute for a causal account — it is the same hollow-specificity pattern with a location attached. This penalty applies symmetrically regardless of which debater makes the claim — prior scoring history and positional advantage confer no leniency.
 -2  Significant unsupported leap
 -3  Clear logical error: category error, circular reasoning, strawman, or analogy whose structural mapping breaks down
 -4  Multiple errors or incoherent structure
@@ -343,6 +343,8 @@ HYPOTHETICAL FIGURES IN COUNTERFACTUALS: A specific number or percentage used to
 
 --- CLAIM AUDITABILITY ---
 For every concrete factual or empirical assertion in either turn that you considered penalizing for hollow specificity — whether or not you ultimately docked a point — add an entry to suspect_claims using the format "AgentName: [exact or close quote of the claim]". This creates an auditable record that can be reviewed independently of the scoring decision. Empty array if no such claims appeared in either turn.
+
+Named-location and named-program research invocations are automatically suspect_claims candidates: any claim that invokes pilot programs, experiments, trials, or studies by naming countries, cities, institutions, or program names (e.g., "pilot studies in Finland, Kenya, and Canada", "the Stockton experiment", "research at MIT") WITHOUT citing a specific paper title or supplying a mechanism chain MUST appear in suspect_claims regardless of whether you applied a penalty.
 
 --- FABRICATION AUDIT ---
 fabricated_claims is a strict subset of suspect_claims reserved for claims that are demonstrably false in a specific, documentable way — not merely unverified or ungrounded:
@@ -1478,6 +1480,7 @@ export async function analyzeTurn(
   messageHistory: Message[],
   signal?: AbortSignal,
   suspectClaims?: string[],
+  pairwiseCalibration?: string,
 ): Promise<TurnAnalysis> {
   const judgePrompt = generateJudgePrompt(
     judge,
@@ -1490,6 +1493,7 @@ export async function analyzeTurn(
     referenceContext,
     messageHistory,
     suspectClaims,
+    pairwiseCalibration,
   );
   const domainNote = buildDomainNote(classifyDebateDomain(topic));
 
@@ -1551,6 +1555,7 @@ function generateJudgePrompt(
   referenceContext: string,
   messageHistory: Message[],
   suspectClaims?: string[],
+  pairwiseCalibration?: string,
 ): string {
   const contextBlock = referenceContext
     ? `\nREFERENCE MATERIAL: ${referenceContext}\n`
@@ -1568,9 +1573,12 @@ function generateJudgePrompt(
     agentClaims.length > 0
       ? `\nPRE-FLAGGED CLAIMS (pairwise judge identified these as potentially hollow — apply −1 unless the turn supplies a mechanism chain for each):\n${agentClaims.map((c, i) => `${i + 1}. ${c}`).join("\n")}\n`
       : "";
+  const calibrationBlock = pairwiseCalibration
+    ? `\n${pairwiseCalibration}\n`
+    : "";
   return `DEBATE TOPIC: ${topic || "General debate"}
 TURN: ${turnNumber}${contextBlock}
-${opponentBlock}${flaggedBlock}
+${opponentBlock}${flaggedBlock}${calibrationBlock}
 
 NOW EVALUATE — ${agent.name}'s response: "${message}"
 
@@ -1590,7 +1598,7 @@ INDEPENDENCE: Score this turn entirely on its own merits. Do not anchor to or at
 
 --- LOGIC (1–10) ---
 Start at 6. -1 unsupported assumption, -2 significant leap, -3 logical error, -4 multiple errors. +1 if every claim has explicit causal chain. A score ≥7 must be actively earned — identify what the argument did right; absence of penalties alone justifies at most 6.
-Hollow specificity is penalizable: a specific number, percentage, named study, or allusion to unnamed research findings (e.g., "recent work shows...", "studies have found...", "experiments demonstrate...") without a mechanism explanation is a -1 unsupported assumption. Precision is not a substitute for a causal account. Apply this symmetrically — no leniency based on prior-turn scoring or positional advantage.
+Hollow specificity is penalizable: a specific number, percentage, named study, named pilot program or location (e.g., "studies in Finland," "pilot programs across three countries," "the Kenya experiment," "trials at Stanford"), or allusion to unnamed research findings (e.g., "recent work shows...", "studies have found...", "experiments demonstrate...") without naming the specific paper AND without supplying a mechanism explanation is a -1 unsupported assumption. Geographic or institutional specificity is not a substitute for a causal account. Apply this symmetrically — no leniency based on prior-turn scoring or positional advantage.
 PRE-FLAGGED CLAIMS: If a PRE-FLAGGED CLAIMS section appears in the prompt, each listed claim was already identified by the pairwise judge as potentially hollow. You MUST apply the −1 hollow specificity penalty to each pre-flagged claim unless the turn's own text supplies an explicit mechanism chain for it. These are not suggestions — they are mandatory deductions unless a mechanism chain is present.
 +1 Grounded precision (symmetric counterpart): a claim that names a specific, verifiable datum AND supplies a mechanism chain linking it to the turn's core argument earns +1. Hollow = specificity without mechanism (−1); Grounded = specificity with mechanism (+1). Both bonuses can coexist on the same turn.
 Symmetric: if the mechanism is fully explained and the causal chain is explicit, award +1 even without a citation.
@@ -1610,7 +1618,7 @@ MID (6–7): Correct claim, some mechanism, but missing the consequence step or 
 LOW (4–5): Assert-only, no mechanism, no consequence, or logical error. E.g.: "Trade liberalisation is good for growth" with no mechanism. Scores LOW because: bare assertion, no causal chain, no consequence.
 
 --- RHETORIC (1–10) ---
-SCORING METHOD — follow this exactly: For each of the four components below, decide whether it is CLEARLY above average for a competent debate turn — not merely adequate, but notably strong. List the components that cleared that bar. Count them (0–4). Your rhetoric_score = 5 + (count). You MUST name which components cleared the bar before outputting rhetoric_score; if you cannot name them, you do not have the evidence to score above 5.
+SCORING METHOD — follow this exactly: For each of the four components below, rate it as ABOVE AVERAGE (clearly strong — not merely adequate), AVERAGE (competent baseline), or BELOW AVERAGE (clearly weak — not merely plain). Count the above-average components (A, 0–4) and the below-average components (B, 0–4). Your rhetoric_score = 5 + A − B, clamped to 1–10. You MUST name which components scored above or below average before outputting rhetoric_score; if you cannot name them, you do not have the evidence to score above 5 or below 5.
 Evaluate on four equally-weighted components:
 1. Expression quality — 9–10: clear, concrete, appropriately concise; 5–6: flat or over-hedged; 3–4: dry or padded. ONE component, not the whole rubric: do NOT let punchiness dominate.
 2. Structural clarity — is the argument easy to follow? Clear signposting beats rambling.
@@ -1625,7 +1633,7 @@ HIGH (8–9): Three or four components clearly above average. Strong structural 
 ABOVE-MID (7): Exactly two components are clearly above average. This is the correct score for a solidly-delivered turn that does two things well and two things ordinarily. It is NOT a resting place for "pretty good." Name both components before assigning it. If you cannot name two, score 6.
 MID (5–6): One component above average (→6) or none (→5). Generic phrasing, functional structure, stakes mentioned but vague. THIS IS THE CORRECT DEFAULT for a competent-but-unremarkable debate turn. Most turns should land here.
 LOW (3–4): No components above average; one or two are actively weak. A score of 4 still finds something worth noting; 3 is for turns that fail across the board.
-ANTI-CLUSTERING: Rhetoric must show real spread across the debate — different turns from different agents with different rhetorical profiles should rarely produce the same score. 5–6 is the natural resting point for competent debate. 7 requires exactly two named components. 8+ requires three or four. If you cannot name them, you have not earned the score. Scoring 7 repeatedly without naming components each time is anchoring, not analysis.
+ANTI-CLUSTERING: Rhetoric must show real spread across the debate — different turns from different agents with different rhetorical profiles should rarely produce the same score. 5 is the natural resting point for a merely competent turn; 6 requires one named above-average component; 7 requires two. Turns with one clearly weak component should score 4 regardless of other components. Scoring 6–7 repeatedly for consecutive turns without naming distinct components each time is anchoring, not analysis.
 
 --- TACTICS (1–10) ---
 Opening turn: score on framing quality, min 5.
@@ -1638,7 +1646,7 @@ Other turns — apply this explicit scale:
 Most competent debate turns score 5–7. Reserve 8+ for turns that do something genuinely notable — and name it explicitly.
 Undefined comparative/superlative: if the motion has an undefined superlative and this turn argues toward it without establishing a metric, −1 tactics.
 
-COMPRESSION AUDIT: Before outputting scores, run this self-check. (1) Are all three scores within 1 point of each other (e.g. 7/7/7 or 7/8/7)? Logic, rhetoric, and tactics measure orthogonal qualities — a turn with tight reasoning but weak framing should show a gap, not a cluster. (2) Is every score 7 or higher? 5–6 is the correct baseline for a competent turn on any dimension; scoring everything ≥7 means you inflated something. (3) Is this score pattern near-identical to the previous turn from a different agent? Independent turns rarely produce identical profiles. (4) rhetoric_score=7: can you name exactly two components that are clearly above average? If not, lower to 6. (5) tactics_score≥8: can you name the specific tactical move and why it was effective? If not, lower to 7.
+COMPRESSION AUDIT: Before outputting scores, run this self-check. (1) Are all three scores within 1 point of each other (e.g. 7/7/7 or 7/8/7)? Logic, rhetoric, and tactics measure orthogonal qualities — a turn with tight reasoning but weak framing should show a gap, not a cluster. (2) Is every score 7 or higher? 5–6 is the correct baseline for a competent turn on any dimension; scoring everything ≥7 means you inflated something. (3) Is this score pattern near-identical to the previous turn from a different agent? Independent turns rarely produce identical profiles. (4) rhetoric_score=7: can you name exactly two components that are clearly above average AND zero below average? (5) rhetoric_score=6: can you name exactly one above-average component AND zero below-average? If not, the score is 5. (6) rhetoric_score≤4: can you name at least one clearly below-average component? If not, the floor is 5. (7) tactics_score≥8: can you name the specific tactical move and why it was effective? If not, lower to 7.
 
 --- DOMAIN CONTEXT ---
 ${domainNote}
