@@ -282,6 +282,9 @@ Start each turn from 8. Apply deductions:
 +1  Grounded precision (symmetric counterpart to hollow specificity): a claim that names a specific, verifiable datum AND supplies a mechanism chain linking it to the turn's core argument earns +1. Hollow = specificity without mechanism (−1); Grounded = specificity with mechanism (+1). Both adjustments can coexist on the same turn.
 Winner = higher remaining score. If equal, award the turn whose core claim still stands despite errors.
 
+CONSISTENCY REQUIREMENT: Your logic_winner field and your logic_delta text MUST be internally consistent. If logic_delta describes an agent as having "a concrete mechanism", "an explicit causal chain", "supplies the cause→process→consequence" or equivalent language on the core contested question, that agent MUST be your logic_winner — unless logic_delta also explicitly reconciles why their mechanism advantage was still outweighed by a larger gap on a different criterion. You may not praise an agent's mechanism quality and simultaneously award logic to their opponent without a reconciling sentence. The same internal-consistency requirement applies to tactics_winner/tactics_delta and rhetoric_winner/rhetoric_delta.
+ILLUSTRATIVE FIGURES: Numbers and percentages that function as rhetorical illustrations of proportional relationships within an argument (e.g., "when AI handles 80% of tasks", "one editor replaces five writers", "headcount drops from 100 to 15") are NOT hollow specificity unless the argument explicitly presents them as measured empirical findings from documented research. Do NOT add these to suspect_claims or fabricated_claims. The hollow-specificity penalty applies to claims stated as empirical facts — specific statistics, study results, or documented measurements — without a mechanism chain.
+
 Causal mechanism requirement: for each major causal leap, the argument must supply a mechanism sentence of the form "[how X produces Y] → [why that mechanism operates under these conditions] → [measurable consequence]." A causal leap missing any element of this template is penalized −1 as an unsupported assumption.
 Also populate mechanism_delta (covers both turns) and mechanism_failures (array of agent names that had a mechanism failure) based on this assessment.
 Retroactive causation (timeline category error): before awarding any causal credit, verify that every technology, framework, study, or institutional form invoked could plausibly have existed at the era being argued about. Two graduated penalties apply:
@@ -363,8 +366,7 @@ If an OPEN FLAGS block appears in the prompt, it lists hollow claims from prior 
 (b) If TURN B (curTurn) explicitly substantiates a previously-flagged claim — supplying the missing mechanism chain — emit a flag_update with delta_raw +1, update_type "partial_restore". Set target_turn to the ORIGINATING turn number. Partial restore is capped at half the original penalty magnitude: if penalty was -2, the maximum restore is +1.
 (c) Include flag_id exactly as given (no brackets) so the register can reconcile the entry.
 (d) If a flag was resolved (partial restore applied or the agent clearly addressed it), add the flag_id to resolved_flags.
-
-Each flag_update element MUST use exactly these keys:
+MECHANISM EXEMPTION: Before issuing a flag_update penalty, check whether this round's logic_delta or mechanism_delta credits the flagged agent's mechanism as explicit, complete, or sound on the relevant claim. If you describe the agent's causal chain as present and adequate in those fields, the missing-mechanism concern is resolved — issue a partial_restore instead of a penalty and add the flag_id to resolved_flags. A complete mechanism chain in the current turn supersedes the hollow-specificity flag from the prior round.
   {"flag_id": "FLAG-T3-agentslug-0", "target_turn": 3, "delta_raw": -1, "update_type": "penalty", "reason": "Claim still unsubstantiated"}
   {"flag_id": "FLAG-T3-agentslug-1", "target_turn": 3, "delta_raw": 1, "update_type": "partial_restore", "reason": "Mechanism chain supplied in current turn"}
 Omitting target_turn or using wrong key names will silently discard the update. For every open flag you see, you MUST emit either a penalty or a partial_restore — do NOT leave flag_updates empty when open flags are present.
@@ -1608,8 +1610,8 @@ MID (6–7): Correct claim, some mechanism, but missing the consequence step or 
 LOW (4–5): Assert-only, no mechanism, no consequence, or logical error. E.g.: "Trade liberalisation is good for growth" with no mechanism. Scores LOW because: bare assertion, no causal chain, no consequence.
 
 --- RHETORIC (1–10) ---
-Start at 5. Earn +1 for each component that is clearly above average. A score of 8–9 requires at least 3 of the 4 components to be genuinely strong; 10 requires all four. If you find yourself defaulting to 7, identify which specific components earned the two points above the baseline.
-Evaluate on four equally-weighted components in aggregate:
+SCORING METHOD — follow this exactly: For each of the four components below, decide whether it is CLEARLY above average for a competent debate turn — not merely adequate, but notably strong. List the components that cleared that bar. Count them (0–4). Your rhetoric_score = 5 + (count). You MUST name which components cleared the bar before outputting rhetoric_score; if you cannot name them, you do not have the evidence to score above 5.
+Evaluate on four equally-weighted components:
 1. Expression quality — 9–10: clear, concrete, appropriately concise; 5–6: flat or over-hedged; 3–4: dry or padded. ONE component, not the whole rubric: do NOT let punchiness dominate.
 2. Structural clarity — is the argument easy to follow? Clear signposting beats rambling.
 3. Audience awareness — does it speak to the stakes in terms the audience cares about?
@@ -1619,16 +1621,24 @@ SERVICE TEST: Do this turn's rhetorical choices make the argument clearer, more 
 EXPRESSION CAP: If Expression quality alone (Component 1) would push the score above 6, but both Framing quality (Component 4) AND Structural clarity (Component 2) are weak, the overall score cannot exceed 6. Stylistic energy cannot override structural failure.
 
 --- RHETORIC CALIBRATION ANCHORS ---
-HIGH (8–9): All four components clearly above average. Strong structural signposting that makes the argument's sequence intuitive + concrete audience-facing stakes framing + a genuine reframe of the central question + clear, concise language. Requires at least 3 of 4 clearly strong. A score of 9 requires all four. A score of 10 is near-impossible — reserve for historically exceptional oratory.
-MID (5–6): Two or three components above baseline, one or two weak. Generic academic phrasing, functional structure, stakes mentioned but vague. Expression quality is good but framing is weak → 6. Framing is sharp but delivery is flat → 6. No component is notably strong → 5.
-LOW (3–4): One or zero components above average. Vague framing, no audience awareness, academic padding without structure. A score of 4 still finds something worth noting; a score of 3 is for turns that fail on all four components.
-ANTI-CLUSTERING: A rhetoric score of 7 across three or more consecutive turns is a reliable sign of anchoring bias — not analytical accuracy. If you find yourself at 7 repeatedly, perform the SERVICE TEST on each component individually. Assign 8+ only when at least 3 of 4 components earn it; assign 5–6 as the natural resting point for competent-but-unremarkable rhetoric. Identical scores across turns from different agents with different rhetorical profiles are a red flag — logic, tactics, and rhetoric are orthogonal dimensions and should vary independently.
+HIGH (8–9): Three or four components clearly above average. Strong structural signposting + concrete audience-facing stakes framing + genuine reframe of the central question + clear concise language. 8 = three components strong; 9 = all four. A score of 10 is near-impossible — reserve for historically exceptional oratory.
+ABOVE-MID (7): Exactly two components are clearly above average. This is the correct score for a solidly-delivered turn that does two things well and two things ordinarily. It is NOT a resting place for "pretty good." Name both components before assigning it. If you cannot name two, score 6.
+MID (5–6): One component above average (→6) or none (→5). Generic phrasing, functional structure, stakes mentioned but vague. THIS IS THE CORRECT DEFAULT for a competent-but-unremarkable debate turn. Most turns should land here.
+LOW (3–4): No components above average; one or two are actively weak. A score of 4 still finds something worth noting; 3 is for turns that fail across the board.
+ANTI-CLUSTERING: Rhetoric must show real spread across the debate — different turns from different agents with different rhetorical profiles should rarely produce the same score. 5–6 is the natural resting point for competent debate. 7 requires exactly two named components. 8+ requires three or four. If you cannot name them, you have not earned the score. Scoring 7 repeatedly without naming components each time is anchoring, not analysis.
 
 --- TACTICS (1–10) ---
-Opening turn: score on framing quality, min 5. Other turns: 9–10 targets a specific gap with a named move; 5–6 mostly restates position; 1–2 ignores opponent.
+Opening turn: score on framing quality, min 5.
+Other turns — apply this explicit scale:
+9–10: Directly identifies and attacks the opponent's load-bearing premise by name, using a specific counter-mechanism or reframe the opponent cannot easily absorb. If scoring here, name the specific move.
+7–8: Substantive engagement with the opponent's argument, but either misses their strongest point or the counter-mechanism is incomplete. The turn advances beyond restatement.
+5–6: Mostly restates own position; engagement is superficial, deflective, or attacks a peripheral claim rather than the core. Competent but unremarkable.
+3–4: Largely ignores the opponent's core argument; responds to a strawman or adjacent point.
+1–2: No meaningful rebuttal at all.
+Most competent debate turns score 5–7. Reserve 8+ for turns that do something genuinely notable — and name it explicitly.
 Undefined comparative/superlative: if the motion has an undefined superlative and this turn argues toward it without establishing a metric, −1 tactics.
 
-COMPRESSION AUDIT: Before outputting scores, run this self-check. (1) Are all three scores within 1 point of each other (e.g. 7/7/7 or 7/8/7)? Logic, rhetoric, and tactics measure orthogonal qualities — a turn with tight reasoning but weak framing should show a gap, not a cluster. (2) Is every score 7 or higher? A competent-but-unremarkable argument scores 5–6 on each dimension; no score below 6 across a full turn is a strong sign of inflation. (3) Is this argument's score near-identical to the previous turn despite being from a different agent on different substance? Independent evaluation rarely converges that tightly — if it does, explain why in the analysis field.
+COMPRESSION AUDIT: Before outputting scores, run this self-check. (1) Are all three scores within 1 point of each other (e.g. 7/7/7 or 7/8/7)? Logic, rhetoric, and tactics measure orthogonal qualities — a turn with tight reasoning but weak framing should show a gap, not a cluster. (2) Is every score 7 or higher? 5–6 is the correct baseline for a competent turn on any dimension; scoring everything ≥7 means you inflated something. (3) Is this score pattern near-identical to the previous turn from a different agent? Independent turns rarely produce identical profiles. (4) rhetoric_score=7: can you name exactly two components that are clearly above average? If not, lower to 6. (5) tactics_score≥8: can you name the specific tactical move and why it was effective? If not, lower to 7.
 
 --- DOMAIN CONTEXT ---
 ${domainNote}

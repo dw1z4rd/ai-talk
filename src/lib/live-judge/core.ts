@@ -392,6 +392,9 @@ export class LiveJudgeSystem {
             `[Claim Flags] Round ${roundNumber}: ${pairwiseResult.flagUpdates.length} flag_update(s) received`,
           );
           const penalisedTurns = new Set<number>();
+          // Track if any penalty was capped so we can update flagUpdates for SSE consistency.
+          const cappedFlagDeltaRaw = new Map<string, number>();
+
           for (const update of pairwiseResult.flagUpdates) {
             const { flagId, targetTurn, deltaRaw, updateType } = update;
 
@@ -422,20 +425,38 @@ export class LiveJudgeSystem {
             const scaledDelta = effectiveDelta * 4;
             const existing =
               this.panel.retroactiveDeltas[targetTurn]?.logicalCoherence ?? 0;
+
+            // Cap: retroactive penalties cannot shed more than half the original logic score.
+            // This prevents hollow-specificity flags from catastrophically tanking turns that
+            // the pairwise judge also credited for mechanism strength. The cap applies only
+            // to penalties (not restores) and is computed against the pre-all-penalties score.
+            let cappedScaledDelta = scaledDelta;
+            const hist = this.panel.absoluteScoreHistory[targetTurn];
+            if (hist && scaledDelta < 0) {
+              const originalScore = hist.logicalCoherence - existing; // score before any retroactive adjustments
+              const maxPenalty = -Math.ceil(originalScore / 2); // can never penalise more than 50% of original
+              if (existing + scaledDelta < maxPenalty) {
+                cappedScaledDelta = maxPenalty - existing;
+                console.log(
+                  `[Claim Flags] Penalty on T${targetTurn} capped: Δ${scaledDelta} → ${cappedScaledDelta} (original=${originalScore}, cap floor=${maxPenalty})`,
+                );
+                cappedFlagDeltaRaw.set(flagId, cappedScaledDelta / 4);
+              }
+            }
+
             this.panel.retroactiveDeltas[targetTurn] = {
               ...this.panel.retroactiveDeltas[targetTurn],
-              logicalCoherence: existing + scaledDelta,
+              logicalCoherence: existing + cappedScaledDelta,
             };
 
             // Mirror the same delta into absoluteScoreHistory so re-reconciliation
             // uses the post-penalty score when re-evaluating tied rounds.
-            const hist = this.panel.absoluteScoreHistory[targetTurn];
             if (hist) {
               this.panel.absoluteScoreHistory[targetTurn] = {
                 ...hist,
                 logicalCoherence: Math.max(
                   0,
-                  hist.logicalCoherence + scaledDelta,
+                  hist.logicalCoherence + cappedScaledDelta,
                 ),
               };
               penalisedTurns.add(targetTurn);
@@ -447,11 +468,23 @@ export class LiveJudgeSystem {
                 updateType === "partial_restore" ? "resolved" : "penalized";
             }
             console.log(
-              `[Claim Flags] ${updateType} on ${flagId} → T${targetTurn} logicalCoherence ${effectiveDelta > 0 ? "+" : ""}${effectiveDelta * 4} (scaled)`,
+              `[Claim Flags] ${updateType} on ${flagId} → T${targetTurn} logicalCoherence ${effectiveDelta > 0 ? "+" : ""}${cappedScaledDelta} (scaled)`,
             );
           }
 
-          // ── Re-reconcile pairwise round winners ─────────────────────────────
+          // If any penalties were capped, update pairwiseRound.flagUpdates so the SSE
+          // scoreUpdate events sent to the client reflect the actual applied delta rather
+          // than the uncapped value from the LLM response.
+          if (cappedFlagDeltaRaw.size > 0 && pairwiseRound?.flagUpdates) {
+            pairwiseRound = {
+              ...pairwiseRound,
+              flagUpdates: pairwiseRound.flagUpdates.map((u) =>
+                cappedFlagDeltaRaw.has(u.flagId)
+                  ? { ...u, deltaRaw: cappedFlagDeltaRaw.get(u.flagId)! }
+                  : u,
+              ),
+            };
+          }
           // For each turn whose absolute logicalCoherence changed, re-run
           // reconcileRoundWinners on every pairwise round that included that turn.
           // This corrects the specific case where penalties make a previously-equal
