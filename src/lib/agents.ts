@@ -1179,12 +1179,14 @@ export async function generateAdaptiveReply(
     ? `${systemPrompt}\n\n[REFERENCE MATERIAL]\nThe following documents have been provided. Draw on them where relevant to support or challenge arguments.\n\n${context}`
     : systemPrompt;
 
-  const reply = prebuiltReply ?? await agent.provider.generateText(prompt, {
-    systemPrompt: effectiveSystemPrompt,
-    temperature: 0.9,
-    maxTokens: 10000,
-    ...(onToken ? { onToken } : {}),
-  });
+  const reply =
+    prebuiltReply ??
+    (await agent.provider.generateText(prompt, {
+      systemPrompt: effectiveSystemPrompt,
+      temperature: 0.9,
+      maxTokens: 10000,
+      ...(onToken ? { onToken } : {}),
+    }));
 
   if (!reply) {
     return { reply: reply ?? null, judgePromise: Promise.resolve(undefined) };
@@ -1205,30 +1207,16 @@ export async function generateAdaptiveReply(
     try {
       const liveJudgeSystem = getLiveJudgeSystem();
 
-      const JUDGE_TIMEOUT_MS = 50_000;
-      const judgeResult = await Promise.race([
-        liveJudgeSystem.processTurn(
-          agent,
-          reply,
-          opponentAgent,
-          opponentMessage,
-          turnNumber,
-          topic,
-          context || "",
-          history,
-        ),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `Judge analysis timed out after ${JUDGE_TIMEOUT_MS}ms`,
-                ),
-              ),
-            JUDGE_TIMEOUT_MS,
-          ),
-        ),
-      ]);
+      const judgeResult = await liveJudgeSystem.processTurn(
+        agent,
+        reply,
+        opponentAgent,
+        opponentMessage,
+        turnNumber,
+        topic,
+        context || "",
+        history,
+      );
 
       // Only apply adaptive pressure if adaptive state exists and not a prebuilt (document) turn
       if (agent.adaptiveState && !prebuiltReply) {
@@ -1354,7 +1342,10 @@ export async function generateDebateNarrativeVerdict(
  * Reset live judge system for new debate.
  * Passing debater model IDs allows the judge to pick a different model than the debaters.
  */
-export function resetLiveJudgeDebate(debaterModelIds?: string[], mode: "debate" | "document_audit" = "debate") {
+export function resetLiveJudgeDebate(
+  debaterModelIds?: string[],
+  mode: "debate" | "document_audit" = "debate",
+) {
   resetLiveJudgeSystem(debaterModelIds, mode);
 }
 

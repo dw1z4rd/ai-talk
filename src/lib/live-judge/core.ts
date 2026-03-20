@@ -121,7 +121,6 @@ export class LiveJudgeSystem {
     this.panel.turnCount = turnNumber;
     const judge = this.panel.judges[0];
     const isOpeningTurn = !opponentMessage.trim();
-    const PER_JUDGE_TIMEOUT_MS = 45_000;
 
     let pairwiseRound: PairwiseRound | undefined;
     let aggregatedScores: JudgeScores;
@@ -151,11 +150,6 @@ export class LiveJudgeSystem {
       // Still run a lightweight adaptive judge on the opening turn so the
       // debater can get feedback on their framing quality for Turn 3.
       try {
-        const controller = new AbortController();
-        const timer = setTimeout(
-          () => controller.abort(),
-          PER_JUDGE_TIMEOUT_MS,
-        );
         const openingAnalysis = await analyzeTurn(
           judge,
           agent,
@@ -166,8 +160,7 @@ export class LiveJudgeSystem {
           topic,
           referenceContext,
           messageHistory,
-          controller.signal,
-        ).finally(() => clearTimeout(timer));
+        );
         judge.lastAnalysis = openingAnalysis;
         judge.analysisCount++;
         judgeAnalyses = [openingAnalysis];
@@ -207,14 +200,6 @@ export class LiveJudgeSystem {
       );
 
       try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => {
-          console.warn(
-            `[Pairwise Judge] Round ${roundNumber} timed out after ${PER_JUDGE_TIMEOUT_MS}ms`,
-          );
-          controller.abort();
-        }, PER_JUDGE_TIMEOUT_MS);
-
         // Pairwise runs first so its suspect_claims feed into the absolute scorer.
         // The absolute scoring is supplementary — its failure never blocks the pairwise result.
         const pairwiseResult = await compareTurns(
@@ -229,7 +214,7 @@ export class LiveJudgeSystem {
           turnNumber,
           topic,
           roundNumber,
-          controller.signal,
+          undefined,
           openFlagsForPrev.length > 0 ? openFlagsForPrev : undefined,
           this.mode,
         );
@@ -243,11 +228,9 @@ export class LiveJudgeSystem {
           topic,
           referenceContext,
           messageHistory,
-          controller.signal,
+          undefined,
           pairwiseResult.suspectClaims,
-        )
-          .catch(() => null)
-          .finally(() => clearTimeout(timer));
+        ).catch(() => null);
 
         pairwiseRound = pairwiseResult;
         judge.analysisCount++;
