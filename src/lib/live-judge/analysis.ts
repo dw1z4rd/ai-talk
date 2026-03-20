@@ -900,18 +900,20 @@ export function reconcileRoundWinners(
       prevAbsolute.logicalCoherence,
       8,
     ),
-    // Tactics/Rhetoric scale 0-30: threshold 5 (≥16% of scale)
+    // Tactics/Rhetoric scale 0-30: threshold 9 (= 3 raw points, ≥30% of scale).
+    // Raised from 5 so pairwise retains authority unless the absolute gap is large —
+    // the pairwise judge has richer context about which turn controlled the exchange.
     tacticsWinner: reconcile(
       rawTactics,
       curAbsolute.tacticalEffectiveness,
       prevAbsolute.tacticalEffectiveness,
-      5,
+      9,
     ),
     rhetoricWinner: reconcile(
       rawRhetoric,
       curAbsolute.rhetoricalForce,
       prevAbsolute.rhetoricalForce,
-      5,
+      9,
     ),
   };
 }
@@ -923,8 +925,8 @@ export function reconcileRoundWinners(
  *
  * Scale thresholds (gap required to flag):
  *   logic:   0–40,   threshold = 5
- *   tactics: 0–30,   threshold = 3
- *   rhetoric: 0–30,  threshold = 3
+ *   tactics: 0–30,   threshold = 6  (= 2 raw points; was 3, raised to reduce noise)
+ *   rhetoric: 0–30,  threshold = 6  (same rationale)
  *   overall: 0–100,  threshold = 15
  */
 export function computeHarmonizationFlags(
@@ -997,14 +999,14 @@ export function computeHarmonizationFlags(
     round.tacticsWinner,
     prevAbsolute.tacticalEffectiveness,
     curAbsolute.tacticalEffectiveness,
-    3,
+    6,
   );
   check(
     "rhetoric",
     round.rhetoricWinner,
     prevAbsolute.rhetoricalForce,
     curAbsolute.rhetoricalForce,
-    3,
+    6,
   );
 
   // Derive the overall pairwise winner as the agent that won a majority of

@@ -17,6 +17,7 @@ function filterThinkingTags(text: string): string {
   // are not concatenated when the block appears mid-sentence or mid-line.
   let filtered = text
     .replace(/\s*<thinking>[\s\S]*?<\/thinking>\s*/gi, " ")
+    .replace(/\s*<think>[\s\S]*?<\/think>\s*/gi, " ") // shortform (e.g. DeepSeek / MiniMax variants)
     .replace(/\s*<reasoning>[\s\S]*?<\/reasoning>\s*/gi, " ")
     .replace(/\s*<thought>[\s\S]*?<\/thought>\s*/gi, " ")
     .replace(/\s*<analysis>[\s\S]*?<\/analysis>\s*/gi, " ")
@@ -142,16 +143,21 @@ export const createOllamaProvider = (
               const lowerToken = token.toLowerCase();
               if (
                 lowerToken.includes("<thinking>") ||
+                lowerToken.includes("<think>") || // shortform thinking tag (e.g. DeepSeek / MiniMax)
                 lowerToken.includes("<reasoning>") ||
                 lowerToken.includes("<thought>") ||
                 lowerToken.includes("<analysis>") ||
                 lowerToken.includes("</tool_call>")
               ) {
                 isInThinkingBlock = true;
+                // If this token contains text before the opening tag, it was already flushed
+                // by prior tokens, so no need to re-emit it here. The important thing is
+                // that we insert a space when the block CLOSES, handled below.
                 return false; // Skip the opening tag
               }
               if (
                 lowerToken.includes("</thinking>") ||
+                lowerToken.includes("</think>") || // shortform closing tag
                 lowerToken.includes("</reasoning>") ||
                 lowerToken.includes("</thought>") ||
                 lowerToken.includes("</analysis>")

@@ -219,26 +219,31 @@ export class LiveJudgeSystem {
           this.mode,
         );
         // Build a calibration hint from the pairwise result so the absolute scorer
-        // doesn't produce a logic score that flatly contradicts what the comparative
-        // judge already concluded. The absolute scorer still evaluates independently —
-        // this only provides a directional anchor to prevent near-failure scores on turns
-        // the pairwise judge credited or treated as equal.
-        const pairwiseLogicWinnerName =
-          pairwiseResult.logicWinner === agent.id
-            ? agent.name
-            : pairwiseResult.logicWinner === "tie" ||
-                pairwiseResult.logicWinner === prevAgentId
-              ? pairwiseResult.logicWinner === "tie"
-                ? null
-                : prevAgentName
-              : null;
+        // doesn't produce scores that flatly contradict what the comparative judge
+        // concluded. Covers all three dimensions. The absolute scorer still evaluates
+        // independently — these anchors prevent near-failure scores on turns the
+        // pairwise judge credited or treated as equal.
+        const buildDimAnchor = (
+          dimension: string,
+          scaleMax: number,
+          floor: number,
+          winner: string,
+        ): string => {
+          if (winner === agent.id) {
+            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${agent.name} (this turn). Your ${dimension.toLowerCase()}_score should be ≥ ${floor}. Scoring below ${floor} would directly contradict the comparative judge's finding — only do so if you identify a specific failure the comparative judge explicitly overlooked.`;
+          } else if (winner === "tie") {
+            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge called this a DRAW. Your ${dimension.toLowerCase()}_score should reflect a genuinely competitive turn — a score below 4 would contradict the draw verdict unless you find a specific failure the comparative judge missed.`;
+          } else {
+            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${prevAgentName} (opponent). ${agent.name}'s ${dimension.toLowerCase()}_score may be below average, but apply the normal rubric independently.`;
+          }
+        };
         const pairwiseCalibration = pairwiseResult.isFallback
           ? undefined
-          : pairwiseLogicWinnerName === null
-            ? `PAIRWISE ANCHOR — Logic: the comparative judge called this round a DRAW between ${agent.name} and ${prevAgentName}. Your logic_score should not be dramatically lower than a neutral baseline — a score below 4 would contradict the draw verdict unless you identify a specific failure the comparative judge missed.`
-            : pairwiseLogicWinnerName === agent.name
-              ? `PAIRWISE ANCHOR — Logic: the comparative judge gave the Logic WIN to ${agent.name} (this turn). Your logic_score should be ≥ 5 (≥20/40). Scoring below 5 would directly contradict the comparative judge's finding — only do so if you identify a clear logical failure that the comparative judge explicitly overlooked.`
-              : `PAIRWISE ANCHOR — Logic: the comparative judge gave the Logic WIN to ${prevAgentName} (opponent). ${agent.name}'s logic_score may be below average, but apply the normal scoring rubric independently.`;
+          : [
+              buildDimAnchor("Logic", 40, 6, pairwiseResult.logicWinner),
+              buildDimAnchor("Tactics", 30, 6, pairwiseResult.tacticsWinner),
+              buildDimAnchor("Rhetoric", 30, 6, pairwiseResult.rhetoricWinner),
+            ].join("\n");
 
         const absoluteAnalysis = await analyzeTurn(
           judge,
@@ -469,19 +474,30 @@ export class LiveJudgeSystem {
             const existing =
               this.panel.retroactiveDeltas[targetTurn]?.logicalCoherence ?? 0;
 
-            // Cap: retroactive penalties cannot shed more than half the original logic score.
-            // This prevents hollow-specificity flags from catastrophically tanking turns that
-            // the pairwise judge also credited for mechanism strength. The cap applies only
-            // to penalties (not restores) and is computed against the pre-all-penalties score.
+            // Cap: retroactive penalties cannot shed more than a fraction of the original
+            // logic score. For turns that won their pairwise logic dimension, use a tighter
+            // 25% cap — this prevents open-flag penalties from creating artificial "both at
+            // penalty floor" ties that contradict a round where the pairwise judge awarded
+            // the logic win. For all other turns the cap is 50% (previous behaviour).
             let cappedScaledDelta = scaledDelta;
             const hist = this.panel.absoluteScoreHistory[targetTurn];
             if (hist && scaledDelta < 0) {
               const originalScore = hist.logicalCoherence - existing; // score before any retroactive adjustments
-              const maxPenalty = -Math.ceil(originalScore / 2); // can never penalise more than 50% of original
+              // Determine if this turn was a pairwise logic winner in its own round.
+              const wasPairwiseLogicWinner = this.panel.scorecard.rounds.some(
+                (r) =>
+                  ((r.curTurn.turnNumber === targetTurn &&
+                    r.curTurn.agentId === update.agentId) ||
+                    (r.prevTurn.turnNumber === targetTurn &&
+                      r.prevTurn.agentId === update.agentId)) &&
+                  (r.logicWinnerRaw ?? r.logicWinner) === update.agentId,
+              );
+              const capFraction = wasPairwiseLogicWinner ? 0.25 : 0.5;
+              const maxPenalty = -Math.ceil(originalScore * capFraction);
               if (existing + scaledDelta < maxPenalty) {
                 cappedScaledDelta = maxPenalty - existing;
                 console.log(
-                  `[Claim Flags] Penalty on T${targetTurn} capped: Δ${scaledDelta} → ${cappedScaledDelta} (original=${originalScore}, cap floor=${maxPenalty})`,
+                  `[Claim Flags] Penalty on T${targetTurn} capped: Δ${scaledDelta} → ${cappedScaledDelta} (original=${originalScore}, cap=${Math.round(capFraction * 100)}%${wasPairwiseLogicWinner ? " — pairwise winner" : ""})`,
                 );
                 cappedFlagDeltaRaw.set(flagId, cappedScaledDelta / 4);
               }

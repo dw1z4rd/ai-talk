@@ -348,7 +348,9 @@
     }
 
     let scoresHtml = "";
-    const scoredRows = liveJudgeResults.filter((r: any) => r.absoluteScores);
+    const scoredRows = liveJudgeResults
+      .filter((r: any) => r.absoluteScores)
+      .sort((a: any, b: any) => a.turnNumber - b.turnNumber);
     if (scoredRows.length > 0) {
       scoresHtml += `<hr style="margin:2rem 0;border:none;border-top:1px solid #ddd">`;
       scoresHtml += `<h2 style="font-size:1rem;font-weight:700;margin-bottom:0.75rem">Per-Turn Absolute Scores</h2>`;
