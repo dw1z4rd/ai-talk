@@ -14,7 +14,7 @@ export const load: PageServerLoad = async () => {
     } catch (err: any) {
         if (err.code === 'ENOENT') {
             // The file doesn't exist yet, meaning no bots have finished suffering.
-            return { victims: [], totalWasted: 0 };
+            return { victims: [], totalWasted: '0.0' };
         }
         console.error('Error reading tarpit logs:', err);
         throw error(500, 'Failed to read tarpit logs.');
