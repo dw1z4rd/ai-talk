@@ -1025,25 +1025,16 @@ export function reconcileRoundWinners(
   /**
    * Reconciliation decision for one dimension:
    * - Equal absolute scores → "tie" (no win counted for either agent)
-   * - Absolute gap ≥ threshold AND absolute leader ≠ pairwise winner → use absolute leader
-   *   (prevents the two scoring systems from publicly contradicting each other)
-   * - Otherwise → retain the pairwise winner's judgment
+   * - Unequal scores → retain the pairwise winner's judgment
+   *   (pairwise has richer context — full turn text — and is authoritative;
+   *    divergences are surfaced separately via computeHarmonizationFlags)
    */
   const reconcile = (
     rawWinner: string,
     curScore: number,
     prevScore: number,
-    threshold: number,
   ): string => {
     if (curScore === prevScore) return "tie";
-    const gap = Math.abs(curScore - prevScore);
-    const absoluteLeader = curScore > prevScore ? curId : prevId;
-    if (rawWinner !== absoluteLeader && gap >= threshold) {
-      console.warn(
-        `[Reconcile] R${round.roundNumber}: absolute gap ${gap} ≥ ${threshold} overrides pairwise winner ${rawWinner} → ${absoluteLeader}`,
-      );
-      return absoluteLeader;
-    }
     return rawWinner;
   };
 
@@ -1052,27 +1043,20 @@ export function reconcileRoundWinners(
     logicWinnerRaw: rawLogic,
     tacticsWinnerRaw: rawTactics,
     rhetoricWinnerRaw: rawRhetoric,
-    // Logic scale 0-40: threshold 8 (≥20% of scale — meaningful signal, not noise)
     logicWinner: reconcile(
       rawLogic,
       curAbsolute.logicalCoherence,
       prevAbsolute.logicalCoherence,
-      8,
     ),
-    // Tactics/Rhetoric scale 0-30: threshold 9 (= 3 raw points, ≥30% of scale).
-    // Raised from 5 so pairwise retains authority unless the absolute gap is large —
-    // the pairwise judge has richer context about which turn controlled the exchange.
     tacticsWinner: reconcile(
       rawTactics,
       curAbsolute.tacticalEffectiveness,
       prevAbsolute.tacticalEffectiveness,
-      9,
     ),
     rhetoricWinner: reconcile(
       rawRhetoric,
       curAbsolute.rhetoricalForce,
       prevAbsolute.rhetoricalForce,
-      9,
     ),
   };
 }

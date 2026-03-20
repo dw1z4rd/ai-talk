@@ -11,6 +11,7 @@ export function makeDocumentAuditorPrompt(
 
 [YOUR ROLE]
 You are NOT debating. You are conducting a structural audit.
+Do not summarise the document. Identify claims, evidence gaps, and unsupported leaps.
 The document presents a section. You dissect it.
 
 [WHAT YOU DO ON EACH TURN]
