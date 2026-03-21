@@ -138,6 +138,8 @@
     updateType: "penalty" | "partial_restore";
   }
   let scoreUpdateNotifications = $state<ScoreUpdateNotification[]>([]);
+  // Persistent log of every retroactive score correction during this debate.
+  let scoreUpdateHistory = $state<ScoreUpdateNotification[]>([]);
 
   // Winner modal
   let winner = $state<{ id: string; name: string; color: string } | null>(null);
@@ -224,6 +226,7 @@
     _scoreTotals = {};
     _momentumTotals = {};
     currentDebateId = null;
+    scoreUpdateHistory = [];
   }
 
   function buildContext(): string | undefined {
@@ -282,6 +285,7 @@
       _scoreTotals = {};
       _momentumTotals = {};
       currentDebateId = null;
+      scoreUpdateHistory = [];
     }
     done = false;
     isPaused = false;
@@ -480,7 +484,7 @@
             // Accumulate delta for the badge display in the score table
             scoreDeltas[data.targetTurn] = (scoreDeltas[data.targetTurn] ?? 0) + data.deltaLogic;
             const notifId = crypto.randomUUID();
-            scoreUpdateNotifications.push({
+            const notif: ScoreUpdateNotification = {
                 id: notifId,
                 targetTurn: data.targetTurn,
                 agentId: data.agentId,
@@ -489,11 +493,13 @@
                 deltaLogic: data.deltaLogic,
                 reason: data.reason,
                 updateType: data.updateType,
-            });
+            };
+            scoreUpdateNotifications.push(notif);
+            scoreUpdateHistory.push(notif);
             setTimeout(() => {
               const i = scoreUpdateNotifications.findIndex((n) => n.id === notifId);
               if (i !== -1) scoreUpdateNotifications.splice(i, 1);
-            }, 3500);
+            }, 6000);
           } else if (data.type === "narrativeVerdict") {
             judgeStatus = null;
             narrativeVerdict = {
@@ -668,6 +674,58 @@
     agentOverrides={docAnalysisMode ? { [agentA]: { name: "Document", color: "#94a3b8" } } : {}}
     onreset={resetConversation}
   />
+{/if}
+
+<!-- Retroactive Adjustments log -->
+{#if scoreUpdateHistory.length > 0}
+  <div class="w-[90vw] max-w-[1600px] mx-auto px-[6px] pb-8">
+    <details class="rounded-xl border border-[--color-border] bg-[--color-panel] overflow-hidden">
+      <summary class="flex items-center gap-2 px-4 py-3 cursor-pointer select-none hover:bg-[--color-hover] transition-colors">
+        <svg class="w-4 h-4 text-[--color-muted] shrink-0" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v4.59L7.3 9.24a.75.75 0 00-1.1 1.02l3.25 3.5a.75.75 0 001.1 0l3.25-3.5a.75.75 0 10-1.1-1.02l-1.95 2.1V6.75z" clip-rule="evenodd" />
+        </svg>
+        <span class="text-sm font-semibold text-[--color-text]">Retroactive Score Adjustments</span>
+        <span class="ml-1 text-xs text-[--color-muted]">({scoreUpdateHistory.length})</span>
+        <span class="ml-auto text-[10px] text-[--color-muted] font-mono uppercase tracking-wider">Fact-check corrections applied after initial scoring</span>
+      </summary>
+      <div class="border-t border-[--color-border]">
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="border-b border-[--color-border] text-[--color-muted]">
+                <th class="px-4 py-2 text-left font-medium">Turn</th>
+                <th class="px-4 py-2 text-left font-medium">Agent</th>
+                <th class="px-4 py-2 text-left font-medium">Type</th>
+                <th class="px-4 py-2 text-right font-medium">Logic Δ</th>
+                <th class="px-4 py-2 text-left font-medium">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each scoreUpdateHistory as n (n.id)}
+                <tr class="border-b border-[--color-border] last:border-0 hover:bg-[--color-hover] transition-colors">
+                  <td class="px-4 py-2.5">
+                    <span class="font-mono font-bold px-1.5 py-0.5 rounded text-[10px]"
+                      style="background: {n.updateType === 'penalty' ? '#f8717122' : '#34d39922'}; color: {n.updateType === 'penalty' ? '#f87171' : '#34d399'}">
+                      T{n.targetTurn}
+                    </span>
+                  </td>
+                  <td class="px-4 py-2.5 font-semibold" style="color: {n.agentColor}">{n.agentName}</td>
+                  <td class="px-4 py-2.5">
+                    <span class="capitalize text-[--color-muted]">{n.updateType === 'partial_restore' ? 'restore' : n.updateType}</span>
+                  </td>
+                  <td class="px-4 py-2.5 text-right font-mono font-bold"
+                    style="color: {n.updateType === 'penalty' ? '#f87171' : '#34d399'}">
+                    {n.deltaLogic > 0 ? '+' : ''}{n.deltaLogic}
+                  </td>
+                  <td class="px-4 py-2.5 text-[--color-muted] leading-snug max-w-[500px]">{n.reason}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+  </div>
 {/if}
 
 <style>
