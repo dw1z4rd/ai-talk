@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { flyInFromLeft, flyOutToRight } from "$lib/transitions";
+  import { flyInFromLeft, flyOutToRight, popIn, popOut } from "$lib/transitions";
+  import { fade } from "svelte/transition";
   import { tick } from "svelte";
 
   interface Props {
@@ -114,8 +115,8 @@
 {#if showWinnerModal}
   <div
     class="fixed inset-0 z-50 flex items-center justify-center"
-    in:flyInFromLeft
-    out:flyOutToRight
+    in:fade={{ duration: 280 }}
+    out:fade={{ duration: 180 }}
   >
     <!-- Confetti canvas (sits behind modal content) -->
     <canvas
@@ -129,8 +130,8 @@
     <!-- Content -->
     <div
       class="relative z-10 flex flex-col items-center gap-6 text-center px-8"
-      in:flyInFromLeft
-      out:flyOutToRight
+      in:popIn
+      out:popOut
     >
       <!-- Glow + name -->
       <div class="relative">

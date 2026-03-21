@@ -57,7 +57,7 @@
   {#if judgeStatus}
     <div
       class="flex items-center gap-2.5 px-3 py-2 rounded-xl border"
-      style="border-color: #7c6af730; background: #7c6af708; animation: fadeSlide 0.75s ease both"
+      style="border-color: #7c6af730; background: #7c6af708; animation: fadeSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1) both"
     >
       <span class="flex gap-1 items-center">
         <span class="w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:0ms]" style="background:#c084fc"></span>
@@ -474,11 +474,11 @@
   @keyframes fadeSlide {
     from {
       opacity: 0;
-      transform: translateY(-6px);
+      transform: translateY(-6px) scale(0.98);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
     }
   }
   @keyframes judgePulse {
@@ -488,7 +488,7 @@
   @keyframes judgeReveal {
     from {
       opacity: 0;
-      transform: translateY(18px) scale(0.93);
+      transform: translateY(12px) scale(0.96);
     }
     to {
       opacity: 1;
@@ -498,11 +498,11 @@
   @keyframes judgeHeaderReveal {
     from {
       opacity: 0;
-      transform: translateY(-6px);
+      transform: translateY(-6px) scale(0.97);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
     }
   }
   .judge-panel {

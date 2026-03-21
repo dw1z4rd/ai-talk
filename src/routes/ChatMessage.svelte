@@ -16,7 +16,7 @@
 {#if msg.agentId === "moderator"}
   <div
     class="flex flex-col items-center gap-2 px-6 py-6 border-t border-[--color-border-subtle]"
-    style="animation: fadeSlide 0.2s ease both; animation-delay: {Math.min(
+    style="animation: fadeSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: {Math.min(
       index * 250,
       250,
     )}ms"
@@ -36,7 +36,7 @@
     class="group flex gap-3 px-3 py-3 sm:px-6 sm:py-4 border-t border-[--color-border-subtle] {isLeft
       ? ''
       : 'sm:flex-row-reverse'}"
-    style="animation: fadeSlide 0.5s ease both; animation-delay: {Math.min(
+    style="animation: fadeSlide 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: {Math.min(
       index * 20,
       100,
     )}ms"
@@ -83,11 +83,11 @@
   @keyframes fadeSlide {
     from {
       opacity: 0;
-      transform: translateY(8px);
+      transform: translateY(8px) scale(0.98);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
     }
   }
 

@@ -28,7 +28,7 @@
     class="flex gap-3 px-3 py-3 sm:px-6 sm:py-4 border-t border-[--color-border-subtle] {isLeft
       ? ''
       : 'sm:flex-row-reverse'}"
-    style="animation: fadeSlide 0.75s ease both"
+    style="animation: fadeSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1) both"
   >
     <div class="flex-shrink-0 flex flex-col items-center gap-1.5">
       <div

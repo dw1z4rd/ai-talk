@@ -1,8 +1,8 @@
-import { cubicOut, cubicIn } from "svelte/easing";
+import { cubicOut, cubicIn, backOut, expoOut, expoIn } from "svelte/easing";
 
 export function flyInFromTop(
   node: Element,
-  { duration = 400, delay = 0, easing = cubicOut } = {},
+  { duration = 340, delay = 0, easing = expoOut } = {},
 ) {
   // 1. Grab the element's computed styles
   const style = getComputedStyle(node);
@@ -26,7 +26,7 @@ export function flyInFromTop(
 
 export function flyOutToBottom(
   node: Element,
-  { duration = 350, delay = 0, easing = cubicIn } = {},
+  { duration = 270, delay = 0, easing = expoIn } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -56,7 +56,7 @@ export function flyOutToBottom(
 }
 export function flyInFromLeft(
   node: Element,
-  { duration = 350, delay = 0, easing = cubicOut } = {},
+  { duration = 280, delay = 0, easing = expoOut } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -79,7 +79,7 @@ export function flyInFromLeft(
 }
 export function flyOutToRight(
   node: Element,
-  { duration = 300, delay = 0, easing = cubicIn } = {},
+  { duration = 220, delay = 0, easing = expoIn } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -104,6 +104,43 @@ export function flyOutToRight(
       pointer-events: none;
       transform: ${transform} translateX(${u * distanceToRight}px);
       opacity: ${targetOpacity * t};
+    `,
+  };
+}
+
+/**
+ * Spring-pop entrance for modals and toasts.
+ * Scales up from 0.88 and slides up 20px with a backOut overshoot.
+ */
+export function popIn(
+  node: Element,
+  { duration = 420, delay = 0, easing = backOut } = {},
+) {
+  return {
+    delay,
+    duration,
+    easing,
+    css: (t: number) => `
+      transform: scale(${0.88 + 0.12 * t}) translateY(${(1 - t) * 20}px);
+      opacity: ${t < 0.5 ? t * 2 : 1};
+    `,
+  };
+}
+
+/**
+ * Matching exit for popIn — collapses down quickly.
+ */
+export function popOut(
+  node: Element,
+  { duration = 180, delay = 0, easing = cubicIn } = {},
+) {
+  return {
+    delay,
+    duration,
+    easing,
+    css: (t: number) => `
+      transform: scale(${0.92 + 0.08 * t}) translateY(${(1 - t) * 12}px);
+      opacity: ${t};
     `,
   };
 }
