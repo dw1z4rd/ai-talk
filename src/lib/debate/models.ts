@@ -20,8 +20,8 @@ export const MODEL_OPTIONS = [
       {
         id: "deepseek-v3.1:671b-cloud",
         name: "DeepSeek V3.1 671B",
-        color: "#A5111B", 
-      }
+        color: "#A5111B",
+      },
       {
         id: "kimi-k2.5:cloud",
         name: "Kimi K2.5",
