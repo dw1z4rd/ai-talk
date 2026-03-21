@@ -866,25 +866,31 @@ export class LiveJudgeSystem {
           // MIN_LOGIC_WIN_GAP of 6 points.  The loser has room to move; the
           // ceiling blocks the winner.
           const MIN_LOGIC_WIN_GAP = 6;
-          if (!pairwiseRound.isFallback && pairwiseRound.logicWinner !== "tie") {
+          if (
+            !pairwiseRound.isFallback &&
+            pairwiseRound.logicWinner !== "tie"
+          ) {
             const prevHistEntry =
-              this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber];
+              this.panel.absoluteScoreHistory[
+                pairwiseRound.prevTurn.turnNumber
+              ];
             if (prevHistEntry !== undefined) {
               const winnerIsCur = pairwiseRound.logicWinner === agent.id;
-              // Clamp prevTurn's Logic into whichever band the pairwise verdict
-              // assigned it (LOSS [10,22] when curTurn wins; WIN [24,40] when
-              // prevTurn wins).
-              const prevLogicClamped = winnerIsCur
-                ? Math.max(10, Math.min(22, prevHistEntry.logicalCoherence))
-                : Math.max(24, Math.min(40, prevHistEntry.logicalCoherence));
+              // Use the already-clamped stored value directly — applyPairwiseFloors
+              // already placed it in the correct band; re-clamping with different
+              // parameters would compute the gap against a phantom reference.
+              const prevLogic = prevHistEntry.logicalCoherence;
               const winnerLogic = winnerIsCur
                 ? absoluteScores.logicalCoherence
-                : prevLogicClamped;
+                : prevLogic;
               const loserLogic = winnerIsCur
-                ? prevLogicClamped
+                ? prevLogic
                 : absoluteScores.logicalCoherence;
               if (winnerLogic - loserLogic < MIN_LOGIC_WIN_GAP) {
-                const adjustedLoser = Math.max(10, winnerLogic - MIN_LOGIC_WIN_GAP);
+                const adjustedLoser = Math.max(
+                  10,
+                  winnerLogic - MIN_LOGIC_WIN_GAP,
+                );
                 if (winnerIsCur) {
                   // prevTurn is the loser — update absoluteScoreHistory so
                   // reconcileRoundWinners sees a non-zero gap.

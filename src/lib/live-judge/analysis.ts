@@ -1120,8 +1120,6 @@ export function applyPairwiseFloors(
     7, // lossFloor
     16, // lossCeil
     30, // scaleCeil
-    prevScores?.tacticalEffectiveness, // gap enforcement: winner ≥ prevTurn + 6
-    6, // winMinGap = 2 raw points on 1–10 scale
   );
   const newRhetoric = clampAbsDim(
     rhetoricWinner,
@@ -1134,8 +1132,6 @@ export function applyPairwiseFloors(
     7, // lossFloor
     16, // lossCeil
     30, // scaleCeil
-    prevScores?.rhetoricalForce, // gap enforcement: winner ≥ prevTurn + 6
-    6, // winMinGap = 2 raw points on 1–10 scale
   );
 
   if (
