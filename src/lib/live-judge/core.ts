@@ -938,82 +938,12 @@ export class LiveJudgeSystem {
             };
           }
 
-          // ── Post-penalty Logic gap enforcement ───────────────────────────────
-          // This is the SOLE gap enforcement for Logic.  It runs after all
-          // deductions (evidence gating, artifact cap) so it sees the true final
-          // score for both turns simultaneously.  The loser is pulled down only —
-          // never push the winner up, which would silently undo a penalty.
-          //
-          // Pipeline order guarantee:
-          //   1. applyPairwiseFloors  — band clamping only (WIN/DRAW/LOSS)
-          //   2. Evidence gating penalty  — may reduce winner's Logic score
-          //   3. Artifact rhetoric cap    — may reduce Rhetoric score
-          //   4. THIS BLOCK              — opens the gap on final values
-          const MIN_LOGIC_WIN_GAP = 6;
-          if (
-            !pairwiseRound.isFallback &&
-            pairwiseRound.logicWinner !== "tie"
-          ) {
-            const prevTurnNumFinal = pairwiseRound.prevTurn.turnNumber;
-            const prevHistFinal =
-              this.panel.absoluteScoreHistory[prevTurnNumFinal];
-            if (prevHistFinal !== undefined) {
-              const winnerIsCur = pairwiseRound.logicWinner === agent.id;
-              const curLogic = absoluteScores.logicalCoherence;
-              const prevLogic = prevHistFinal.logicalCoherence;
-              const winnerLogic = winnerIsCur ? curLogic : prevLogic;
-              const loserLogic = winnerIsCur ? prevLogic : curLogic;
-              if (winnerLogic - loserLogic < MIN_LOGIC_WIN_GAP) {
-                const adjustedLoser = Math.max(
-                  10,
-                  winnerLogic - MIN_LOGIC_WIN_GAP,
-                );
-                if (winnerIsCur) {
-                  // prevTurn is the loser — pull it down and emit a scoreUpdate SSE.
-                  const delta = adjustedLoser - prevHistFinal.logicalCoherence;
-                  if (delta !== 0) {
-                    this.panel.absoluteScoreHistory[prevTurnNumFinal] = {
-                      ...prevHistFinal,
-                      logicalCoherence: adjustedLoser,
-                    };
-                    logicGapAdjustment = logicGapAdjustment
-                      ? {
-                          ...logicGapAdjustment,
-                          deltaLogic: logicGapAdjustment.deltaLogic + delta,
-                        }
-                      : {
-                          targetTurn: prevTurnNumFinal,
-                          targetAgentId: pairwiseRound.prevTurn.agentId,
-                          deltaLogic: delta,
-                        };
-                    console.log(
-                      `[Logic WIN Gap] R${pairwiseRound.roundNumber} ` +
-                        `T${prevTurnNumFinal} (${pairwiseRound.prevTurn.agentId}) Logic ` +
-                        `${prevHistFinal.logicalCoherence}→${adjustedLoser} ` +
-                        `(delta=${delta}) — gap opened below ` +
-                        `T${turnNumber} Logic=${absoluteScores.logicalCoherence}`,
-                    );
-                  }
-                } else {
-                  // curTurn is the loser — pull it down in-place.
-                  const oldLogic = absoluteScores.logicalCoherence;
-                  absoluteScores = {
-                    ...absoluteScores,
-                    logicalCoherence: adjustedLoser,
-                  };
-                  console.log(
-                    `[Logic WIN Gap] R${pairwiseRound.roundNumber} ` +
-                      `T${turnNumber} (${agent.name}) Logic ` +
-                      `${oldLogic}→${adjustedLoser} ` +
-                      `— pulled down to open gap below ` +
-                      `T${prevTurnNumFinal} Logic=${prevLogic}`,
-                  );
-                }
-              }
-            }
-          }
-
           // Persist for next round's harmonization check and retroactive re-reconciliation
+          // NOTE: Logic gap enforcement (MIN_LOGIC_WIN_GAP) has been moved to
+          // enforceAllLogicGaps(), called once inside generateNarrativeVerdict after all
+          // turns are scored.  Running it here caused stacking: when T3 was later pulled
+          // down as a loser in R3, it equalized with T2 (which had already been pulled
+          // down for R2), flipping R2 from DS-win to "tie".
           this.panel.lastAbsoluteScores[agent.id] = absoluteScores;
           this.panel.absoluteScoreHistory[turnNumber] = absoluteScores;
         }
@@ -1322,6 +1252,81 @@ export class LiveJudgeSystem {
   }
 
   /**
+   * Enforce a minimum Logic gap between winner and loser for every scored round,
+   * applied in a single reverse-order pass after all turns are processed.
+   *
+   * Reverse order is required because a turn can be the winner in round N and
+   * the loser in round N+1.  Processing N+1 first establishes the loser's final
+   * score; round N then uses that reduced score to set the earlier loser, cascading
+   * the gap correctly down the chain.  Forward-order processing breaks earlier
+   * round gaps when a later round pulls a shared turn's score below the earlier
+   * winner's floor.
+   *
+   * Only the loser is ever adjusted (downward).  The winner's score is never
+   * touched here — all per-turn penalties are already baked into absoluteScoreHistory.
+   * After adjusting scores, reconcileRoundWinners is re-run for any affected round so
+   * rounds where the gap was already ≥ MIN_LOGIC_WIN_GAP remain unchanged.
+   */
+  private enforceAllLogicGaps(): void {
+    const MIN_LOGIC_WIN_GAP = 6;
+    const rounds = this.panel.scorecard.rounds;
+
+    // Reverse pass: last round first so shared turns cascade correctly.
+    for (let i = rounds.length - 1; i >= 0; i--) {
+      const round = rounds[i];
+      if (round.isFallback || round.logicWinner === "tie") continue;
+
+      const prevAbs =
+        this.panel.absoluteScoreHistory[round.prevTurn.turnNumber];
+      const curAbs = this.panel.absoluteScoreHistory[round.curTurn.turnNumber];
+      if (!prevAbs || !curAbs) continue;
+
+      const winnerIsCur = round.logicWinner === round.curTurn.agentId;
+      const winnerTurn = winnerIsCur
+        ? round.curTurn.turnNumber
+        : round.prevTurn.turnNumber;
+      const loserTurn = winnerIsCur
+        ? round.prevTurn.turnNumber
+        : round.curTurn.turnNumber;
+
+      const winnerLogic =
+        this.panel.absoluteScoreHistory[winnerTurn]!.logicalCoherence;
+      const loserEntry = this.panel.absoluteScoreHistory[loserTurn]!;
+      const loserLogic = loserEntry.logicalCoherence;
+
+      if (winnerLogic - loserLogic < MIN_LOGIC_WIN_GAP) {
+        const adjustedLoser = Math.max(10, winnerLogic - MIN_LOGIC_WIN_GAP);
+        if (adjustedLoser !== loserLogic) {
+          this.panel.absoluteScoreHistory[loserTurn] = {
+            ...loserEntry,
+            logicalCoherence: adjustedLoser,
+          };
+          console.log(
+            `[Logic Gap Pass] R${round.roundNumber} ` +
+              `T${loserTurn} Logic ${loserLogic}→${adjustedLoser} ` +
+              `(winner T${winnerTurn}=${winnerLogic}, gap was ${winnerLogic - loserLogic})`,
+          );
+        }
+      }
+
+      // Re-reconcile this round using the (possibly updated) scores so equal-score
+      // pairs are correctly flagged as "tie" and unequal pairs retain their winner.
+      const updatedPrev =
+        this.panel.absoluteScoreHistory[round.prevTurn.turnNumber]!;
+      const updatedCur =
+        this.panel.absoluteScoreHistory[round.curTurn.turnNumber]!;
+      const reconciled = reconcileRoundWinners(round, updatedCur, updatedPrev);
+      if (
+        reconciled.logicWinner !== round.logicWinner ||
+        reconciled.tacticsWinner !== round.tacticsWinner ||
+        reconciled.rhetoricWinner !== round.rhetoricWinner
+      ) {
+        rounds[i] = reconciled;
+      }
+    }
+  }
+
+  /**
    * Generate the full-debate narrative verdict. Call this after all turns complete.
    */
   async generateNarrativeVerdict(
@@ -1331,6 +1336,14 @@ export class LiveJudgeSystem {
     agentB: Agent,
   ): Promise<NarrativeVerdict | null> {
     if (this.panel.scorecard.rounds.length === 0) return null;
+
+    // ── Final gap enforcement ─────────────────────────────────────────────────
+    // All per-turn penalties (evidence gating, artifact cap) are now finalised.
+    // Run a single reverse-order pass to enforce MIN_LOGIC_WIN_GAP across every
+    // round.  Reverse order ensures that when a turn is shared between two rounds
+    // (winner in R_N, loser in R_{N+1}), R_{N+1}'s adjustment is applied first so
+    // R_N can cascade down correctly without creating new ties.
+    this.enforceAllLogicGaps();
 
     const judge = this.panel.judges[0];
     const VERDICT_TIMEOUT_MS = 60_000;
