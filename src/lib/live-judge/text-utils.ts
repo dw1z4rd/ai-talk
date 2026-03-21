@@ -100,6 +100,26 @@ export const FUNCTION_WORDS = new Set([
   "off",
 ]);
 
+// Real English words that happen to be decomposable into two FUNCTION_WORDS.
+// These must NOT be split � confirmed by exhaustive enumeration of all
+// function-word pairs.
+export const SPACE_DROP_EXEMPT = new Set([
+  "anon", // an + on
+  "bean", // be + an
+  "beam", // be + am
+  "beat", // be + at
+  "heat", // he + at
+  "mean", // me + an
+  "meat", // me + at
+  "noon", // no + on
+  "onus", // on + us
+  "outdo", // out + do
+  "some", // so + me
+  "wean", // we + an
+  "within", // with + in
+  "without", // with + out
+]);
+
 export const SPACE_DROP_THRESHOLD = 2; // ≥2 fused pairs per message
 
 /**
@@ -109,7 +129,7 @@ export function detectSpaceDrops(text: string): number {
   const words = text.match(LOWERCASE_WORD_RE) ?? [];
   let hits = 0;
   for (const w of words) {
-    if (FUNCTION_WORDS.has(w)) continue;
+    if (FUNCTION_WORDS.has(w) || SPACE_DROP_EXEMPT.has(w)) continue;
     for (let i = 1; i < w.length - 1; i++) {
       if (FUNCTION_WORDS.has(w.slice(0, i)) && FUNCTION_WORDS.has(w.slice(i))) {
         hits++;
@@ -129,7 +149,7 @@ export function detectSpaceDrops(text: string): number {
  */
 export function repairSpaceDrops(text: string): string {
   return text.replace(LOWERCASE_WORD_RE, (word) => {
-    if (FUNCTION_WORDS.has(word)) return word;
+    if (FUNCTION_WORDS.has(word) || SPACE_DROP_EXEMPT.has(word)) return word;
     for (let i = 1; i < word.length - 1; i++) {
       if (
         FUNCTION_WORDS.has(word.slice(0, i)) &&
@@ -167,7 +187,8 @@ export interface ArtifactRepairResult {
 // Inline CJK mixed with Latin text — reliable signal of tokeniser encoding failure.
 // Does NOT fire on purely CJK text (e.g. Japanese-language debates); only on
 // isolated CJK characters embedded inside otherwise Latin prose.
-const CJK_RE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]/;
+const CJK_RE =
+  /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]/;
 const ALL_CJK_RE =
   /^[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\s\p{P}]+$/u;
 
@@ -193,7 +214,8 @@ export function repairAndTrackArtefacts(text: string): ArtifactRepairResult {
     note = `${spaceDropCount} space-drop artefacts repaired before scoring (fused function words reconnected). Moderate artefact count may indicate residual noise; rhetoric score reflects cleaned text.`;
   } else if (applied) {
     severity = "minor";
-    note = "Space-drop artefacts repaired before scoring (fused function words reconnected — rhetoric score reflects cleaned text).";
+    note =
+      "Space-drop artefacts repaired before scoring (fused function words reconnected — rhetoric score reflects cleaned text).";
   }
 
   return { repaired, applied, severity, note };
