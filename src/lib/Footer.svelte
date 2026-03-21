@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { fade } from 'svelte/transition';
-  import { quintOut } from 'svelte/easing';
+  import { cubicInOut } from 'svelte/easing';
 
   const year = new Date().getFullYear();
   let visible = true;
@@ -30,7 +30,7 @@
 
 {#if visible}
   <footer
-    transition:fade={{ duration: 500, easing: quintOut }}
+    transition:fade={{ duration: 1500, easing: cubicInOut }}
     class="fixed bottom-0 left-0 right-0 z-50 backdrop-blur-md bg-[--color-surface]/80"
     style="border-top: 1px solid #0a0a12; box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);"
     on:mouseleave={handleMouseLeave}
