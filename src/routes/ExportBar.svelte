@@ -74,8 +74,12 @@
             let roundMd =
               `### Round ${round.roundNumber} · T${round.prevTurn.turnNumber} (${round.prevTurn.agentName}) vs T${round.curTurn.turnNumber} (${round.curTurn.agentName})\n\n` +
               `**Logic:** ${logicWinnerName} · **Tactics:** ${tacticsWinnerName} · **Rhetoric:** ${rhetoricWinnerName}\n\n` +
-              `**Logic Analysis:**\n\n> ${round.logicDelta}\n\n` +
-              (round.languageWarning ? `> ⚠ ${round.languageWarning}\n\n` : "");
+              `**Logic:** ${round.logicDelta}\n\n`;
+            if (round.tacticsDelta) roundMd += `**Tactics:** ${round.tacticsDelta}\n\n`;
+            if (round.rhetoricDelta) roundMd += `**Rhetoric:** ${round.rhetoricDelta}\n\n`;
+            if (round.mechanismDelta) roundMd += `**Mechanism:** ${round.mechanismDelta}\n\n`;
+            if (round.epistemicNote) roundMd += `**Epistemic:** ${round.epistemicNote}\n\n`;
+            if (round.languageWarning) roundMd += `> ⚠ ${round.languageWarning}\n\n`;
             const dimFlags = (round.harmonizationFlags ?? []).filter(
               (f: any) => f.dimension !== "overall",
             );
@@ -155,6 +159,59 @@
             : `${s.logicalCoherence}`;
           content += `| T${r.turnNumber} | ${resolveAgent(r.agentId).name} | ${logicCell} | ${s.rhetoricalForce} | ${s.tacticalEffectiveness} | ${liveTotal} |\n`;
         });
+
+        // Rubric breakdown — one subsection per turn with available breakdown data
+        const turnsWithBreakdown = scoredResults.filter((r: any) => r.scoreBreakdown);
+        if (turnsWithBreakdown.length > 0) {
+          content += "\n### Rubric Breakdown\n\n";
+          turnsWithBreakdown.forEach((r: any) => {
+            const s = r.absoluteScores;
+            const bd = r.scoreBreakdown;
+            const agentName = resolveAgent(r.agentId).name;
+            content += `#### T${r.turnNumber} — ${agentName}\n\n`;
+
+            // Logic steps
+            if (bd.logicSteps?.length > 0) {
+              content += `**Logic** · ${s.logicalCoherence}/40 (raw ${bd.logicRaw}/10)\n\n`;
+              content += `| Rule | Δ |\n|------|---|\n`;
+              bd.logicSteps.forEach((step: any) => {
+                content += `| ${step.rule} | ${step.delta > 0 ? '+' : ''}${step.delta} |\n`;
+              });
+              content += "\n";
+              if (bd.pairwiseFloorApplied) content += `> ⚡ ${bd.pairwiseFloorNote}\n\n`;
+              if (bd.evidenceEnforcementNote) content += `> ⚖ ${bd.evidenceEnforcementNote}\n\n`;
+            }
+
+            // Rhetoric components
+            if (bd.rhetoricalComponents) {
+              const rc = bd.rhetoricalComponents;
+              content += `**Rhetoric** · ${s.rhetoricalForce}/30 (raw ${bd.rhetoricalRaw}/10 = 5+${bd.rhetoricalAboveCount}−${bd.rhetoricalBelowCount})\n`;
+              content += `Expression: ${rc.expression} · Structure: ${rc.structure} · Audience: ${rc.audience} · Framing: ${rc.framing}\n\n`;
+              if (bd.rhetoricalScoreCapped) content += `> 🚨 ${bd.rhetoricalCapNote}\n\n`;
+            }
+
+            // Tactics note
+            if (bd.tacticsNote) {
+              content += `**Tactics** · ${s.tacticalEffectiveness}/30 (raw ${bd.tacticsRaw}/10)\n${bd.tacticsNote}\n\n`;
+            }
+
+            // Evidence gating
+            if (bd.evidenceGatingNote) {
+              const icon = bd.evidenceDetected ? "✓" : "⚠";
+              content += `${icon} ${bd.evidenceGatingNote}\n`;
+              if (bd.empiricalClaimsList?.length) {
+                content += `_Empirical claims: "${bd.empiricalClaimsList.slice(0, 3).join('", "')}"_\n`;
+              }
+              content += "\n";
+            }
+
+            // Artifact repair
+            if (bd.artifactRepairNote) {
+              const icon = bd.artifactSeverity === 'severe' ? "🚨" : "🔧";
+              content += `${icon} ${bd.artifactRepairNote}\n\n`;
+            }
+          });
+        }
       }
 
       mime = "text/markdown";
@@ -170,7 +227,12 @@
           .map((round) => {
             let line =
               `[Round ${round.roundNumber}  T${round.prevTurn.turnNumber}:${round.prevTurn.agentName} vs T${round.curTurn.turnNumber}:${round.curTurn.agentName}]\n` +
-              `Logic: ${resolveAgent(round.logicWinner).name}  Tactics: ${resolveAgent(round.tacticsWinner).name}  Rhetoric: ${resolveAgent(round.rhetoricWinner).name}\n${round.logicDelta}`;
+              `Logic: ${resolveAgent(round.logicWinner).name}  Tactics: ${resolveAgent(round.tacticsWinner).name}  Rhetoric: ${resolveAgent(round.rhetoricWinner).name}\n` +
+              `Logic: ${round.logicDelta}`;
+            if (round.tacticsDelta) line += `\nTactics: ${round.tacticsDelta}`;
+            if (round.rhetoricDelta) line += `\nRhetoric: ${round.rhetoricDelta}`;
+            if (round.mechanismDelta) line += `\nMechanism: ${round.mechanismDelta}`;
+            if (round.epistemicNote) line += `\nEpistemic: ${round.epistemicNote}`;
             const dimFlags = (round.harmonizationFlags ?? []).filter(
               (f: any) => f.dimension !== "overall",
             );
@@ -241,6 +303,49 @@
           content += `T${r.turnNumber}  ${resolveAgent(r.agentId).name}  Logic:${logicStr}/40  Rhetoric:${s.rhetoricalForce}/30  Tactics:${s.tacticalEffectiveness}/30  Score:${liveTotal}\n`;
         });
         content += "\n";
+
+        const turnsWithBreakdownTxt = scoredResultsTxt.filter((r: any) => r.scoreBreakdown);
+        if (turnsWithBreakdownTxt.length > 0) {
+          content += `${"═".repeat(40)}\nRUBRIC BREAKDOWN\n\n`;
+          turnsWithBreakdownTxt.forEach((r: any) => {
+            const s = r.absoluteScores;
+            const bd = r.scoreBreakdown;
+            content += `T${r.turnNumber}  ${resolveAgent(r.agentId).name}\n`;
+
+            if (bd.logicSteps?.length > 0) {
+              content += `  Logic ${s.logicalCoherence}/40 (raw ${bd.logicRaw}/10)\n`;
+              bd.logicSteps.forEach((step: any) => {
+                content += `    ${step.delta > 0 ? '+' : ''}${step.delta}  ${step.rule}\n`;
+              });
+              if (bd.pairwiseFloorApplied) content += `    ⚡ ${bd.pairwiseFloorNote}\n`;
+              if (bd.evidenceEnforcementNote) content += `    ⚖ ${bd.evidenceEnforcementNote}\n`;
+            }
+
+            if (bd.rhetoricalComponents) {
+              const rc = bd.rhetoricalComponents;
+              content += `  Rhetoric ${s.rhetoricalForce}/30 (raw ${bd.rhetoricalRaw}/10)\n`;
+              content += `    Expression:${rc.expression}  Structure:${rc.structure}  Audience:${rc.audience}  Framing:${rc.framing}\n`;
+              if (bd.rhetoricalScoreCapped) content += `    🚨 ${bd.rhetoricalCapNote}\n`;
+            }
+
+            if (bd.tacticsNote) {
+              content += `  Tactics ${s.tacticalEffectiveness}/30 (raw ${bd.tacticsRaw}/10)\n    ${bd.tacticsNote}\n`;
+            }
+
+            if (bd.evidenceGatingNote) {
+              content += `  ${bd.evidenceDetected ? '✓' : '⚠'} ${bd.evidenceGatingNote}\n`;
+              if (bd.empiricalClaimsList?.length) {
+                content += `    Empirical: "${bd.empiricalClaimsList.slice(0, 3).join('", "')}"\n`;
+              }
+            }
+
+            if (bd.artifactRepairNote) {
+              content += `  ${bd.artifactSeverity === 'severe' ? '🚨' : '🔧'} ${bd.artifactRepairNote}\n`;
+            }
+
+            content += "\n";
+          });
+        }
       }
 
       mime = "text/plain";
@@ -302,7 +407,11 @@
         scoreHtml += `<div style="margin-bottom:1rem;padding:0.75rem;background:#f7f7fb;border-radius:6px;font-size:0.82rem">`;
         scoreHtml += `<div style="font-weight:700;margin-bottom:0.4rem">Round ${round.roundNumber} · T${round.prevTurn.turnNumber} (${escapeHtml(round.prevTurn.agentName)}) vs T${round.curTurn.turnNumber} (${escapeHtml(round.curTurn.agentName)})</div>`;
         scoreHtml += `<div style="margin-bottom:0.3rem"><strong>Logic:</strong> ${escapeHtml(logicW)} &nbsp;·&nbsp; <strong>Tactics:</strong> ${escapeHtml(tacW)} &nbsp;·&nbsp; <strong>Rhetoric:</strong> ${escapeHtml(rhetW)}</div>`;
-        scoreHtml += `<div style="color:#555;font-style:italic">${escapeHtml(round.logicDelta)}</div>`;
+        scoreHtml += `<div style="margin-bottom:0.2rem"><strong style="font-size:0.75rem;color:#444">Logic:</strong> <span style="color:#555;font-style:italic">${escapeHtml(round.logicDelta)}</span></div>`;
+        if (round.tacticsDelta) scoreHtml += `<div style="margin-bottom:0.2rem"><strong style="font-size:0.75rem;color:#444">Tactics:</strong> <span style="color:#555;font-style:italic">${escapeHtml(round.tacticsDelta)}</span></div>`;
+        if (round.rhetoricDelta) scoreHtml += `<div style="margin-bottom:0.2rem"><strong style="font-size:0.75rem;color:#444">Rhetoric:</strong> <span style="color:#555;font-style:italic">${escapeHtml(round.rhetoricDelta)}</span></div>`;
+        if (round.mechanismDelta) scoreHtml += `<div style="margin-top:0.3rem;padding:0.4rem 0.6rem;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:3px;font-size:0.78rem"><strong style="color:#92400e">Mechanism:</strong> ${escapeHtml(round.mechanismDelta)}</div>`;
+        if (round.epistemicNote) scoreHtml += `<div style="margin-top:0.3rem;padding:0.4rem 0.6rem;background:#eff6ff;border-left:3px solid #38bdf8;border-radius:3px;font-size:0.78rem"><strong style="color:#0369a1">Epistemic:</strong> ${escapeHtml(round.epistemicNote)}</div>`;
         scoreHtml += `</div>`;
       }
 
@@ -370,6 +479,70 @@
         scoresHtml += `<tr style="background:${i % 2 === 0 ? "#fff" : "#f9f9f9"}"><td style="padding:0.3rem 0.5rem">T${r.turnNumber}</td><td style="padding:0.3rem 0.5rem">${escapeHtml(getModelInfo(r.agentId).name)}</td><td style="padding:0.3rem 0.5rem;text-align:center">${logicCell}</td><td style="padding:0.3rem 0.5rem;text-align:center">${s.rhetoricalForce}</td><td style="padding:0.3rem 0.5rem;text-align:center">${s.tacticalEffectiveness}</td><td style="padding:0.3rem 0.5rem;text-align:center;font-weight:700">${liveTotal}</td></tr>`;
       });
       scoresHtml += `</tbody></table>`;
+
+      // Per-turn rubric breakdown
+      const turnsWithBreakdownPdf = scoredRows.filter((r: any) => r.scoreBreakdown);
+      if (turnsWithBreakdownPdf.length > 0) {
+        scoresHtml += `<h3 style="font-size:0.9rem;font-weight:700;margin-top:1.25rem;margin-bottom:0.75rem">Rubric Breakdown</h3>`;
+        turnsWithBreakdownPdf.forEach((r: any) => {
+          const s = r.absoluteScores;
+          const bd = r.scoreBreakdown;
+          const agentInfo = getModelInfo(r.agentId);
+          scoresHtml += `<div style="margin-bottom:1rem;padding:0.7rem 0.8rem;background:#f9f9fb;border-radius:6px;border-left:3px solid #c084fc;font-size:0.8rem">`;
+          scoresHtml += `<div style="font-weight:700;margin-bottom:0.5rem">T${r.turnNumber} — ${escapeHtml(agentInfo.name)}</div>`;
+
+          // Logic steps
+          if (bd.logicSteps?.length > 0) {
+            scoresHtml += `<div style="margin-bottom:0.4rem"><strong>Logic</strong> ${s.logicalCoherence}/40 (raw ${bd.logicRaw}/10)`;
+            if (bd.pairwiseFloorApplied) scoresHtml += ` <span style="color:#d97706;font-size:0.75em">⚡ floor applied</span>`;
+            scoresHtml += `</div>`;
+            scoresHtml += `<table style="width:100%;border-collapse:collapse;font-size:0.76rem;margin-bottom:0.4rem">`;
+            bd.logicSteps.forEach((step: any) => {
+              const col = step.delta > 0 ? '#16a34a' : step.delta < 0 ? '#dc2626' : '#666';
+              scoresHtml += `<tr><td style="padding:0.1rem 0.4rem 0.1rem 0;color:#444">${escapeHtml(step.rule)}</td><td style="padding:0.1rem 0;text-align:right;font-weight:700;color:${col};white-space:nowrap">${step.delta > 0 ? '+' : ''}${step.delta}</td></tr>`;
+            });
+            scoresHtml += `</table>`;
+            if (bd.pairwiseFloorApplied) scoresHtml += `<div style="font-size:0.74rem;color:#d97706;margin-bottom:0.3rem">⚡ ${escapeHtml(bd.pairwiseFloorNote)}</div>`;
+            if (bd.evidenceEnforcementNote) scoresHtml += `<div style="font-size:0.74rem;color:#dc2626;margin-bottom:0.3rem">⚖ ${escapeHtml(bd.evidenceEnforcementNote)}</div>`;
+          }
+
+          // Rhetoric components
+          if (bd.rhetoricalComponents) {
+            const rc = bd.rhetoricalComponents;
+            const ratingColor = (v: string) => v === 'above' ? '#16a34a' : v === 'below' ? '#dc2626' : '#666';
+            scoresHtml += `<div style="margin-bottom:0.3rem"><strong>Rhetoric</strong> ${s.rhetoricalForce}/30 (raw ${bd.rhetoricalRaw}/10 = 5+${bd.rhetoricalAboveCount}−${bd.rhetoricalBelowCount}) &nbsp;`;
+            scoresHtml += `Expr <span style="color:${ratingColor(rc.expression)}">${rc.expression}</span> &nbsp;`;
+            scoresHtml += `Struct <span style="color:${ratingColor(rc.structure)}">${rc.structure}</span> &nbsp;`;
+            scoresHtml += `Audience <span style="color:${ratingColor(rc.audience)}">${rc.audience}</span> &nbsp;`;
+            scoresHtml += `Framing <span style="color:${ratingColor(rc.framing)}">${rc.framing}</span></div>`;
+            if (bd.rhetoricalScoreCapped) scoresHtml += `<div style="font-size:0.74rem;color:#dc2626;margin-bottom:0.3rem">🚨 ${escapeHtml(bd.rhetoricalCapNote ?? '')}</div>`;
+          }
+
+          // Tactics note
+          if (bd.tacticsNote) {
+            scoresHtml += `<div style="margin-bottom:0.3rem"><strong>Tactics</strong> ${s.tacticalEffectiveness}/30 (raw ${bd.tacticsRaw}/10) — <span style="color:#555;font-style:italic">${escapeHtml(bd.tacticsNote)}</span></div>`;
+          }
+
+          // Evidence gating
+          if (bd.evidenceGatingNote) {
+            const evColor = bd.evidenceDetected ? '#16a34a' : '#d97706';
+            const evIcon = bd.evidenceDetected ? '✓' : '⚠';
+            scoresHtml += `<div style="font-size:0.74rem;color:${evColor};margin-bottom:0.2rem">${evIcon} ${escapeHtml(bd.evidenceGatingNote)}</div>`;
+            if (bd.empiricalClaimsList?.length) {
+              scoresHtml += `<div style="font-size:0.72rem;color:#666;font-style:italic;margin-bottom:0.2rem">Empirical: "${escapeHtml(bd.empiricalClaimsList.slice(0, 3).join('", "'))}"</div>`;
+            }
+          }
+
+          // Artifact repair
+          if (bd.artifactRepairNote) {
+            const artColor = bd.artifactSeverity === 'severe' ? '#dc2626' : '#0369a1';
+            const artIcon = bd.artifactSeverity === 'severe' ? '🚨' : '🔧';
+            scoresHtml += `<div style="font-size:0.74rem;color:${artColor}">${artIcon} ${escapeHtml(bd.artifactRepairNote)}</div>`;
+          }
+
+          scoresHtml += `</div>`;
+        });
+      }
     }
 
     const html = `
