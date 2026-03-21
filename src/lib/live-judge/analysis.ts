@@ -1057,14 +1057,14 @@ function clampAbsDim(
  * Returns a (possibly new) JudgeScores object; returns the same reference if
  * no value changed so callers can skip logging.
  *
- * prevScores: when provided, all three WIN paths enforce a minimum gap between
- * the winner's absolute score and prevTurn's absolute score, preventing
- * reconcileRoundWinners from silently demoting the win to "tie":
- *   Logic    winMinGap = 4  (= 1 raw point on the 1–10 rubric scale × 4 factor)
- *   Tactics  winMinGap = 6  (= 2 raw points on the 1–10 rubric scale × 3 factor)
- *   Rhetoric winMinGap = 6  (same rationale as Tactics)
- * When prevTurn's score is already near scaleCeil, the cap may still produce
- * equal values.
+ * prevScores: when provided, the Logic WIN path enforces a minimum gap of 4
+ * (= 1 raw point on the 1–10 rubric scale × 4 factor) between the winner's
+ * absolute score and prevTurn's absolute score, preventing reconcileRoundWinners
+ * from silently demoting the win to "tie". When prevTurn's Logic score is already
+ * at or near scaleCeil, the cap may still produce equal values.
+ * Tactics and Rhetoric do NOT use winMinGap: their scaleCeil is 30 and a 6-point
+ * gap requirement creates a permanent ceiling lock once any winner reaches 30
+ * (every subsequent winner is forced to Math.min(30, 30+6) = 30 forever).
  * Omit prevScores for contextualization calls where gap enforcement is not wanted.
  *
  * Scale parameters used (WIN/DRAW/LOSS bands as [floor, ceil]):
@@ -1106,8 +1106,6 @@ export function applyPairwiseFloors(
     7, // lossFloor
     16, // lossCeil
     30, // scaleCeil
-    prevScores?.tacticalEffectiveness, // gap enforcement: winner ≥ prevTurn + 6
-    6, // winMinGap = 2 raw points on 1–10 scale
   );
   const newRhetoric = clampAbsDim(
     rhetoricWinner,
@@ -1120,8 +1118,6 @@ export function applyPairwiseFloors(
     7, // lossFloor
     16, // lossCeil
     30, // scaleCeil
-    prevScores?.rhetoricalForce, // gap enforcement: winner ≥ prevTurn + 6
-    6, // winMinGap = 2 raw points on 1–10 scale
   );
 
   if (
@@ -1344,9 +1340,7 @@ export function computeHarmonizationFlags(
     // path), spreadGap = 0 and the flag correctly stays silent.
     if (pairwiseWinnerId === "tie") {
       const spreadGap =
-        rawPrevScore !== undefined
-          ? Math.abs(curScore - rawPrevScore)
-          : gap;
+        rawPrevScore !== undefined ? Math.abs(curScore - rawPrevScore) : gap;
       if (spreadGap >= drawThreshold) {
         const rawAbsoluteLeaderId =
           rawPrevScore !== undefined

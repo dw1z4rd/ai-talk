@@ -1,0 +1,182 @@
+diff --git a/src/lib/live-judge/analysis.ts b/src/lib/live-judge/analysis.ts
+index 62dfd7e..dd834e0 100644
+--- a/src/lib/live-judge/analysis.ts
++++ b/src/lib/live-judge/analysis.ts
+@@ -1057,13 +1057,14 @@ function clampAbsDim(
+  * Returns a (possibly new) JudgeScores object; returns the same reference if
+  * no value changed so callers can skip logging.
+  *
+- * prevScores: when provided, the Logic WIN path enforces a minimum gap of 4
+- * (= 1 raw point on the 1–10 rubric scale) between the winner's absolute score
+- * and prevTurn's absolute score. This reduces or eliminates ties between turns
+- * after a genuine pairwise win (when a gap can be created below scaleCeil),
+- * preventing reconcileRoundWinners from silently demoting the win to "tie".
+- * When prevTurn's Logic score is already at or near scaleCeil, the cap may
+- * still produce equal values.
++ * prevScores: when provided, all three WIN paths enforce a minimum gap between
++ * the winner's absolute score and prevTurn's absolute score, preventing
++ * reconcileRoundWinners from silently demoting the win to "tie":
++ *   Logic    winMinGap = 4  (= 1 raw point on the 1–10 rubric scale × 4 factor)
++ *   Tactics  winMinGap = 6  (= 2 raw points on the 1–10 rubric scale × 3 factor)
++ *   Rhetoric winMinGap = 6  (same rationale as Tactics)
++ * When prevTurn's score is already near scaleCeil, the cap may still produce
++ * equal values.
+  * Omit prevScores for contextualization calls where gap enforcement is not wanted.
+  *
+  * Scale parameters used (WIN/DRAW/LOSS bands as [floor, ceil]):
+@@ -1105,6 +1106,8 @@ export function applyPairwiseFloors(
+     7, // lossFloor
+     16, // lossCeil
+     30, // scaleCeil
++    prevScores?.tacticalEffectiveness, // gap enforcement: winner ≥ prevTurn + 6
++    6, // winMinGap = 2 raw points on 1–10 scale
+   );
+   const newRhetoric = clampAbsDim(
+     rhetoricWinner,
+@@ -1117,6 +1120,8 @@ export function applyPairwiseFloors(
+     7, // lossFloor
+     16, // lossCeil
+     30, // scaleCeil
++    prevScores?.rhetoricalForce, // gap enforcement: winner ≥ prevTurn + 6
++    6, // winMinGap = 2 raw points on 1–10 scale
+   );
+ 
+   if (
+@@ -1275,11 +1280,20 @@ export function reconcileRoundWinners(
+  *   logic:   drawThreshold = 6  (wider than the inversion threshold; the 0–40 scale
+  *            warrants a larger gap before a draw is considered meaningfully inconsistent)
+  *   tactics/rhetoric: drawThreshold = 4  (default)
++ *
++ * rawPrevAbsolute: the un-contextualized prevHistScore straight from absoluteScoreHistory.
++ * Used exclusively for the draw spread check. The directional-inversion check uses
++ * prevAbsolute (contextualized) to avoid spurious band-mismatch flags. The draw spread
++ * check must use raw scores because contextualizeScoreForRound applies DRAW-band clamping
++ * to prevHistScore after reconcile forces "tie" from equal raw scores — creating an
++ * artificial gap between the WIN-clamped curScore and the DRAW-clamped prevScore that
++ * does not exist in the actual stored scores.
+  */
+ export function computeHarmonizationFlags(
+   round: PairwiseRound,
+   curAbsolute: import("./types").JudgeScores | undefined,
+   prevAbsolute: import("./types").JudgeScores | undefined,
++  rawPrevAbsolute?: import("./types").JudgeScores,
+ ): HarmonizationFlag[] {
+   if (!curAbsolute || !prevAbsolute) return [];
+ 
+@@ -1294,6 +1308,7 @@ export function computeHarmonizationFlags(
+     curScore: number,
+     threshold: number,
+     drawThreshold: number = 4,
++    rawPrevScore?: number,
+   ) => {
+     const gap = Math.abs(curScore - prevScore);
+ 
+@@ -1318,26 +1333,42 @@ export function computeHarmonizationFlags(
+       return;
+     }
+ 
+-    // Draw with a non-trivial absolute gap: the two scoring systems agree on
+-    // "tie" overall, but the absolute scores indicate a meaningful leader.
+-    // This fires independently of the directional-inversion check below so
+-    // that rounds like "Tactics Draw but absolute gap = 4" are surfaced.
+-    // Uses >= so a gap exactly at the threshold triggers (previously > meant
+-    // only gap ≥ threshold+1 would fire, silently missing the boundary case).
+-    if (pairwiseWinnerId === "tie" && gap >= drawThreshold) {
+-      const absoluteLeaderId = curScore > prevScore ? curId : prevId;
+-      const leaderName =
+-        absoluteLeaderId === prevId
+-          ? round.prevTurn.agentName
+-          : round.curTurn.agentName;
+-      flags.push({
+-        roundNumber: round.roundNumber,
+-        dimension,
+-        pairwiseWinner: "tie",
+-        absoluteScoreLeader: absoluteLeaderId,
+-        divergenceMagnitude: gap,
+-        note: `${dimension} pairwise Draw but absolute scores indicate ${leaderName} by ${gap} (prev=${prevScore}, cur=${curScore})`,
+-      });
++    // Draw with a non-trivial raw score gap: the pairwise verdict is "tie" but
++    // the stored scores indicate a meaningful leader. Uses rawPrevScore (the
++    // un-contextualized prevHistScore) rather than the contextualized prevScore
++    // to avoid false positives: contextualizeScoreForRound applies DRAW-band
++    // clamping to prevHistScore after reconcile forces "tie" from equal raw
++    // scores, creating an artificial gap between the WIN-clamped curScore and
++    // the DRAW-clamped prevScore. Comparing against raw scores eliminates this
++    // band-mismatch artifact — when raw scores are equal (the common reconcile
++    // path), spreadGap = 0 and the flag correctly stays silent.
++    if (pairwiseWinnerId === "tie") {
++      const spreadGap =
++        rawPrevScore !== undefined
++          ? Math.abs(curScore - rawPrevScore)
++          : gap;
++      if (spreadGap >= drawThreshold) {
++        const rawAbsoluteLeaderId =
++          rawPrevScore !== undefined
++            ? curScore > rawPrevScore
++              ? curId
++              : prevId
++            : curScore > prevScore
++              ? curId
++              : prevId;
++        const leaderName =
++          rawAbsoluteLeaderId === prevId
++            ? round.prevTurn.agentName
++            : round.curTurn.agentName;
++        flags.push({
++          roundNumber: round.roundNumber,
++          dimension,
++          pairwiseWinner: "tie",
++          absoluteScoreLeader: rawAbsoluteLeaderId,
++          divergenceMagnitude: spreadGap,
++          note: `${dimension} pairwise Draw but raw absolute scores indicate ${leaderName} by ${spreadGap} (rawPrev=${rawPrevScore ?? prevScore}, cur=${curScore})`,
++        });
++      }
+       return;
+     }
+ 
+@@ -1365,6 +1396,7 @@ export function computeHarmonizationFlags(
+     curAbsolute.logicalCoherence,
+     5,
+     6, // Logic scale 0–40: gap ≥ 6 on a Draw flags meaningful spread
++    rawPrevAbsolute?.logicalCoherence,
+   );
+   check(
+     "tactics",
+@@ -1372,6 +1404,8 @@ export function computeHarmonizationFlags(
+     prevAbsolute.tacticalEffectiveness,
+     curAbsolute.tacticalEffectiveness,
+     6,
++    4, // default drawThreshold
++    rawPrevAbsolute?.tacticalEffectiveness,
+   );
+   check(
+     "rhetoric",
+@@ -1379,6 +1413,8 @@ export function computeHarmonizationFlags(
+     prevAbsolute.rhetoricalForce,
+     curAbsolute.rhetoricalForce,
+     6,
++    4, // default drawThreshold
++    rawPrevAbsolute?.rhetoricalForce,
+   );
+ 
+   // Derive the overall pairwise winner as the agent that won a majority of
+diff --git a/src/lib/live-judge/core.ts b/src/lib/live-judge/core.ts
+index c48f19e..9acca17 100644
+--- a/src/lib/live-judge/core.ts
++++ b/src/lib/live-judge/core.ts
+@@ -757,6 +757,7 @@ export class LiveJudgeSystem {
+                 postPenaltyRound,
+                 curAbs,
+                 contextualizeScoreForRound(postPenaltyRound, prevAbs),
++                prevAbs, // raw prevHistScore for draw spread check
+               );
+               this.panel.scorecard.rounds[ri] = {
+                 ...postPenaltyRound,
+@@ -944,6 +945,7 @@ export class LiveJudgeSystem {
+               pairwiseRound,
+               this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber],
+             ),
++            this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber], // raw prevHistScore for draw spread check
+           )
+         : [];
+     if (harmonizationFlags.length > 0) {
