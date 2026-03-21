@@ -22,7 +22,10 @@ function filterThinkingTags(text: string): string {
     .replace(/\s*<thought>[\s\S]*?<\/thought>\s*/gi, " ")
     .replace(/\s*<analysis>[\s\S]*?<\/analysis>\s*/gi, " ")
     // Remove any remaining stray thinking/reasoning tags, even if malformed or missing '>'
-    .replace(/\s*<\/?\s*(thinking|think|reasoning|thought|analysis)[^>]*>?/gi, "");
+    .replace(
+      /\s*<\/?\s*(thinking|think|reasoning|thought|analysis)[^>]*>?/gi,
+      "",
+    );
 
   // Clean up extra whitespace introduced by block removal (double spaces, leading/trailing)
   return filtered
@@ -132,44 +135,43 @@ export const createOllamaProvider = (
             const choice = (chunk.choices as any)?.[0];
             const token: string = choice?.delta?.content ?? "";
             if (token) {
-              // Check if we're entering or exiting a thinking block
-              const lowerToken = token.toLowerCase();
-              if (
-                lowerToken.includes("<thinking>") ||
-                lowerToken.includes("<think>") || // shortform thinking tag (e.g. DeepSeek / MiniMax)
-                lowerToken.includes("<reasoning>") ||
-                lowerToken.includes("<thought>") ||
-                lowerToken.includes("<analysis>") ||
-                lowerToken.includes("</tool_call>")
-              ) {
-                isInThinkingBlock = true;
-                // If this token contains text before the opening tag, it was already flushed
-                // by prior tokens, so no need to re-emit it here. The important thing is
-                // that we insert a space when the block CLOSES, handled below.
-                return false; // Skip the opening tag
-              }
-              if (
-                lowerToken.includes("</thinking>") ||
-                lowerToken.includes("</think>") || // shortform closing tag
-                lowerToken.includes("</reasoning>") ||
-                lowerToken.includes("</thought>") ||
-                lowerToken.includes("</analysis>")
-              ) {
-                isInThinkingBlock = false;
-                // Insert a space so that text before and after the stripped block
-                // is not concatenated (e.g. "corporate<think>...</think>Algorithms"
-                // must not become "corporateAlgorithms").
-                if (fullText.length > 0 && !/\s$/.test(fullText)) {
-                  fullText += " ";
-                  options?.onToken?.(" ");
-                }
-                return false; // Skip the closing tag
-              }
-
-              // Only stream tokens if we're not in a thinking block
               if (!isInThinkingBlock) {
+                // Fast path: normal content — only scan for opening tags.
+                // Avoids the closing-tag checks on the vast majority of tokens.
+                const lowerToken = token.toLowerCase();
+                if (
+                  lowerToken.includes("<thinking>") ||
+                  lowerToken.includes("<think>") ||
+                  lowerToken.includes("<reasoning>") ||
+                  lowerToken.includes("<thought>") ||
+                  lowerToken.includes("<analysis>") ||
+                  lowerToken.includes("<tool_call>")
+                ) {
+                  isInThinkingBlock = true;
+                  return false; // skip opening tag token
+                }
+                // No tag —stream it directly.
                 fullText += token;
                 options?.onToken?.(token);
+              } else {
+                // Slow path: inside a thinking block — scan for closing tags.
+                const lowerToken = token.toLowerCase();
+                if (
+                  lowerToken.includes("</thinking>") ||
+                  lowerToken.includes("</think>") ||
+                  lowerToken.includes("</reasoning>") ||
+                  lowerToken.includes("</thought>") ||
+                  lowerToken.includes("</analysis>") ||
+                  lowerToken.includes("</tool_call>")
+                ) {
+                  isInThinkingBlock = false;
+                  // Insert a space so surrounding words aren't concatenated.
+                  if (fullText.length > 0 && !/\s$/.test(fullText)) {
+                    fullText += " ";
+                    options?.onToken?.(" ");
+                  }
+                }
+                return false; // skip all tokens inside (and closing of) thinking block
               }
             }
             if (choice?.finish_reason != null)

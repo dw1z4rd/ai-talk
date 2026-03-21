@@ -19,92 +19,105 @@ import { withRetry } from "$lib/llm-agent/retry";
 
 export type DebateDomain = "empirical" | "philosophical" | "policy" | "mixed";
 
+// Module-level keyword arrays — allocated once, not per call.
+const PHILOSOPHICAL_KEYWORDS = [
+  "consciousness",
+  "free will",
+  "morality",
+  "ethics",
+  "justice",
+  "identity",
+  "metaphysics",
+  "qualia",
+  "knowledge",
+  "beauty",
+  "god",
+  "soul",
+  "meaning",
+  "existence",
+  "epistemology",
+  "truth",
+  "mind",
+  "subjective",
+  "objective reality",
+  "determinism",
+  "moral",
+];
+const EMPIRICAL_KEYWORDS = [
+  "climate",
+  "vaccine",
+  "health",
+  "economic",
+  "data",
+  "study",
+  "research",
+  "science",
+  "statistic",
+  "evidence",
+  "correlation",
+  "causation",
+  "experiment",
+  "trial",
+  "survey",
+  "measurement",
+  "empirical",
+];
+const POLICY_KEYWORDS = [
+  "policy",
+  "law",
+  "regulation",
+  "government",
+  "ban",
+  "tax",
+  "reform",
+  "should ",
+  "ought",
+  "legislation",
+  "rights",
+  "democratic",
+  "governance",
+  "nuclear",
+  "military",
+  "ai safety",
+  "censorship",
+];
+
+// Domain classification cache — topic string → DebateDomain. Topics never change
+// within a debate, so a 1-entry memo eliminates repeated keyword scans.
+const _domainCache = new Map<string, DebateDomain>();
+
 /**
  * Classify the debate topic into a domain category using keyword heuristics.
  * Used to inject domain-appropriate evidentiary standards into judge prompts.
  */
 export function classifyDebateDomain(topic: string): DebateDomain {
   const t = topic.toLowerCase();
+  const cached = _domainCache.get(t);
+  if (cached !== undefined) return cached;
 
-  const philosophicalKeywords = [
-    "consciousness",
-    "free will",
-    "morality",
-    "ethics",
-    "justice",
-    "identity",
-    "metaphysics",
-    "qualia",
-    "knowledge",
-    "beauty",
-    "god",
-    "soul",
-    "meaning",
-    "existence",
-    "epistemology",
-    "truth",
-    "mind",
-    "subjective",
-    "objective reality",
-    "determinism",
-    "moral",
-  ];
-  const empiricalKeywords = [
-    "climate",
-    "vaccine",
-    "health",
-    "economic",
-    "data",
-    "study",
-    "research",
-    "science",
-    "statistic",
-    "evidence",
-    "correlation",
-    "causation",
-    "experiment",
-    "trial",
-    "survey",
-    "measurement",
-    "empirical",
-  ];
-  const policyKeywords = [
-    "policy",
-    "law",
-    "regulation",
-    "government",
-    "ban",
-    "tax",
-    "reform",
-    "should ",
-    "ought",
-    "legislation",
-    "rights",
-    "democratic",
-    "governance",
-    "nuclear",
-    "military",
-    "ai safety",
-    "censorship",
-  ];
-
-  const philoScore = philosophicalKeywords.filter((k) => t.includes(k)).length;
-  const empiricalScore = empiricalKeywords.filter((k) => t.includes(k)).length;
-  const policyScore = policyKeywords.filter((k) => t.includes(k)).length;
+  const philoScore = PHILOSOPHICAL_KEYWORDS.filter((k) => t.includes(k)).length;
+  const empiricalScore = EMPIRICAL_KEYWORDS.filter((k) => t.includes(k)).length;
+  const policyScore = POLICY_KEYWORDS.filter((k) => t.includes(k)).length;
 
   const total = philoScore + empiricalScore + policyScore;
-  if (total === 0) return "mixed";
-
-  if (
+  let result: DebateDomain;
+  if (total === 0) {
+    result = "mixed";
+  } else if (
     philoScore >= empiricalScore &&
     philoScore >= policyScore &&
     philoScore > 0
-  )
-    return "philosophical";
-  if (empiricalScore > philoScore && empiricalScore >= policyScore)
-    return "empirical";
-  if (policyScore > 0) return "policy";
-  return "mixed";
+  ) {
+    result = "philosophical";
+  } else if (empiricalScore > philoScore && empiricalScore >= policyScore) {
+    result = "empirical";
+  } else if (policyScore > 0) {
+    result = "policy";
+  } else {
+    result = "mixed";
+  }
+  _domainCache.set(t, result);
+  return result;
 }
 
 function buildDomainNote(domain: DebateDomain): string {
@@ -120,21 +133,114 @@ function buildDomainNote(domain: DebateDomain): string {
   }
 }
 
+// Memoized helper: classifies topic and builds the domain note in one call,
+// caching both the classification and the resulting note string.
+const _domainNoteCache = new Map<string, string>();
+function buildDomainNoteForTopic(topic: string): string {
+  const key = topic.toLowerCase();
+  const cached = _domainNoteCache.get(key);
+  if (cached !== undefined) return cached;
+  const note = buildDomainNote(classifyDebateDomain(topic));
+  _domainNoteCache.set(key, note);
+  return note;
+}
+
 // ── Language consistency check ────────────────────────────────────────────────
 
 // Module-level constants for space-drop artefact detection.
 // Defined here (not inside detectLanguageMismatch) so the Set is allocated once
 // rather than rebuilt on every pairwise call.
 const FUNCTION_WORDS = new Set([
-  "a","an","the","be","is","are","was","were","been","being","am",
-  "do","does","did","have","has","had","will","would","shall","should",
-  "may","might","can","could","must","need","dare","ought",
-  "i","you","he","she","it","we","they","me","him","her","us","them",
-  "my","your","his","its","our","their","mine","yours","ours","theirs",
-  "this","that","these","those","which","who","whom","whose","what",
-  "in","on","at","by","for","of","to","up","as","if","so","or","and",
-  "but","nor","yet","not","no","nor","than","then","when","while",
-  "with","from","into","onto","upon","out","off",
+  "a",
+  "an",
+  "the",
+  "be",
+  "is",
+  "are",
+  "was",
+  "were",
+  "been",
+  "being",
+  "am",
+  "do",
+  "does",
+  "did",
+  "have",
+  "has",
+  "had",
+  "will",
+  "would",
+  "shall",
+  "should",
+  "may",
+  "might",
+  "can",
+  "could",
+  "must",
+  "need",
+  "dare",
+  "ought",
+  "i",
+  "you",
+  "he",
+  "she",
+  "it",
+  "we",
+  "they",
+  "me",
+  "him",
+  "her",
+  "us",
+  "them",
+  "my",
+  "your",
+  "his",
+  "its",
+  "our",
+  "their",
+  "mine",
+  "yours",
+  "ours",
+  "theirs",
+  "this",
+  "that",
+  "these",
+  "those",
+  "which",
+  "who",
+  "whom",
+  "whose",
+  "what",
+  "in",
+  "on",
+  "at",
+  "by",
+  "for",
+  "of",
+  "to",
+  "up",
+  "as",
+  "if",
+  "so",
+  "or",
+  "and",
+  "but",
+  "nor",
+  "yet",
+  "not",
+  "no",
+  "nor",
+  "than",
+  "then",
+  "when",
+  "while",
+  "with",
+  "from",
+  "into",
+  "onto",
+  "upon",
+  "out",
+  "off",
 ]);
 const SPACE_DROP_THRESHOLD = 2; // ≥2 fused pairs per message
 
@@ -212,7 +318,10 @@ export function detectLanguageMismatch(
 
   const spaceDropA = detectSpaceDrops(messageA);
   const spaceDropB = detectSpaceDrops(messageB);
-  if (spaceDropA >= SPACE_DROP_THRESHOLD || spaceDropB >= SPACE_DROP_THRESHOLD) {
+  if (
+    spaceDropA >= SPACE_DROP_THRESHOLD ||
+    spaceDropB >= SPACE_DROP_THRESHOLD
+  ) {
     const who =
       spaceDropA >= SPACE_DROP_THRESHOLD && spaceDropB >= SPACE_DROP_THRESHOLD
         ? "both turns"
@@ -256,7 +365,7 @@ export async function compareTurns(
   }
 
   const isOpeningRound = prevTurnNumber === 1;
-  const domainNote = buildDomainNote(classifyDebateDomain(topic));
+  const domainNote = buildDomainNoteForTopic(topic);
   const prompt = generatePairwisePrompt(
     prevAgentName,
     prevMessage,
@@ -270,14 +379,9 @@ export async function compareTurns(
     openFlags,
   );
 
-  const baseProvider = createJudgeProvider(
+  const judgeProvider = createJudgeProviderWithRetry(
     judge.modelId || "kimi-k2-thinking:cloud",
   );
-  const judgeProvider = withRetry(baseProvider, {
-    maxRetries: 3,
-    initialDelayMs: 800,
-    backoffFactor: 2,
-  });
   const start = Date.now();
 
   try {
@@ -336,7 +440,27 @@ export async function compareTurns(
   }
 }
 
+// Cache for the large pairwise system prompt (~10KB) — the rubric is fully static;
+// only agent names, domainNote, and mode vary (all stable within a debate).
+// Bounded: nameA/nameB come from MODEL_CATALOG (fixed finite set), domainNote from
+// buildDomainNote (4 values), mode has 2 values — at most O(|catalog|²×8) entries.
+const _pairwiseSystemPromptCache = new Map<string, string>();
+
 export function generatePairwiseSystemPrompt(
+  nameA: string,
+  nameB: string,
+  domainNote: string = "",
+  mode?: "debate" | "document_audit",
+): string {
+  const cacheKey = `${nameA}\x00${nameB}\x00${domainNote}\x00${mode ?? ""}`;
+  const cached = _pairwiseSystemPromptCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const result = _buildPairwiseSystemPrompt(nameA, nameB, domainNote, mode);
+  _pairwiseSystemPromptCache.set(cacheKey, result);
+  return result;
+}
+
+function _buildPairwiseSystemPrompt(
   nameA: string,
   nameB: string,
   domainNote: string = "",
@@ -968,7 +1092,7 @@ export function applyPairwiseFloors(
     22, // lossCeil
     40, // scaleCeil
     prevScores?.logicalCoherence, // gap enforcement: winner ≥ prevTurn + 4
-    4,                            // winMinGap = 1 raw point on 1–10 scale
+    4, // winMinGap = 1 raw point on 1–10 scale
   );
   const newTactics = clampAbsDim(
     tacticsWinner,
@@ -1750,9 +1874,9 @@ export async function analyzeTurn(
     suspectClaims,
     pairwiseCalibration,
   );
-  const domainNote = buildDomainNote(classifyDebateDomain(topic));
+  const domainNote = buildDomainNoteForTopic(topic);
 
-  const judgeProvider = createJudgeProvider(
+  const judgeProvider = createJudgeProviderWithRetry(
     judge.modelId || "kimi-k2-thinking:cloud",
   );
   const start = Date.now();
@@ -1840,7 +1964,19 @@ NOW EVALUATE — ${agent.name}'s response: "${message}"
 Respond with the JSON object only:`;
 }
 
+// Cache for the judge system prompt — domainNote is the only variable part
+// and is constant for the duration of a debate.
+const _judgeSystemPromptCache = new Map<string, string>();
+
 export function generateJudgeSystemPrompt(domainNote: string): string {
+  const cached = _judgeSystemPromptCache.get(domainNote);
+  if (cached !== undefined) return cached;
+  const result = _buildJudgeSystemPrompt(domainNote);
+  _judgeSystemPromptCache.set(domainNote, result);
+  return result;
+}
+
+function _buildJudgeSystemPrompt(domainNote: string): string {
   return `You are a debate scoring system. Your entire response must be a single JSON object — no preamble, no explanation, no markdown.
 
 Required output format (integers 1–10 only):
@@ -2172,10 +2308,38 @@ export function calculateFrameControlShift(
   );
 }
 
+// Provider cache — the judge model is stable for the entire debate. Reusing the
+// same provider instance avoids re-instantiating the factory on every LLM call.
+const _judgeProviderCache = new Map<
+  string,
+  import("$lib/llm-agent").LLMProvider
+>();
+const _judgeProviderRetryCache = new Map<
+  string,
+  import("$lib/llm-agent").LLMProvider
+>();
+
 function createJudgeProvider(modelId: string) {
+  const cached = _judgeProviderCache.get(modelId);
+  if (cached) return cached;
   const modelDef = MODEL_CATALOG[modelId];
   if (!modelDef) throw new Error(`Model ${modelId} not found in catalog`);
-  return modelDef.makeProvider();
+  const provider = modelDef.makeProvider();
+  _judgeProviderCache.set(modelId, provider);
+  return provider;
+}
+
+function createJudgeProviderWithRetry(modelId: string) {
+  const cached = _judgeProviderRetryCache.get(modelId);
+  if (cached) return cached;
+  const base = createJudgeProvider(modelId);
+  const provider = withRetry(base, {
+    maxRetries: 3,
+    initialDelayMs: 800,
+    backoffFactor: 2,
+  });
+  _judgeProviderRetryCache.set(modelId, provider);
+  return provider;
 }
 
 // ── Positional convergence detection ────────────────────────────────────────────────────
