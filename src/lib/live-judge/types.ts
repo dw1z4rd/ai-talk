@@ -507,6 +507,7 @@ export interface JudgeAnalysisResult {
     targetTurn: number;
     targetAgentId: string;
     deltaLogic: number;
+    roundNumber: number;
   };
 }
 

@@ -138,7 +138,7 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
   },
   "kimi-k2.5:cloud": {
     name: "Kimi K2.5",
-    color: "#06B6D4",
+    color: "#AE099A", // light purple
     makeProvider: () =>
       createOllamaProvider({
         baseUrl: OLLAMA_CLOUD_URL,

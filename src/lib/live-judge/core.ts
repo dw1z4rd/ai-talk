@@ -215,7 +215,7 @@ export class LiveJudgeSystem {
     let absoluteScores: JudgeScores | undefined;
     let scoreBreakdown: import("./types").TurnScoreBreakdown | undefined;
     let logicGapAdjustment:
-      | { targetTurn: number; targetAgentId: string; deltaLogic: number }
+      | { targetTurn: number; targetAgentId: string; deltaLogic: number; roundNumber: number }
       | undefined;
 
     if (isOpeningTurn) {

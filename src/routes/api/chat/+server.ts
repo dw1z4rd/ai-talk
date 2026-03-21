@@ -193,6 +193,7 @@ export const POST: RequestHandler = async ({ request }) => {
               deltaLogic: adj.deltaLogic,
               reason: `Logic WIN gap enforced: opponent's score adjusted ${adj.deltaLogic > 0 ? "+" : ""}${adj.deltaLogic} to open a 6-point separation`,
               updateType: "logicGapAdjustment",
+              gapRoundNumber: adj.roundNumber,
             });
           }
         };

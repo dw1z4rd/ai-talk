@@ -25,7 +25,7 @@ export const MODEL_OPTIONS = [
       {
         id: "kimi-k2.5:cloud",
         name: "Kimi K2.5",
-        color: "#06B6D4", // cyan
+        color: "#AE099A", // dark purple
       },
       {
         id: "kimi-k2:1t-cloud",
