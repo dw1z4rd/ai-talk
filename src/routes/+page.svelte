@@ -22,6 +22,20 @@
   let chatEl = $state<HTMLElement | null>(null);
   let userScrolled = $state(false);
   let abortController = $state<AbortController | null>(null);
+
+  // Debounced scroll — one rAF per burst of tokens, not one per token.
+  // `force` bypasses the pending guard for message-completion events so the
+  // final scroll always fires even if a token rAF is already queued.
+  let _scrollPending = false;
+  function scheduleScroll(force = false) {
+    if (userScrolled) return;
+    if (!force && _scrollPending) return;
+    _scrollPending = true;
+    requestAnimationFrame(() => {
+      _scrollPending = false;
+      if (!userScrolled) chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: "smooth" });
+    });
+  }
   let docAnalysisMode = $state(false);
   let documentText = $state("");
 
@@ -347,18 +361,12 @@
               typingAgentName = "";
               typingAgentColor = "";
             } else {
-              streamingMessage = {
-                agentId: streamingMessage.agentId,
-                agentName: streamingMessage.agentName,
-                color: streamingMessage.color,
-                text: streamingMessage.text + data.text,
-              };
+              // Mutate the property in-place on Svelte 5's reactive proxy—
+              // avoids allocating a new object + copying 3 unchanged fields on every token
+              streamingMessage.text += data.text;
             }
             await tick();
-            setTimeout(() => {
-              if (!userScrolled)
-                chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: "smooth" });
-            }, 20);
+            scheduleScroll();
           } else if (data.type === "message") {
             streamingMessage = null;
             // Clear the indicator; the next turn_start will re-set it with the
@@ -377,10 +385,7 @@
               },
             ];
             await tick();
-            setTimeout(() => {
-              if (!userScrolled)
-                chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: "smooth" });
-            }, 50);
+            scheduleScroll(true);
           } else if (data.type === "judgeStatus") {
             judgeStatus = data.status ?? null;
           } else if (data.type === "judgeResult") {

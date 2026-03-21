@@ -185,7 +185,12 @@ export const POST: RequestHandler = async ({ request }) => {
           // Tell the client which agent is about to speak before any tokens
           // arrive. This lets the typing indicator show the correct model name
           // regardless of turn-order swaps resolved server-side.
-          send({ type: "turn_start", agentId: agent.id, agentName: agent.name, color: agent.color });
+          send({
+            type: "turn_start",
+            agentId: agent.id,
+            agentName: agent.name,
+            color: agent.color,
+          });
 
           const { reply, judgePromise } = await generateAdaptiveReply(
             agent,
@@ -259,7 +264,6 @@ export const POST: RequestHandler = async ({ request }) => {
           pendingJudges.set(agent.id, pendingEntry);
 
           turn++;
-          await new Promise((r) => setTimeout(r, 250));
         }
 
         // Await any remaining pending judges (last 1–2 turns) before the verdict.

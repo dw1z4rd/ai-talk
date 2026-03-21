@@ -24,6 +24,12 @@ import type { AdaptiveAgentState, MetaGoal } from "$lib/adaptive/types";
 import type { AdaptivePressure } from "$lib/live-judge/types";
 import { generateHiddenDirective } from "$lib/live-judge/pressure";
 
+// Pre-compiled once at module load — used in the per-token hot path.
+// CJK_TEST has no /g flag so .test() is stateless (global regexes advance lastIndex).
+// CJK_RE carries /g for .replace() which resets lastIndex internally before scanning.
+const CJK_TEST = /[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/;
+const CJK_RE = /[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g;
+
 export interface Agent {
   id: string;
   name: string;
@@ -531,8 +537,16 @@ export function buildAgents(
   const archetypeB = resolveArchetype(personalityB);
 
   return [
-    buildAgentFromDef(agentAId, defA, makeSystemPrompt(defA.name, defB.name, archetypeA)),
-    buildAgentFromDef(agentBId, defB, makeSystemPrompt(defB.name, defA.name, archetypeB)),
+    buildAgentFromDef(
+      agentAId,
+      defA,
+      makeSystemPrompt(defA.name, defB.name, archetypeA),
+    ),
+    buildAgentFromDef(
+      agentBId,
+      defB,
+      makeSystemPrompt(defB.name, defA.name, archetypeB),
+    ),
   ];
 }
 
@@ -925,8 +939,18 @@ export function buildAdaptiveAgents(
   const adaptiveStateB = initializeAdaptiveAgent(secondId, archetypeB, goalsB);
 
   return [
-    buildAgentFromDef(firstId, defA, makeSystemPrompt(defA.name, defB.name, archetypeA), adaptiveStateA),
-    buildAgentFromDef(secondId, defB, makeSystemPrompt(defB.name, defA.name, archetypeB), adaptiveStateB),
+    buildAgentFromDef(
+      firstId,
+      defA,
+      makeSystemPrompt(defA.name, defB.name, archetypeA),
+      adaptiveStateA,
+    ),
+    buildAgentFromDef(
+      secondId,
+      defB,
+      makeSystemPrompt(defB.name, defA.name, archetypeB),
+      adaptiveStateB,
+    ),
   ];
 }
 
@@ -1166,7 +1190,7 @@ export async function generateAdaptiveReply(
         ? {
             onToken: (token: string) =>
               onToken(
-                token.replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, " "),
+                CJK_TEST.test(token) ? token.replace(CJK_RE, " ") : token,
               ),
           }
         : {}),
@@ -1181,10 +1205,7 @@ export async function generateAdaptiveReply(
   // instruction. Space rather than empty-string preserves word boundaries.
   // Matches the full CJK/fullwidth stripping already applied to narrative verdict
   // text in core.ts.
-  const turnText = reply
-    .replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, " ")
-    .replace(/ {2,}/g, " ")
-    .trim();
+  const turnText = reply.replace(CJK_RE, " ").replace(/ {2,}/g, " ").trim();
 
   if (!prebuiltReply) {
     console.log(
