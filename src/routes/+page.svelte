@@ -391,9 +391,7 @@
           } else if (data.type === "judgeResult") {
             // Don't clear judgeStatus here — another judge may still be in flight.
             // judgeStatus is cleared only by writing_verdict / narrativeVerdict / done.
-            liveJudgeResults = [
-              ...liveJudgeResults,
-              {
+            liveJudgeResults.push({
                 turnNumber: data.turnNumber,
                 agentId: data.agentId,
                 scores: data.scores,
@@ -402,23 +400,16 @@
                 tacticalAnalysis: data.tacticalAnalysis,
                 reasoning: data.reasoning,
                 absoluteScores: data.absoluteScores ?? null,
-              },
-            ];
+            });
 
             if (data.pairwiseRound) {
-              pairwiseRounds = [...pairwiseRounds, data.pairwiseRound]
-                .sort((a, b) => a.roundNumber - b.roundNumber);
+              pairwiseRounds.push(data.pairwiseRound);
+              pairwiseRounds.sort((a, b) => a.roundNumber - b.roundNumber);
             }
 
             // Incrementally update score/momentum accumulators (O(1) per event)
-            _scoreTotals = {
-              ..._scoreTotals,
-              [data.agentId]: (_scoreTotals[data.agentId] ?? 0) + (data.scores?.overallScore ?? 50),
-            };
-            _momentumTotals = {
-              ..._momentumTotals,
-              [data.agentId]: (_momentumTotals[data.agentId] ?? 0) + (data.momentumShift ?? 0),
-            };
+            _scoreTotals[data.agentId] = (_scoreTotals[data.agentId] ?? 0) + (data.scores?.overallScore ?? 50);
+            _momentumTotals[data.agentId] = (_momentumTotals[data.agentId] ?? 0) + (data.momentumShift ?? 0);
 
             if (
               data.scorecard &&
@@ -465,26 +456,14 @@
               (r) => r.turnNumber === data.targetTurn && r.agentId === data.agentId,
             );
             if (idx !== -1 && liveJudgeResults[idx].absoluteScores) {
-              liveJudgeResults[idx] = {
-                ...liveJudgeResults[idx],
-                absoluteScores: {
-                  ...liveJudgeResults[idx].absoluteScores,
-                  logicalCoherence:
-                    (liveJudgeResults[idx].absoluteScores.logicalCoherence ?? 0) +
-                    data.deltaLogic,
-                },
-              };
-              liveJudgeResults = [...liveJudgeResults];
+              // Mutate deeply via $state proxy — no spread allocation needed.
+              liveJudgeResults[idx].absoluteScores.logicalCoherence =
+                (liveJudgeResults[idx].absoluteScores.logicalCoherence ?? 0) + data.deltaLogic;
             }
             // Accumulate delta for the badge display in the score table
-            scoreDeltas = {
-              ...scoreDeltas,
-              [data.targetTurn]: (scoreDeltas[data.targetTurn] ?? 0) + data.deltaLogic,
-            };
+            scoreDeltas[data.targetTurn] = (scoreDeltas[data.targetTurn] ?? 0) + data.deltaLogic;
             const notifId = crypto.randomUUID();
-            scoreUpdateNotifications = [
-              ...scoreUpdateNotifications,
-              {
+            scoreUpdateNotifications.push({
                 id: notifId,
                 targetTurn: data.targetTurn,
                 agentId: data.agentId,
@@ -493,12 +472,10 @@
                 deltaLogic: data.deltaLogic,
                 reason: data.reason,
                 updateType: data.updateType,
-              },
-            ];
+            });
             setTimeout(() => {
-              scoreUpdateNotifications = scoreUpdateNotifications.filter(
-                (n) => n.id !== notifId,
-              );
+              const i = scoreUpdateNotifications.findIndex((n) => n.id === notifId);
+              if (i !== -1) scoreUpdateNotifications.splice(i, 1);
             }, 3500);
           } else if (data.type === "narrativeVerdict") {
             judgeStatus = null;

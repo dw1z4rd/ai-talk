@@ -757,6 +757,7 @@ export class LiveJudgeSystem {
                 postPenaltyRound,
                 curAbs,
                 contextualizeScoreForRound(postPenaltyRound, prevAbs),
+                prevAbs, // raw prevHistScore for draw spread check
               );
               this.panel.scorecard.rounds[ri] = {
                 ...postPenaltyRound,
@@ -944,6 +945,7 @@ export class LiveJudgeSystem {
               pairwiseRound,
               this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber],
             ),
+            this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber], // raw prevHistScore for draw spread check
           )
         : [];
     if (harmonizationFlags.length > 0) {
