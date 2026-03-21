@@ -170,6 +170,24 @@ export function popIn(
 }
 
 /**
+ * Matching exit for popIn — collapses down quickly.
+ */
+export function popOut(
+  node: Element,
+  { duration = 180, delay = 0, easing = cubicIn } = {},
+) {
+  return {
+    delay,
+    duration,
+    easing,
+    css: (t: number) => `
+      transform: scale(${0.92 + 0.08 * t}) translateY(${(1 - t) * 12}px);
+      opacity: ${t};
+    `,
+  };
+}
+
+/**
  * Slow zoom+fade in for chat messages — starts sluggish, accelerates in.
  * Enter: scale 0.88→1, opacity 0→1 over 2000ms with a cubic-in-out feel.
  * Exit: reverse — scale 1→0.88, opacity 1→0 over 1800ms.
