@@ -835,6 +835,14 @@ export class LiveJudgeSystem {
           // scorer independently produces a score that inverts or grossly
           // contradicts the pairwise judgment.
           //
+          // Only band clamping is applied here (WIN/DRAW/LOSS floors/ceilings).
+          // prevScores is intentionally NOT passed — the winMinGap enforcement
+          // that used to live here ran before penalties (evidence gating, artifact
+          // cap) and caused a feedback loop where the pre-penalty bump was always
+          // erased by the subsequent penalty, landing scores at the same value
+          // every round.  Gap enforcement is now the sole responsibility of the
+          // post-penalty block below, which sees final values of both turns.
+          //
           // Only curTurn's scores are modified.  PrevTurn's scores are frozen
           // (they were set in a prior processTurn call and may carry retroactive
           // penalties that we must not silently undo here).
@@ -847,9 +855,7 @@ export class LiveJudgeSystem {
               agent.id,
               pairwiseRound.prevTurn.agentId,
               absoluteScores,
-              this.panel.absoluteScoreHistory[
-                pairwiseRound.prevTurn.turnNumber
-              ],
+              // prevScores omitted — gap enforcement moved to post-penalty block
             );
             if (clamped !== absoluteScores) {
               const floorNote =
@@ -873,7 +879,6 @@ export class LiveJudgeSystem {
                 };
               }
             }
-
           }
 
           // ── Evidence gating enforcement ─────────────────────────────────────
@@ -934,16 +939,21 @@ export class LiveJudgeSystem {
           }
 
           // ── Post-penalty Logic gap enforcement ───────────────────────────────
-          // Evidence gating and artifact cap (above) run after applyPairwiseFloors,
-          // so they may collapse the Logic WIN gap to zero (e.g. both sides land at
-          // 34 after independent penalties).  Fix: after all penalties are final,
-          // check the gap once and pull the LOSER down only — never push the winner
-          // up, which would silently undo the penalty.
+          // This is the SOLE gap enforcement for Logic.  It runs after all
+          // deductions (evidence gating, artifact cap) so it sees the true final
+          // score for both turns simultaneously.  The loser is pulled down only —
+          // never push the winner up, which would silently undo a penalty.
           //
-          // This also handles the scaleCeil (40) case where clampAbsDim's winMinGap
-          // was capped: pulling prevTurn down is the only valid way to open the gap.
+          // Pipeline order guarantee:
+          //   1. applyPairwiseFloors  — band clamping only (WIN/DRAW/LOSS)
+          //   2. Evidence gating penalty  — may reduce winner's Logic score
+          //   3. Artifact rhetoric cap    — may reduce Rhetoric score
+          //   4. THIS BLOCK              — opens the gap on final values
           const MIN_LOGIC_WIN_GAP = 6;
-          if (!pairwiseRound.isFallback && pairwiseRound.logicWinner !== "tie") {
+          if (
+            !pairwiseRound.isFallback &&
+            pairwiseRound.logicWinner !== "tie"
+          ) {
             const prevTurnNumFinal = pairwiseRound.prevTurn.turnNumber;
             const prevHistFinal =
               this.panel.absoluteScoreHistory[prevTurnNumFinal];

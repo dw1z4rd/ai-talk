@@ -979,17 +979,20 @@ function clampAbsDim(
  * Returns a (possibly new) JudgeScores object; returns the same reference if
  * no value changed so callers can skip logging.
  *
- * prevScores: when provided, gap enforcement pushes each WIN score to at least
- * prevTurn's score + a per-dimension minimum gap, preventing reconcileRoundWinners
- * from silently demoting the win to "tie" due to equal absolute scores:
+ * This function performs BAND CLAMPING only — it places curTurn's score in the
+ * range consistent with the pairwise verdict (WIN/DRAW/LOSS) but does NOT enforce
+ * a minimum gap between winner and loser.  Gap enforcement is intentionally moved
+ * to the post-penalty block in core.ts processTurn so it sees the final scores of
+ * both turns after all deductions (evidence gating, artifact cap) have fired.
+ *
+ * prevScores: optional.  When provided, winMinGap is additionally applied so the
+ * winner's score is ≥ prevTurn + per-dimension gap.  This is retained as an escape
+ * hatch but is NOT used in the main scoring pipeline — pass prevScores only when
+ * you need pre-penalty gap enforcement (e.g. testing or legacy callers).
  *   Logic    winMinGap = 4 (= 1 raw point × 4 scale factor)
  *   Tactics  winMinGap = 6 (= 2 raw points × 3 scale factor)
  *   Rhetoric winMinGap = 6 (= 2 raw points × 3 scale factor)
- * All three are capped at scaleCeil, so when prevTurn's score is already near the
- * ceiling (e.g. prevLogic=40 → gap target=44, cap to 40) the gap may not open here.
- * The caller is responsible for a post-penalty pull-down pass that handles this case
- * (see "Post-penalty Logic gap enforcement" block in core.ts processTurn).
- * Omit prevScores for contextualization calls where gap enforcement is not wanted.
+ * Omit prevScores for the normal scoring path and for contextualization calls.
  *
  * Scale parameters used (WIN/DRAW/LOSS bands as [floor, ceil]):
  *   Logic    (0–40): WIN [24,40]  DRAW [18,30]  LOSS [10,22]
