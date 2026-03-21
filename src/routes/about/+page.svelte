@@ -211,8 +211,7 @@
         <span class="text-[--color-accent] mt-0.5 shrink-0">→</span>
         <span>
           <strong class="text-white">Multi-dimensional scoring.</strong> There is
-          no single "who won" meter. Logic, rhetoric, tactics, frame control, and
-          credibility are tracked separately, so a win on style that conceals weak
+          no single "who won" meter. Logic, rhetoric, and tactics are tracked separately, so a win on style that conceals weak
           reasoning is visible in the scorecard.
         </span>
       </li>
