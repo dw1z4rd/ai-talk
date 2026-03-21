@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
 
   const NAV_ITEMS = [
     { href: '/', label: '⚔️ Debate' },
@@ -7,7 +7,7 @@
   ];
 
   function isActive(href: string): boolean {
-    return $page.url.pathname === href;
+    return page.url.pathname === href;
   }
 
   function activeColor(_href: string): string {
