@@ -128,7 +128,7 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
   },
   "deepseek-v3.1:671b-cloud": {
     name: "DeepSeek V3.1 671B",
-    color: "#F59E0B",
+    color: "#E11D48",
     makeProvider: () =>
       createOllamaProvider({
         baseUrl: OLLAMA_CLOUD_URL,
@@ -138,7 +138,7 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
   },
   "kimi-k2.5:cloud": {
     name: "Kimi K2.5",
-    color: "#F59E0B",
+    color: "#06B6D4",
     makeProvider: () =>
       createOllamaProvider({
         baseUrl: OLLAMA_CLOUD_URL,
@@ -204,7 +204,7 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
 
   "glm-4.6:cloud": {
     name: "GLM-4.6",
-    color: "#8B5CF6",
+    color: "#F472B6",
     makeProvider: () =>
       createOllamaProvider({
         baseUrl: OLLAMA_CLOUD_URL,
