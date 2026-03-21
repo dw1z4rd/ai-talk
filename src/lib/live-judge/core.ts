@@ -1394,6 +1394,13 @@ export class LiveJudgeSystem {
     const gapAdjustments = this.enforceAllLogicGaps();
     if (gapAdjustments.length > 0) onGapAdjustments?.(gapAdjustments);
 
+    // Re-run harmonization after enforcement: enforceAllLogicGaps mutates
+    // absoluteScoreHistory, so the per-turn pass (run during processTurn) is
+    // stale. This catches Draw spread flags where a curTurn score was pulled
+    // down into a spread with prevTurn, and WIN near-zero gap flags where the
+    // reverse-pass cascade left a margin below MIN_LOGIC_WIN_GAP.
+    this.recomputeAllHarmonizationFlags();
+
     const judge = this.panel.judges[0];
     const VERDICT_TIMEOUT_MS = 60_000;
 

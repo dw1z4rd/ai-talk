@@ -1218,11 +1218,11 @@ export function reconcileRoundWinners(
  *   tactics/rhetoric: drawThreshold = 4  (default)
  *
  * Win-gap thresholds (minimum gap required for a valid WIN; below this the margin is
- * suspiciously small — typically caused by retroactive gap enforcement in
- * applyPairwiseFloors pulling the winner's score down toward the loser):
- *   logic:   winMinGap = 4  (matches applyPairwiseFloors winMinGap)
- *   tactics: winMinGap = 6  (idem)
- *   rhetoric: winMinGap = 6 (idem)
+ * suspiciously small — typically caused by the reverse-cascade in enforceAllLogicGaps
+ * leaving a floor-constrained round with a margin below the enforcement minimum):
+ *   logic:   winMinGap = 6  (matches MIN_LOGIC_WIN_GAP in enforceAllLogicGaps)
+ *   tactics: winMinGap = 6  (matches applyPairwiseFloors tactics winMinGap)
+ *   rhetoric: winMinGap = 6 (matches applyPairwiseFloors rhetoric winMinGap)
  *   overall: not checked (no matching enforcement gap)
  *
  * rawPrevAbsolute: the un-contextualized prevHistScore straight from absoluteScoreHistory.
@@ -1368,7 +1368,7 @@ export function computeHarmonizationFlags(
     5,
     6, // Logic scale 0–40: gap ≥ 6 on a Draw flags meaningful spread
     rawPrevAbsolute?.logicalCoherence,
-    4, // winMinGap: matches applyPairwiseFloors logic winMinGap
+    6, // winMinGap: matches MIN_LOGIC_WIN_GAP in enforceAllLogicGaps
   );
   check(
     "tactics",
