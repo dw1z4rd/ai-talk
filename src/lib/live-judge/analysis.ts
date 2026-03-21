@@ -878,10 +878,12 @@ export function updateScorecard(
  *
  * Optional prevVal + winMinGap: when provided for the WIN path, the winner's
  * score is also pushed to at least prevVal + winMinGap so that a genuine win is
- * always visible in the absolute scores even when both turns argued competently
- * and the LLM scores them identically. This is a last-resort backstop — the
- * primary mechanism is the WIN prompt rubric (which should already push
- * competitive wins to 8–9). The gap is capped at scaleCeil.
+ * visible in the absolute scores (when there is headroom below scaleCeil) even
+ * when both turns argued competently and the LLM scores them identically. This
+ * is a last-resort backstop — the primary mechanism is the WIN prompt rubric
+ * (which should already push competitive wins to 8–9). The gap is capped at
+ * scaleCeil, so when prevVal is already near the ceiling, the WIN turn may still
+ * end up numerically tied at scaleCeil.
  *
  * Overlapping bands are intentional: a close win can numerically resemble a
  * strong draw, and a strong-draw can resemble a narrow loss. Non-overlapping
@@ -933,9 +935,11 @@ function clampAbsDim(
  *
  * prevScores: when provided, the Logic WIN path enforces a minimum gap of 4
  * (= 1 raw point on the 1–10 rubric scale) between the winner's absolute score
- * and prevTurn's absolute score. This prevents both turns landing at identical
- * Logic values after a genuine pairwise win, which would otherwise cause
- * reconcileRoundWinners to silently demote the win to "tie".
+ * and prevTurn's absolute score. This reduces or eliminates ties between turns
+ * after a genuine pairwise win (when a gap can be created below scaleCeil),
+ * preventing reconcileRoundWinners from silently demoting the win to "tie".
+ * When prevTurn's Logic score is already at or near scaleCeil, the cap may
+ * still produce equal values.
  * Omit prevScores for contextualization calls where gap enforcement is not wanted.
  *
  * Scale parameters used (WIN/DRAW/LOSS bands as [floor, ceil]):
