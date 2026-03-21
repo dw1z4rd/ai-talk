@@ -639,6 +639,58 @@ describe("applyPairwiseFloors", () => {
     // Rhetoric 8: LOSS band [7,16] → 8 (unchanged, within band)
     expect(result.rhetoricalForce).toBe(8);
   });
+
+  // ── Win-gap enforcement (prevScores) ──────────────────────────────────────
+
+  it("WIN path: curVal equal to prevVal gets bumped by winMinGap (4)", () => {
+    // Both turns scored 30 on Logic — winner must be lifted above loser
+    const cur = makeScores(30, 22, 20);
+    const prev = makeScores(30, 20, 18);
+    const result = applyPairwiseFloors("b", "b", "b", "b", "a", cur, prev);
+    // 30 + 4 = 34; bandApplied = max(24, min(40, 30)) = 30; gap: max(30, 34) = 34
+    expect(result.logicalCoherence).toBe(34);
+  });
+
+  it("WIN path: curVal already above prevVal + gap — no extra lift applied", () => {
+    const cur = makeScores(36, 22, 20);
+    const prev = makeScores(28, 20, 18);
+    const result = applyPairwiseFloors("b", "b", "b", "b", "a", cur, prev);
+    // 28 + 4 = 32; curVal 36 already exceeds 32
+    expect(result.logicalCoherence).toBe(36);
+  });
+
+  it("WIN path: gap enforcement is capped at scaleCeil (40)", () => {
+    // prevVal = 40 → prevVal + 4 = 44, must not exceed 40
+    const cur = makeScores(40, 22, 20);
+    const prev = makeScores(40, 20, 18);
+    const result = applyPairwiseFloors("b", "b", "b", "b", "a", cur, prev);
+    expect(result.logicalCoherence).toBe(40);
+  });
+
+  it("WIN path: gap enforcement only affects Logic, not Tactics/Rhetoric", () => {
+    // Both Tactics and Rhetoric at 20 (WIN for both) — no gap enforcement there
+    const cur = makeScores(30, 20, 20);
+    const prev = makeScores(30, 20, 20);
+    const result = applyPairwiseFloors("b", "b", "b", "b", "a", cur, prev);
+    expect(result.logicalCoherence).toBe(34); // gap enforcement fired
+    expect(result.tacticalEffectiveness).toBe(20); // unchanged
+    expect(result.rhetoricalForce).toBe(20); // unchanged
+  });
+
+  it("WIN path: omitting prevScores disables gap enforcement (backward-compatible)", () => {
+    const cur = makeScores(30, 22, 20);
+    const result = applyPairwiseFloors("b", "b", "b", "b", "a", cur);
+    // No prevScores — bandApplied only: max(24, min(40, 30)) = 30
+    expect(result.logicalCoherence).toBe(30);
+  });
+
+  it("LOSS path: prevScores has no effect on loss clamping", () => {
+    const cur = makeScores(30, 22, 20); // Logic 30 — well above lossCeil
+    const prev = makeScores(36, 22, 20);
+    const result = applyPairwiseFloors("a", "a", "a", "b", "a", cur, prev);
+    // cur is LOSS (a=prevId wins) — lossCeil = 22
+    expect(result.logicalCoherence).toBe(22);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -274,7 +274,7 @@ export class LiveJudgeSystem {
                 : "";
             const logicNote =
               dimension === "Logic"
-                ? ` LOGIC WIN — override "Start at 6": use 8 as your baseline. Graduated scoring: 9 = decisive win — complete cause→process→consequence chain AND opponent's load-bearing premise explicitly named and refuted; 8 = clear win — own mechanism present with causal chain, opponent's gap named or exploited — expected score for a solid Logic win; 7 = narrow win — own argument clearly better but mechanism incomplete, OR opponent's premise not directly named; 6 = barely wins — both incomplete, requires explicit reconciliation explaining why this turn's mechanism outperformed. Scoring exactly 8 every time signals anchoring — name the specific mechanism quality that justifies the actual score.`
+                ? ` LOGIC WIN — override "Start at 6": use 8 as your baseline for a clear mechanism win. Graduated scoring: 9 = decisive win — complete cause→process→consequence chain AND opponent's load-bearing premise explicitly named and refuted; 8 = clear win — own mechanism complete and causally connected, opponent's gap identified or exploited; USE THIS for competitive rounds where both turns argued well but this turn's mechanism was more complete or precise — a win in a competent exchange scores 8, not 7; 7 = narrow win — THIS TURN's own mechanism is incomplete (missing a causal link or consequence step), but structurally stronger than the opponent's; reserve 7 for cases where the win comes from relative strength despite a gap in your own argument's chain; 6 = barely wins — both mechanisms incomplete, winner only on minor framing differences, requires explicit reconciliation. IMPORTANT: score 7 only when THIS TURN's own argument has a missing step — if this turn supplied a complete mechanism that dissolved the opponent's regress or closed their gap, score 8 or 9.`
                 : "";
             return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${agent.name} (this turn). Your ${dim}_score should be ≥ ${winFloor}.${rhetoricNote}${logicNote} Scoring below ${winFloor} would directly contradict the comparative judge's finding — only do so if you identify a specific failure the comparative judge explicitly overlooked.`;
           } else if (winner === "tie") {
@@ -810,6 +810,7 @@ export class LiveJudgeSystem {
               agent.id,
               pairwiseRound.prevTurn.agentId,
               absoluteScores,
+              this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber],
             );
             if (clamped !== absoluteScores) {
               console.log(
