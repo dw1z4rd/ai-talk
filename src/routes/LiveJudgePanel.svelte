@@ -89,7 +89,7 @@
     ...(narrativeVerdict ? [{ id: 'verdict' }] : []),
     ...(liveJudgeResults.some((r) => r.absoluteScores) ? [{ id: 'scores' }] : []),
   ] as section, i (section.id)}
-    <div in:flyInFromLeft={{ duration: 2000, distance: 100, delay: 1500 }} out:flyOutToBottom={{ duration: 1500, distance: 100 }} animate:flip={{ duration: 2000, easing: quintOut }}>
+    <div in:flyInFromLeft={{ duration: 1000, distance: 100, delay: 1000 + i * 50 }} out:flyOutToBottom={{ duration: 1000, distance: 100 }} animate:flip={{ duration: 2000, easing: quintOut }}>
 
       {#if section.id === 'verdict'}
         <!-- Narrative verdict (shown after debate completes) -->
@@ -98,8 +98,8 @@
           style="border-color: {verdictAgreesWithScorecard
             ? '#7c6af740'
             : '#f59e0b40'}"
-          in:popIn={{ duration: 2000, easing: quintOut, delay: 1800 + i * 50 }}
-          out:popOut={{ duration: 1800, easing: quintOut, delay: i * 25 }}
+          in:popIn={{ duration: 1000, easing: quintOut, delay: 1000 + i * 50 }}
+          out:popOut={{ duration: 1000, easing: quintOut, delay: i * 25 }}
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
@@ -222,8 +222,8 @@
               {@const isExpanded = expandedBreakdowns.has(r.turnNumber)}
               <div
                 class="border-b border-[--color-border] last:border-0"
-                in:popIn={{ duration: 2000, easing: quintOut, delay: 1800 + i * 50 }}
-                out:popOut={{ duration: 1800, easing: quintOut, delay: i * 25 }}
+                in:popIn={{ duration: 1000, easing: quintOut, delay: 1000 + i * 50 }}
+                out:popOut={{ duration: 1000, easing: quintOut, delay: i * 25 }}
                 animate:flip={{ duration: 2000, easing: quintOut }} 
               >
                 <!-- Score row -->
@@ -538,8 +538,8 @@
       <div
         class="rounded-xl border bg-[--color-panel] p-3 judge-card"
         style="border-color: #7c6af720; animation-delay: {i * 45}ms"
-        in:flyInFromTop={{ duration: 2000, delay: 1500 + (i * 50), distance: 100, easing: quintOut }}
-        out:flyOutToBottom={{ duration: 500, distance: 100, easing: quintOut }}
+        in:flyInFromTop={{ duration: 1000, delay: 1000 + i * 50, distance: 100, easing: quintOut }}
+        out:flyOutToBottom={{ duration: 1000, distance: 100, easing: quintOut }}
         animate:flip={{ duration: 2000, easing: quintOut }}
       >
         <!-- Round header -->
