@@ -10,6 +10,7 @@ import {
   type HarmonizationFlag,
   type OpenFlag,
   type FlagUpdate,
+  type PositionalConvergenceAnalysis,
 } from "./types";
 import type { Agent, Message } from "$lib/agents";
 import { MODEL_CATALOG } from "$lib/agents";
@@ -42,6 +43,16 @@ function extractJsonObject(text: string): string | null {
 }
 
 /**
+ * Append missing closing braces to a truncated JSON string.
+ * Returns the original when already balanced.
+ */
+function repairTruncatedJson(jsonString: string): string {
+  const open = (jsonString.match(/\{/g) ?? []).length;
+  const close = (jsonString.match(/\}/g) ?? []).length;
+  return open > close ? jsonString + "}".repeat(open - close) : jsonString;
+}
+
+/**
  * Count likely function-word fusions in text (e.g. "beits", "ofthe").
  * Defined at module level to avoid closure re-creation on every detectLanguageMismatch call.
  */
@@ -68,7 +79,7 @@ function detectSpaceDrops(text: string): number {
  * Safe to call on partial (streaming) text.
  */
 export function repairSpaceDrops(text: string): string {
-  return text.replace(/\b[a-z]{4,20}\b/g, (word) => {
+  return text.replace(LOWERCASE_WORD_RE, (word) => {
     if (FUNCTION_WORDS.has(word)) return word;
     for (let i = 1; i < word.length - 1; i++) {
       if (
@@ -162,9 +173,12 @@ export function classifyDebateDomain(topic: string): DebateDomain {
   const cached = _domainCache.get(t);
   if (cached !== undefined) return cached;
 
-  const philoScore = PHILOSOPHICAL_KEYWORDS.filter((k) => t.includes(k)).length;
-  const empiricalScore = EMPIRICAL_KEYWORDS.filter((k) => t.includes(k)).length;
-  const policyScore = POLICY_KEYWORDS.filter((k) => t.includes(k)).length;
+  let philoScore = 0,
+    empiricalScore = 0,
+    policyScore = 0;
+  for (const k of PHILOSOPHICAL_KEYWORDS) if (t.includes(k)) philoScore++;
+  for (const k of EMPIRICAL_KEYWORDS) if (t.includes(k)) empiricalScore++;
+  for (const k of POLICY_KEYWORDS) if (t.includes(k)) policyScore++;
 
   const total = philoScore + empiricalScore + policyScore;
   let result: DebateDomain;
@@ -753,13 +767,8 @@ function parsePairwiseResponse(
     try {
       data = JSON.parse(jsonString);
     } catch {
-      // Attempt brace-count repair for truncated responses
-      const openBraces = (jsonString.match(/\{/g) || []).length;
-      const closeBraces = (jsonString.match(/\}/g) || []).length;
-      let fixed = jsonString;
-      for (let i = 0; i < openBraces - closeBraces; i++) fixed += "}";
       try {
-        data = JSON.parse(fixed);
+        data = JSON.parse(repairTruncatedJson(jsonString));
       } catch {
         console.warn(
           `[Pairwise Judge] Round ${roundNumber}: JSON repair failed`,
@@ -1460,8 +1469,12 @@ export function computeHarmonizationFlags(
     round.tacticsWinner,
     round.rhetoricWinner,
   ];
-  const prevWins = winners.filter((w) => w === round.prevTurn.agentId).length;
-  const curWins = winners.filter((w) => w === round.curTurn.agentId).length;
+  let prevWins = 0,
+    curWins = 0;
+  for (const w of winners) {
+    if (w === round.prevTurn.agentId) prevWins++;
+    else if (w === round.curTurn.agentId) curWins++;
+  }
   const overallPairwiseWinner =
     prevWins >= 2
       ? round.prevTurn.agentId
@@ -1512,76 +1525,69 @@ export async function generateNarrativeVerdictText(
     .filter(Boolean)
     .join(" | ");
 
-  const pairwiseReasoning = scorecard.rounds
-    .filter((r) => !r.isFallback)
-    .map((r) => {
-      // Resolve a dimension winner ID to a display name.
-      // When the winner is "tie" (set by reconcileRoundWinners), show "Draw"
-      // rather than falling through to the curTurn agent name — the previous
-      // behaviour caused the narrative LLM to misattribute dimension wins.
-      const resolveDim = (winnerId: string): string => {
-        if (winnerId === r.prevTurn.agentId) return r.prevTurn.agentName;
-        if (winnerId === r.curTurn.agentId) return r.curTurn.agentName;
-        return "Draw";
-      };
-      const lines = [
-        `Round ${r.roundNumber} (${r.prevTurn.agentName} vs ${r.curTurn.agentName}):`,
-        `  Logic → ${resolveDim(r.logicWinner)}: ${r.logicDelta}`,
-        `  Tactics → ${resolveDim(r.tacticsWinner)}: ${r.tacticsDelta}`,
-        `  Rhetoric → ${resolveDim(r.rhetoricWinner)}: ${r.rhetoricDelta}`,
-      ];
-      if (r.mechanismDelta) lines.push(`  Mechanism: ${r.mechanismDelta}`);
-      if (r.mechanismFailures && r.mechanismFailures.length > 0)
-        lines.push(`  Mechanism failures: ${r.mechanismFailures.join(", ")}`);
-      if (r.suspectClaims && r.suspectClaims.length > 0)
-        lines.push(`  Suspect claims: ${r.suspectClaims.join("; ")}`);
-      return lines.join("\n");
-    })
-    .join("\n\n");
+  const pairwiseReasoningParts: string[] = [];
+  const roundWinParts: string[] = [];
+  const epistemicNoteParts: string[] = [];
 
-  const epistemicNotes = scorecard.rounds
-    .filter((r) => !r.isFallback && r.epistemicNote)
-    .map((r) => `Round ${r.roundNumber}: ${r.epistemicNote}`);
+  // Single pass over non-fallback rounds to build pairwise reasoning,
+  // round-win record, and epistemic notes simultaneously.
+  for (const r of scorecard.rounds) {
+    if (r.isFallback) continue;
+
+    // Resolve a dimension winner ID to a display name.
+    // Returns null for "tie" (set by reconcileRoundWinners) and unrecognised IDs.
+    const resolveName = (winnerId: string): string | null => {
+      if (winnerId === r.prevTurn.agentId) return r.prevTurn.agentName;
+      if (winnerId === r.curTurn.agentId) return r.curTurn.agentName;
+      return null;
+    };
+
+    const logicName = resolveName(r.logicWinner) ?? "Draw";
+    const tacticsName = resolveName(r.tacticsWinner) ?? "Draw";
+    const rhetoricName = resolveName(r.rhetoricWinner) ?? "Draw";
+
+    // PAIRWISE REASONING
+    const lines = [
+      `Round ${r.roundNumber} (${r.prevTurn.agentName} vs ${r.curTurn.agentName}):`,
+      `  Logic → ${logicName}: ${r.logicDelta}`,
+      `  Tactics → ${tacticsName}: ${r.tacticsDelta}`,
+      `  Rhetoric → ${rhetoricName}: ${r.rhetoricDelta}`,
+    ];
+    if (r.mechanismDelta) lines.push(`  Mechanism: ${r.mechanismDelta}`);
+    if (r.mechanismFailures?.length)
+      lines.push(`  Mechanism failures: ${r.mechanismFailures.join(", ")}`);
+    if (r.suspectClaims?.length)
+      lines.push(`  Suspect claims: ${r.suspectClaims.join("; ")}`);
+    pairwiseReasoningParts.push(lines.join("\n"));
+
+    // ROUND-WIN RECORD
+    const wins: Record<string, number> = {};
+    for (const name of [logicName, tacticsName, rhetoricName]) {
+      if (name !== "Draw") wins[name] = (wins[name] ?? 0) + 1;
+    }
+    const sorted = Object.entries(wins).sort((a, b) => b[1] - a[1]);
+    const roundWinner =
+      sorted.length > 0 && (sorted.length === 1 || sorted[0][1] > sorted[1][1])
+        ? sorted[0][0]
+        : "TIE";
+    roundWinParts.push(`R${r.roundNumber}\u2192${roundWinner}`);
+
+    // EPISTEMIC NOTES
+    if (r.epistemicNote)
+      epistemicNoteParts.push(`Round ${r.roundNumber}: ${r.epistemicNote}`);
+  }
+
+  const pairwiseReasoning = pairwiseReasoningParts.join("\n\n");
+  const roundWinRecord = roundWinParts.join(" \u00b7 ");
 
   const reasoningSection =
     pairwiseReasoning.length > 0
       ? `\nPAIRWISE REASONING (per-round findings):\n${pairwiseReasoning}\n`
       : "";
   const epistemicSection =
-    epistemicNotes.length > 0
-      ? `\nEPISTEMIC NOTES (per-round):\n${epistemicNotes.join("\n")}\n`
+    epistemicNoteParts.length > 0
+      ? `\nEPISTEMIC NOTES (per-round):\n${epistemicNoteParts.join("\n")}\n`
       : "";
-
-  // Pre-compute a round-win record line so the LLM can easily spot momentum
-  // reversals and identify RECOVERY ARC or ASYMMETRIC DEPTH patterns without
-  // having to reconstruct it from the full PAIRWISE REASONING prose.
-  const roundWinRecord = scorecard.rounds
-    .filter((r) => !r.isFallback)
-    .map((r) => {
-      // Resolve a dimension winner ID to a display name; "tie" (post-reconciliation)
-      // and any unrecognised ID resolve to null (not counted for either side).
-      const resolveName = (winnerId: string): string | null => {
-        if (winnerId === r.prevTurn.agentId) return r.prevTurn.agentName;
-        if (winnerId === r.curTurn.agentId) return r.curTurn.agentName;
-        return null;
-      };
-      const wins: Record<string, number> = {};
-      for (const w of [
-        resolveName(r.logicWinner),
-        resolveName(r.tacticsWinner),
-        resolveName(r.rhetoricWinner),
-      ]) {
-        if (w) wins[w] = (wins[w] ?? 0) + 1;
-      }
-      const sorted = Object.entries(wins).sort((a, b) => b[1] - a[1]);
-      const roundWinner =
-        sorted.length > 0 &&
-        (sorted.length === 1 || sorted[0][1] > sorted[1][1])
-          ? sorted[0][0]
-          : "TIE";
-      return `R${r.roundNumber}→${roundWinner}`;
-    })
-    .join(" · ");
 
   const prompt = `DEBATE TOPIC: "${topic}"
 
@@ -2146,12 +2152,8 @@ export function parseJudgeAnalysis(
     try {
       data = JSON.parse(jsonString);
     } catch {
-      const openBraces = (jsonString.match(/\{/g) || []).length;
-      const closeBraces = (jsonString.match(/\}/g) || []).length;
-      let fixed = jsonString;
-      for (let i = 0; i < openBraces - closeBraces; i++) fixed += "}";
       try {
-        data = JSON.parse(fixed);
+        data = JSON.parse(repairTruncatedJson(jsonString));
       } catch {
         return createFallbackAnalysis(
           judge,
@@ -2291,30 +2293,33 @@ export function aggregateJudgeScores(
       overallScore: 0,
     };
   }
-  const agg: JudgeScores = {
-    logicalCoherence: 0,
-    rhetoricalForce: 0,
-    frameControl: 0,
-    credibilityScore: 0,
-    tacticalEffectiveness: 0,
-    overallScore: 0,
-  };
-  judgeAnalyses.forEach((a) => {
-    agg.logicalCoherence += a.scores.logicalCoherence;
-    agg.rhetoricalForce += a.scores.rhetoricalForce;
-    agg.frameControl += a.scores.frameControl;
-    agg.credibilityScore += a.scores.credibilityScore;
-    agg.tacticalEffectiveness += a.scores.tacticalEffectiveness;
-    agg.overallScore += a.scores.overallScore;
-  });
+  const sum = judgeAnalyses.reduce(
+    (acc, a) => {
+      acc.logicalCoherence += a.scores.logicalCoherence;
+      acc.rhetoricalForce += a.scores.rhetoricalForce;
+      acc.frameControl += a.scores.frameControl;
+      acc.credibilityScore += a.scores.credibilityScore;
+      acc.tacticalEffectiveness += a.scores.tacticalEffectiveness;
+      acc.overallScore += a.scores.overallScore;
+      return acc;
+    },
+    {
+      logicalCoherence: 0,
+      rhetoricalForce: 0,
+      frameControl: 0,
+      credibilityScore: 0,
+      tacticalEffectiveness: 0,
+      overallScore: 0,
+    },
+  );
   const d = judgeAnalyses.length;
   return {
-    logicalCoherence: Math.round(agg.logicalCoherence / d),
-    rhetoricalForce: Math.round(agg.rhetoricalForce / d),
-    frameControl: Math.round(agg.frameControl / d),
-    credibilityScore: Math.round(agg.credibilityScore / d),
-    tacticalEffectiveness: Math.round(agg.tacticalEffectiveness / d),
-    overallScore: Math.round(agg.overallScore / d),
+    logicalCoherence: Math.round(sum.logicalCoherence / d),
+    rhetoricalForce: Math.round(sum.rhetoricalForce / d),
+    frameControl: Math.round(sum.frameControl / d),
+    credibilityScore: Math.round(sum.credibilityScore / d),
+    tacticalEffectiveness: Math.round(sum.tacticalEffectiveness / d),
+    overallScore: Math.round(sum.overallScore / d),
   };
 }
 
@@ -2400,7 +2405,7 @@ function createJudgeProviderWithRetry(modelId: string) {
  * the narrative verdict.
  */
 export async function detectPositionalConvergence(
-  judge: import("./types").LiveJudge,
+  judge: LiveJudge,
   fullTranscript: Message[],
   agentAName: string,
   agentBName: string,
@@ -2408,8 +2413,8 @@ export async function detectPositionalConvergence(
   signal?: AbortSignal,
   agentAId?: string,
   agentBId?: string,
-): Promise<import("./types").PositionalConvergenceAnalysis> {
-  const fallback: import("./types").PositionalConvergenceAnalysis = {
+): Promise<PositionalConvergenceAnalysis> {
+  const fallback: PositionalConvergenceAnalysis = {
     detected: false,
     convergenceTurnRange: null,
     coreClaimAgentA_early: "",
