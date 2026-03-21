@@ -223,6 +223,9 @@ export interface TurnScoreBreakdown {
   pairwiseFloorApplied?: boolean;
   pairwiseFloorNote?: string; // e.g. "Logic floored to WIN band [24–40]: 16 → 24"
 
+  // Post-penalty gap re-enforcement (populated in core.ts after evidence gating + artifact cap)
+  postPenaltyGapNote?: string; // e.g. "Post-penalty gap re-enforced — Logic: 34→38"
+
   // Evidence gating (populated in analyzeTurn before prompt construction)
   evidenceDetected?: boolean;
   evidenceCitations?: string[]; // citation strings found in the turn text
@@ -489,7 +492,11 @@ export interface JudgeAnalysisResult {
    * deltaLogic is negative (the amount subtracted).  Consumers should emit a
    * scoreUpdate SSE so the client display reflects the retroactive change.
    */
-  logicGapAdjustment?: { targetTurn: number; targetAgentId: string; deltaLogic: number };
+  logicGapAdjustment?: {
+    targetTurn: number;
+    targetAgentId: string;
+    deltaLogic: number;
+  };
 }
 
 // Judge specialization configurations

@@ -180,6 +180,7 @@
               content += "\n";
               if (bd.pairwiseFloorApplied) content += `> ⚡ ${bd.pairwiseFloorNote}\n\n`;
               if (bd.evidenceEnforcementNote) content += `> ⚖ ${bd.evidenceEnforcementNote}\n\n`;
+              if (bd.postPenaltyGapNote) content += `> 🔒 ${bd.postPenaltyGapNote}\n\n`;
             }
 
             // Rhetoric components
@@ -319,6 +320,7 @@
               });
               if (bd.pairwiseFloorApplied) content += `    ⚡ ${bd.pairwiseFloorNote}\n`;
               if (bd.evidenceEnforcementNote) content += `    ⚖ ${bd.evidenceEnforcementNote}\n`;
+              if (bd.postPenaltyGapNote) content += `    🔒 ${bd.postPenaltyGapNote}\n`;
             }
 
             if (bd.rhetoricalComponents) {
@@ -504,6 +506,7 @@
             scoresHtml += `</table>`;
             if (bd.pairwiseFloorApplied) scoresHtml += `<div style="font-size:0.74rem;color:#d97706;margin-bottom:0.3rem">⚡ ${escapeHtml(bd.pairwiseFloorNote)}</div>`;
             if (bd.evidenceEnforcementNote) scoresHtml += `<div style="font-size:0.74rem;color:#dc2626;margin-bottom:0.3rem">⚖ ${escapeHtml(bd.evidenceEnforcementNote)}</div>`;
+            if (bd.postPenaltyGapNote) scoresHtml += `<div style="font-size:0.74rem;color:#3b82f6;margin-bottom:0.3rem">🔒 ${escapeHtml(bd.postPenaltyGapNote)}</div>`;
           }
 
           // Rhetoric components

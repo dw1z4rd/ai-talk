@@ -883,8 +883,7 @@ export class LiveJudgeSystem {
             if (clamped.prevLogicOverride !== undefined) {
               const prevTurnNum = pairwiseRound.prevTurn.turnNumber;
               const prevAgentId = pairwiseRound.prevTurn.agentId;
-              const prevHist =
-                this.panel.absoluteScoreHistory[prevTurnNum];
+              const prevHist = this.panel.absoluteScoreHistory[prevTurnNum];
               if (prevHist !== undefined) {
                 const delta =
                   clamped.prevLogicOverride - prevHist.logicalCoherence;
@@ -929,7 +928,10 @@ export class LiveJudgeSystem {
               absoluteScores.logicalCoherence - EVIDENCE_LOGIC_PENALTY,
             );
             if (penalised !== absoluteScores.logicalCoherence) {
-              absoluteScores = { ...absoluteScores, logicalCoherence: penalised };
+              absoluteScores = {
+                ...absoluteScores,
+                logicalCoherence: penalised,
+              };
               scoreBreakdown = {
                 ...scoreBreakdown,
                 evidenceEnforcementNote:
@@ -962,6 +964,82 @@ export class LiveJudgeSystem {
                 `Rhetoric capped at ${RHETORIC_ARTIFACT_CAP}/30 — CJK inline encoding artifact detected. ` +
                 `Space-drop repair cannot fix this class of tokeniser failure; score reflects uncertainty.`,
             };
+          }
+
+          // ── Post-penalty gap re-enforcement ─────────────────────────────────
+          // Evidence gating and artifact cap (above) may have reduced curTurn's
+          // scores after applyPairwiseFloors already ran, collapsing the WIN gap
+          // to zero so reconcileRoundWinners silently downgrades the win to "tie".
+          // Re-run applyPairwiseFloors with the now-final absoluteScores and the
+          // current absoluteScoreHistory entry for prevTurn (which may itself have
+          // already been pulled down by the first prevLogicOverride pass).
+          if (!pairwiseRound.isFallback) {
+            const prevTurnNumPP = pairwiseRound.prevTurn.turnNumber;
+            const prevScoresPP = this.panel.absoluteScoreHistory[prevTurnNumPP];
+            if (prevScoresPP !== undefined) {
+              const reGapped = applyPairwiseFloors(
+                pairwiseRound.logicWinner,
+                pairwiseRound.tacticsWinner,
+                pairwiseRound.rhetoricWinner,
+                agent.id,
+                pairwiseRound.prevTurn.agentId,
+                absoluteScores,
+                prevScoresPP,
+              );
+              if (reGapped !== absoluteScores) {
+                const ppNote =
+                  `Post-penalty gap re-enforced — ` +
+                  `Logic: ${absoluteScores.logicalCoherence}→${reGapped.logicalCoherence} ` +
+                  `Tactics: ${absoluteScores.tacticalEffectiveness}→${reGapped.tacticalEffectiveness} ` +
+                  `Rhetoric: ${absoluteScores.rhetoricalForce}→${reGapped.rhetoricalForce}`;
+                console.log(
+                  `[Post-Penalty Gap] R${pairwiseRound.roundNumber} T${turnNumber} ` +
+                    `(${agent.name}) — ${ppNote}`,
+                );
+                absoluteScores = reGapped;
+                if (scoreBreakdown) {
+                  scoreBreakdown = {
+                    ...scoreBreakdown,
+                    postPenaltyGapNote: ppNote,
+                  };
+                }
+                // If the ceiling cap still prevents opening the gap from above,
+                // pull prevTurn Logic down — accumulate into logicGapAdjustment
+                // so a single SSE carries the total delta.
+                if (reGapped.prevLogicOverride !== undefined) {
+                  const prevHistPP =
+                    this.panel.absoluteScoreHistory[prevTurnNumPP];
+                  if (prevHistPP !== undefined) {
+                    const deltaPP =
+                      reGapped.prevLogicOverride - prevHistPP.logicalCoherence;
+                    if (deltaPP !== 0) {
+                      this.panel.absoluteScoreHistory[prevTurnNumPP] = {
+                        ...prevHistPP,
+                        logicalCoherence: reGapped.prevLogicOverride,
+                      };
+                      if (logicGapAdjustment) {
+                        logicGapAdjustment = {
+                          ...logicGapAdjustment,
+                          deltaLogic: logicGapAdjustment.deltaLogic + deltaPP,
+                        };
+                      } else {
+                        logicGapAdjustment = {
+                          targetTurn: prevTurnNumPP,
+                          targetAgentId: pairwiseRound.prevTurn.agentId,
+                          deltaLogic: deltaPP,
+                        };
+                      }
+                      console.log(
+                        `[Post-Penalty Gap Override] R${pairwiseRound.roundNumber} ` +
+                          `T${prevTurnNumPP} (${pairwiseRound.prevTurn.agentId}) Logic ` +
+                          `${prevHistPP.logicalCoherence}→${reGapped.prevLogicOverride} ` +
+                          `(delta=${deltaPP})`,
+                      );
+                    }
+                  }
+                }
+              }
+            }
           }
 
           // Persist for next round's harmonization check and retroactive re-reconciliation

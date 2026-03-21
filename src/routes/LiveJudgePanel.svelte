@@ -353,7 +353,13 @@
                           <p class="text-[10px] text-[--color-muted-fg] leading-relaxed">{bd.evidenceEnforcementNote}</p>
                         </div>
                       {/if}
-
+                      <!-- Post-penalty gap re-enforcement -->
+                      {#if bd.postPenaltyGapNote}
+                        <div class="rounded-lg border border-blue-500/20 bg-blue-500/5 px-2.5 py-2">
+                          <p class="text-[10px] font-bold text-blue-400 mb-0.5">🔒 Post-penalty gap restored</p>
+                          <p class="text-[10px] text-[--color-muted-fg] leading-relaxed">{bd.postPenaltyGapNote}</p>
+                        </div>
+                      {/if}
                       <!-- Artifact repair -->
                       {#if bd.artifactRepairApplied || bd.artifactSeverity === 'severe'}
                         <div class="rounded-lg border px-2.5 py-2"

@@ -707,6 +707,49 @@ describe("applyPairwiseFloors", () => {
     // cur is LOSS (a=prevId wins) — lossCeil = 22
     expect(result.logicalCoherence).toBe(22);
   });
+
+  it("second call with post-penalty equal scores re-enforces gap", () => {
+    // Simulates the post-penalty scenario from the feedback:
+    // curTurn won Logic pairwise.  applyPairwiseFloors (first call) lifted curTurn
+    // to 40.  Then an evidence-gating penalty reduced curTurn to 34.  Meanwhile
+    // prevTurn also sits at 34 (no penalty applied to it).  A second call to
+    // applyPairwiseFloors with these post-penalty scores must restore the gap.
+    const penalisedCur = makeScores(34, 22, 20); // after evidence-gating penalty
+    const frozenPrev = makeScores(34, 20, 18); // prevTurn — no penalty, stayed at 34
+    const result = applyPairwiseFloors(
+      "b",
+      "b",
+      "b",
+      "b",
+      "a",
+      penalisedCur,
+      frozenPrev,
+    );
+    // winMinGap=4 → curLogic lifted from 34 to 38.
+    expect(result.logicalCoherence).toBe(38);
+    // MIN_LOGIC_WIN_GAP=6 inside applyPairwiseFloors: gap is 38-34=4 < 6, so
+    // prevLogicOverride fires: max(10, 38-6) = 32.  The caller should pull
+    // prevTurn down to 32, giving a final gap of 6 (38-32).
+    expect(result.prevLogicOverride).toBe(32);
+  });
+
+  it("second call: penalty collapses both turns to scaleCeil — prevLogicOverride set", () => {
+    // Edge case: both turns at 40 post-penalty.  curTurn can't go above 40, so
+    // applyPairwiseFloors must set prevLogicOverride = max(10, 40-6) = 34.
+    const penalisedCur = makeScores(40, 22, 20);
+    const frozenPrev = makeScores(40, 20, 18);
+    const result = applyPairwiseFloors(
+      "b",
+      "b",
+      "b",
+      "b",
+      "a",
+      penalisedCur,
+      frozenPrev,
+    );
+    expect(result.logicalCoherence).toBe(40);
+    expect(result.prevLogicOverride).toBe(34);
+  });
 });
 
 // ---------------------------------------------------------------------------
