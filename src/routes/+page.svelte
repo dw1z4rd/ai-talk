@@ -105,6 +105,10 @@
   let naturallyEnded = $state(false);
   let showLiveJudgePanel = $state(false);
 
+  // Scopes all live-judge reads to the debate that produced this stream.
+  // Set from the 'debateId' SSE event; prevents cross-user state leakage.
+  let currentDebateId = $state<string | null>(null);
+
   let liveJudgeResults = $state<any[]>([]);
   // Cumulative retroactive logic deltas per turn number (from flag_updates)
   let scoreDeltas = $state<Record<number, number>>({});
@@ -153,7 +157,9 @@
       }
 
       try {
-        const response = await fetch("/api/judge");
+        const response = await fetch(
+          currentDebateId ? `/api/judge?debateId=${currentDebateId}` : "/api/judge"
+        );
         if (response.ok) {
           const data = await response.json();
           finalJudgePanel = data.panelState;
@@ -217,6 +223,7 @@
     judgeStatus = null;
     _scoreTotals = {};
     _momentumTotals = {};
+    currentDebateId = null;
   }
 
   function buildContext(): string | undefined {
@@ -274,6 +281,7 @@
       scoreDeltas = {};
       _scoreTotals = {};
       _momentumTotals = {};
+      currentDebateId = null;
     }
     done = false;
     isPaused = false;
@@ -348,7 +356,9 @@
           if (!line.startsWith("data: ")) continue;
           const data = JSON.parse(line.slice(6));
 
-          if (data.type === "turn_start") {
+          if (data.type === "debateId") {
+            currentDebateId = data.debateId;
+          } else if (data.type === "turn_start") {
             typingAgentName = data.agentName;
             typingAgentColor = data.color;
           } else if (data.type === "token") {

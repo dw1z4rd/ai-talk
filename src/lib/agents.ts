@@ -11,7 +11,13 @@ import {
   OLLAMA_CLOUD_URL,
   OLLAMA_CLOUD_API_KEY,
 } from "$env/static/private";
-import { getLiveJudgeSystem, resetLiveJudgeSystem } from "$lib/live-judge/core";
+import {
+  getLiveJudgeSystem,
+  resetLiveJudgeSystem,
+  createLiveJudgeSession,
+  getSessionSystem,
+  deleteSession,
+} from "$lib/live-judge/core";
 import type { JudgeAnalysisResult } from "$lib/live-judge/types";
 import {
   initializeAdaptiveAgent,
@@ -1126,6 +1132,7 @@ export async function generateAdaptiveReply(
   onReply?: (reply: string) => void,
   prebuiltReply?: string,
   signal?: AbortSignal,
+  debateId?: string,
 ): Promise<{
   reply: string | null;
   judgePromise: Promise<LiveJudgeResult | undefined>;
@@ -1226,7 +1233,9 @@ export async function generateAdaptiveReply(
   // at the start of that agent's next turn, 2 turns away).
   const judgePromise: Promise<LiveJudgeResult | undefined> = (async () => {
     try {
-      const liveJudgeSystem = getLiveJudgeSystem();
+      const liveJudgeSystem = debateId
+        ? getSessionSystem(debateId)
+        : getLiveJudgeSystem();
 
       const judgeResult = await liveJudgeSystem.processTurn(
         agent,
@@ -1328,18 +1337,23 @@ export async function generateAdaptiveReply(
 }
 
 /**
- * Get current live judge panel state
+ * Get current live judge panel state.
+ * Pass debateId (from the SSE stream) to scope to a specific session.
  */
-export function getLiveJudgeState() {
-  const liveJudgeSystem = getLiveJudgeSystem();
+export function getLiveJudgeState(debateId?: string) {
+  const liveJudgeSystem = debateId
+    ? getSessionSystem(debateId)
+    : getLiveJudgeSystem();
   return liveJudgeSystem.getPanelState();
 }
 
 /**
  * Get the current debate scorecard (pairwise win tallies).
  */
-export function getDebateScorecard() {
-  return getLiveJudgeSystem().getScorecard();
+export function getDebateScorecard(debateId?: string) {
+  return (
+    debateId ? getSessionSystem(debateId) : getLiveJudgeSystem()
+  ).getScorecard();
 }
 
 /**
@@ -1350,24 +1364,34 @@ export async function generateDebateNarrativeVerdict(
   topic: string,
   agentA: Agent,
   agentB: Agent,
+  debateId?: string,
 ) {
-  return getLiveJudgeSystem().generateNarrativeVerdict(
-    fullTranscript,
-    topic,
-    agentA,
-    agentB,
-  );
+  return (
+    debateId ? getSessionSystem(debateId) : getLiveJudgeSystem()
+  ).generateNarrativeVerdict(fullTranscript, topic, agentA, agentB);
 }
 
 /**
  * Reset live judge system for new debate.
- * Passing debater model IDs allows the judge to pick a different model than the debaters.
+ * When debateId is provided a fresh isolated session is created for that debate.
  */
 export function resetLiveJudgeDebate(
   debaterModelIds?: string[],
   mode: "debate" | "document_audit" = "debate",
+  debateId?: string,
 ) {
-  resetLiveJudgeSystem(debaterModelIds, mode);
+  if (debateId) {
+    createLiveJudgeSession(debateId, debaterModelIds, mode);
+  } else {
+    resetLiveJudgeSystem(debaterModelIds, mode);
+  }
+}
+
+/**
+ * Remove the session map entry once a debate is fully over.
+ */
+export function cleanupLiveJudgeSession(debateId: string) {
+  deleteSession(debateId);
 }
 
 /**

@@ -228,9 +228,19 @@ export interface TurnScoreBreakdown {
   evidenceCitations?: string[]; // citation strings found in the turn text
   evidenceGatingNote?: string; // note shown in the audit panel
 
+  // Evidence enforcement (code-level; populated in core.ts post-scoring)
+  empiricalClaimsWithoutCitations?: boolean; // true when empirical patterns present but no citations
+  empiricalClaimsList?: string[]; // matched empirical-claim phrases (for audit)
+  evidenceEnforcementNote?: string; // describes the Logic penalty applied
+
   // Artifact remediation (populated in analyzeTurn before prompt construction)
   artifactRepairApplied?: boolean;
   artifactRepairNote?: string; // what was repaired and how
+  artifactSeverity?: "none" | "minor" | "moderate" | "severe"; // severity of detected artifacts
+
+  // Rhetoric cap (populated in core.ts when severe artifacts prevent reliable assessment)
+  rhetoricalScoreCapped?: boolean;
+  rhetoricalCapNote?: string; // reason for the cap
 }
 
 /** Running win tally for one agent across all pairwise rounds. */

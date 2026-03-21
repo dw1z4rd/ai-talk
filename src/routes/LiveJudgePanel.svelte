@@ -343,11 +343,26 @@
                         </div>
                       {/if}
 
+                      <!-- Evidence enforcement (code-level Logic penalty) -->
+                      {#if bd.evidenceEnforcementNote}
+                        <div class="rounded-lg border border-red-500/20 bg-red-500/5 px-2.5 py-2">
+                          <p class="text-[10px] font-bold text-red-400 mb-0.5">⚖ Evidence gate applied</p>
+                          {#if bd.empiricalClaimsList?.length}
+                            <p class="text-[10px] text-[--color-muted] mb-1 leading-relaxed italic">"{bd.empiricalClaimsList.slice(0, 2).join('", "')}"</p>
+                          {/if}
+                          <p class="text-[10px] text-[--color-muted-fg] leading-relaxed">{bd.evidenceEnforcementNote}</p>
+                        </div>
+                      {/if}
+
                       <!-- Artifact repair -->
-                      {#if bd.artifactRepairApplied}
-                        <div class="rounded-lg border border-sky-500/20 bg-sky-500/5 px-2.5 py-2">
-                          <p class="text-[10px] font-bold text-sky-400 mb-0.5">🔧 Artifact repair applied</p>
-                          <p class="text-[10px] text-[--color-muted-fg] leading-relaxed">{bd.artifactRepairNote}</p>
+                      {#if bd.artifactRepairApplied || bd.artifactSeverity === 'severe'}
+                        <div class="rounded-lg border px-2.5 py-2"
+                          style="border-color: {bd.artifactSeverity === 'severe' ? '#f8717130' : '#38bdf830'}; background: {bd.artifactSeverity === 'severe' ? '#f8717108' : '#38bdf808'}">
+                          <p class="text-[10px] font-bold mb-0.5" style="color: {bd.artifactSeverity === 'severe' ? '#f87171' : '#38bdf8'}">
+                            {bd.artifactSeverity === 'severe' ? '🚨 Severe artifact detected' : '🔧 Artifact repair applied'}
+                            {#if bd.rhetoricalScoreCapped} · Rhetoric capped{/if}
+                          </p>
+                          <p class="text-[10px] text-[--color-muted-fg] leading-relaxed">{bd.artifactRepairNote ?? bd.rhetoricalCapNote}</p>
                         </div>
                       {/if}
 
@@ -566,11 +581,36 @@
           </div>
         </div>
 
-        <!-- Logic delta (2-3 sentences) -->
-        <div class="pt-2 border-t border-[--color-border]">
-          <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">
-            {round.logicDelta}
-          </p>
+        <!-- Pairwise rubric deltas -->
+        <div class="pt-2 border-t border-[--color-border] flex flex-col gap-2">
+          <div>
+            <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-0.5">Logic</p>
+            <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.logicDelta}</p>
+          </div>
+          {#if round.tacticsDelta}
+            <div>
+              <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-0.5">Tactics</p>
+              <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.tacticsDelta}</p>
+            </div>
+          {/if}
+          {#if round.rhetoricDelta}
+            <div>
+              <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-0.5">Rhetoric</p>
+              <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.rhetoricDelta}</p>
+            </div>
+          {/if}
+          {#if round.mechanismDelta}
+            <div class="rounded-lg border border-amber-500/20 bg-amber-500/5 px-2 py-1.5">
+              <p class="text-[10px] font-bold text-amber-400 mb-0.5">Mechanism</p>
+              <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.mechanismDelta}</p>
+            </div>
+          {/if}
+          {#if round.epistemicNote}
+            <div class="rounded-lg border border-sky-500/20 bg-sky-500/5 px-2 py-1.5">
+              <p class="text-[10px] font-bold text-sky-400 mb-0.5">Epistemic</p>
+              <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.epistemicNote}</p>
+            </div>
+          {/if}
         </div>
       </div>
       {/each}

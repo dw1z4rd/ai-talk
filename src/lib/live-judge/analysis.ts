@@ -26,8 +26,10 @@ import {
   repairSpaceDrops,
   repairAndTrackArtefacts,
   detectEvidence,
+  detectEmpiricalClaims,
   type ArtifactRepairResult,
   type EvidenceDetectionResult,
+  type EmpiricalClaimResult,
 } from "./text-utils";
 
 export { repairSpaceDrops } from "./text-utils";
@@ -977,14 +979,16 @@ function clampAbsDim(
  * Returns a (possibly new) JudgeScores object; returns the same reference if
  * no value changed so callers can skip logging.
  *
- * prevScores: when provided, the Logic WIN path enforces a minimum gap of 4
- * (= 1 raw point on the 1–10 rubric scale × 4 factor) between the winner's
- * absolute score and prevTurn's absolute score, preventing reconcileRoundWinners
- * from silently demoting the win to "tie". When prevTurn's Logic score is already
- * at or near scaleCeil, the cap may still produce equal values.
- * Tactics and Rhetoric do NOT use winMinGap: their scaleCeil is 30 and a 6-point
- * gap requirement creates a permanent ceiling lock once any winner reaches 30
- * (every subsequent winner is forced to Math.min(30, 30+6) = 30 forever).
+ * prevScores: when provided, gap enforcement pushes each WIN score to at least
+ * prevTurn's score + a per-dimension minimum gap, preventing reconcileRoundWinners
+ * from silently demoting the win to "tie" due to equal absolute scores:
+ *   Logic    winMinGap = 4 (= 1 raw point × 4 scale factor)
+ *   Tactics  winMinGap = 6 (= 2 raw points × 3 scale factor)
+ *   Rhetoric winMinGap = 6 (= 2 raw points × 3 scale factor)
+ * All three are capped at scaleCeil, so when prevTurn's score is already near the
+ * ceiling (e.g. prevTactics=28 → gap target=34, cap to 30) both sides may land at
+ * scaleCeil and reconcileRoundWinners will force "tie" — this is acceptable and
+ * documented expected behaviour (see test "gap enforcement is capped at scaleCeil").
  * Omit prevScores for contextualization calls where gap enforcement is not wanted.
  *
  * Scale parameters used (WIN/DRAW/LOSS bands as [floor, ceil]):
@@ -1026,6 +1030,8 @@ export function applyPairwiseFloors(
     7, // lossFloor
     16, // lossCeil
     30, // scaleCeil
+    prevScores?.tacticalEffectiveness, // gap enforcement: winner ≥ prevTurn + 6
+    6, // winMinGap = 2 raw points on 1–10 scale
   );
   const newRhetoric = clampAbsDim(
     rhetoricWinner,
@@ -1038,6 +1044,8 @@ export function applyPairwiseFloors(
     7, // lossFloor
     16, // lossCeil
     30, // scaleCeil
+    prevScores?.rhetoricalForce, // gap enforcement: winner ≥ prevTurn + 6
+    6, // winMinGap = 2 raw points on 1–10 scale
   );
 
   if (
@@ -1791,6 +1799,9 @@ export async function analyzeTurn(
   // ── Pre-scoring: artifact remediation & evidence gating ──────────────────
   const repairResult = repairAndTrackArtefacts(message);
   const evidenceResult = detectEvidence(repairResult.repaired);
+  // Empirical claim detection runs on the repaired text so space-drop
+  // artefacts don't interfere with pattern matching.
+  const empiricalResult = detectEmpiricalClaims(repairResult.repaired);
 
   const judgePrompt = generateJudgePrompt(
     judge,
@@ -1868,9 +1879,15 @@ export async function analyzeTurn(
           ? evidenceResult.citations
           : undefined,
       evidenceGatingNote: evidenceResult.gatingNote,
+      // Empirical claims (used by core.ts for code-level enforcement)
+      empiricalClaimsWithoutCitations:
+        !evidenceResult.hasEvidence && empiricalResult.hasEmpirical,
+      empiricalClaimsList:
+        empiricalResult.hasEmpirical ? empiricalResult.claims : undefined,
       // Artifact remediation
       artifactRepairApplied: repairResult.applied,
       artifactRepairNote: repairResult.note,
+      artifactSeverity: repairResult.severity,
     };
   }
 

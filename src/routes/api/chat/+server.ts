@@ -7,6 +7,7 @@ import {
   getDebateScorecard,
   makeDocumentAuditorPrompt,
   MODEL_CATALOG,
+  cleanupLiveJudgeSession,
 } from "$lib/agents";
 import type { Message } from "$lib/agents";
 
@@ -41,6 +42,10 @@ export const POST: RequestHandler = async ({ request }) => {
   const agentAId = agentA ?? "kimi-k2:1t-cloud";
   const agentBId = agentB ?? "nemotron-3-super-cloud";
 
+  // Unique ID for this debate — scopes the LiveJudgeSystem so concurrent
+  // users never share state.
+  const debateId = crypto.randomUUID();
+
   const stream = new ReadableStream({
     async start(controller) {
       const send = (data: object) => {
@@ -60,10 +65,17 @@ export const POST: RequestHandler = async ({ request }) => {
       try {
         // Reset live judge system, passing debater IDs so the judge
         // model can be selected to differ from the debaters.
+        // The debateId scopes this session so it is isolated from other
+        // concurrent debates on the same server process.
         resetLiveJudgeDebate(
           [agentAId, agentBId],
           isDocMode ? "document_audit" : "debate",
+          debateId,
         );
+
+        // Send the debate ID to the client immediately so it can include it in
+        // subsequent /api/judge requests to read the correct session.
+        send({ type: "debateId", debateId });
 
         const history: Message[] = (messages || []).map((m: any) => {
           if (m.agentId === "moderator") {
@@ -228,6 +240,7 @@ export const POST: RequestHandler = async ({ request }) => {
               ? documentSegments![Math.floor(turn / 2)]?.text
               : undefined,
             request.signal,
+            debateId,
           );
 
           if (!reply) {
@@ -290,7 +303,7 @@ export const POST: RequestHandler = async ({ request }) => {
         const debateAgentHistory = history.filter(
           (m) => m.agentId !== "moderator",
         );
-        const scorecard = getDebateScorecard();
+        const scorecard = getDebateScorecard(debateId);
 
         if (scorecard.rounds.length > 0) {
           send({ type: "judgeStatus", status: "writing_verdict" });
@@ -300,6 +313,7 @@ export const POST: RequestHandler = async ({ request }) => {
               safeTopic,
               agents[0],
               agents[1],
+              debateId,
             );
 
             if (narrativeVerdict) {
@@ -331,6 +345,9 @@ export const POST: RequestHandler = async ({ request }) => {
         send({ type: "error", message: String(err) });
       } finally {
         clearInterval(keepAlive);
+        // Schedule cleanup so any in-flight /api/judge poll can still read
+        // the session state before it is removed.
+        setTimeout(() => cleanupLiveJudgeSession(debateId), 60_000);
         controller.close();
       }
     },

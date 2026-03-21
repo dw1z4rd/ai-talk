@@ -921,6 +921,60 @@ export class LiveJudgeSystem {
             }
           }
 
+          // ── Evidence gating enforcement ─────────────────────────────────────
+          // Code-level backstop for empirical claims without citations.
+          // The judge prompt already instructs the LLM to penalise hollow
+          // specificity, but the LLM may classify borderline phrasing as
+          // "normative" and skip the penalty.  When the pre-scoring detector
+          // found empirical patterns AND no inline citations, apply a −4 Logic
+          // penalty (= −1 raw point × 4) capped at the LOSS band floor (10).
+          // Only fires when Logic is above 24 (WIN floor): turns already scored
+          // in the LOSS/DRAW band are not further depressed.
+          const EVIDENCE_LOGIC_PENALTY = 4; // −1 raw point on 1–10 scale × 4
+          if (
+            scoreBreakdown?.empiricalClaimsWithoutCitations &&
+            absoluteScores.logicalCoherence > 24
+          ) {
+            const penalised = Math.max(
+              24,
+              absoluteScores.logicalCoherence - EVIDENCE_LOGIC_PENALTY,
+            );
+            if (penalised !== absoluteScores.logicalCoherence) {
+              absoluteScores = { ...absoluteScores, logicalCoherence: penalised };
+              scoreBreakdown = {
+                ...scoreBreakdown,
+                evidenceEnforcementNote:
+                  `Logic −${EVIDENCE_LOGIC_PENALTY}: empirical claims detected without inline citations ` +
+                  `(${scoreBreakdown.empiricalClaimsList?.slice(0, 2).join("; ") ?? "see audit"}). ` +
+                  `Score capped at WIN floor pending citation.`,
+              };
+            }
+          }
+
+          // ── Artifact remediation: Rhetoric cap ──────────────────────────────
+          // CJK inline artifacts signal a tokeniser encoding failure that
+          // space-drop repair cannot fix.  The LLM scored repaired text, but
+          // residual encoding noise may have inflated Expression or Structure
+          // ratings.  Cap Rhetoric at the DRAW-band ceiling (22/30) for severe
+          // artifacts so the cap is visible in the audit trail.
+          const RHETORIC_ARTIFACT_CAP = 22; // DRAW-band max for Tactics/Rhetoric
+          if (
+            scoreBreakdown?.artifactSeverity === "severe" &&
+            absoluteScores.rhetoricalForce > RHETORIC_ARTIFACT_CAP
+          ) {
+            absoluteScores = {
+              ...absoluteScores,
+              rhetoricalForce: RHETORIC_ARTIFACT_CAP,
+            };
+            scoreBreakdown = {
+              ...scoreBreakdown,
+              rhetoricalScoreCapped: true,
+              rhetoricalCapNote:
+                `Rhetoric capped at ${RHETORIC_ARTIFACT_CAP}/30 — CJK inline encoding artifact detected. ` +
+                `Space-drop repair cannot fix this class of tokeniser failure; score reflects uncertainty.`,
+            };
+          }
+
           // Persist for next round's harmonization check and retroactive re-reconciliation
           this.panel.lastAbsoluteScores[agent.id] = absoluteScores;
           this.panel.absoluteScoreHistory[turnNumber] = absoluteScores;
@@ -1595,7 +1649,42 @@ export class LiveJudgeSystem {
   }
 }
 
-// ── Singleton ─────────────────────────────────────────────────────────────────
+// ── Session-scoped instances (one LiveJudgeSystem per active debate) ──────────
+//
+// Each call to POST /api/chat generates a unique debateId (UUID) and creates
+// an isolated LiveJudgeSystem for that debate.  All subsequent requests that
+// belong to the same debate pass the debateId so they operate on the right
+// instance rather than on a shared global.  This prevents state from leaking
+// between concurrent users.
+
+const _sessions = new Map<string, LiveJudgeSystem>();
+
+/** Create (or replace) the isolated LiveJudgeSystem for a debate session. */
+export function createLiveJudgeSession(
+  sessionId: string,
+  debaterModelIds?: string[],
+  mode: "debate" | "document_audit" = "debate",
+): void {
+  const system = new LiveJudgeSystem();
+  system.reset(debaterModelIds, mode);
+  _sessions.set(sessionId, system);
+}
+
+/** Return the LiveJudgeSystem for an existing session. Throws if not found. */
+export function getSessionSystem(sessionId: string): LiveJudgeSystem {
+  const system = _sessions.get(sessionId);
+  if (!system) {
+    throw new Error(`No live judge session for ID: ${sessionId}`);
+  }
+  return system;
+}
+
+/** Remove the session from the map once the debate is fully over. */
+export function deleteSession(sessionId: string): void {
+  _sessions.delete(sessionId);
+}
+
+// ── Legacy singleton — kept for unit tests only ───────────────────────────────
 
 let liveJudgeSystem: LiveJudgeSystem | null = null;
 

@@ -144,30 +144,59 @@ export function repairSpaceDrops(text: string): string {
 
 // ── Artifact repair with tracking ────────────────────────────────────────────
 
+export type ArtifactSeverity = "none" | "minor" | "moderate" | "severe";
+
 export interface ArtifactRepairResult {
   /** The (possibly repaired) text to feed to the scorer. */
   repaired: string;
-  /** True when at least one artefact was fixed. */
+  /** True when at least one space-drop artefact was fixed. */
   applied: boolean;
+  /**
+   * Severity of the worst artifact class detected, even if unrepairable.
+   * "none"     — no artefacts found
+   * "minor"    — 1–2 space-drop fusions (repaired)
+   * "moderate" — 3+ space-drop fusions (repaired but residual noise likely)
+   * "severe"   — CJK script inlined with Latin text (tokeniser encoding failure;
+   *              space-drop repair does not fix this class)
+   */
+  severity: ArtifactSeverity;
   /** Human-readable note for the audit panel; undefined when no repair occurred. */
   note?: string;
 }
 
+// Inline CJK mixed with Latin text — reliable signal of tokeniser encoding failure.
+// Does NOT fire on purely CJK text (e.g. Japanese-language debates); only on
+// isolated CJK characters embedded inside otherwise Latin prose.
+const CJK_RE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]/;
+const ALL_CJK_RE =
+  /^[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f\s\p{P}]+$/u;
+
 /**
- * Apply space-drop repair and return both the cleaned text and a tracking record.
- * Use this before passing turn text to any LLM scorer so that tokeniser artefacts
- * do not depress rhetoric scores for formatting reasons unrelated to argument quality.
+ * Apply space-drop repair and classify artifact severity.
+ * Severity "severe" signals a CJK encoding failure that space-drop repair
+ * cannot fix; core.ts uses this to cap the Rhetoric score.
  */
 export function repairAndTrackArtefacts(text: string): ArtifactRepairResult {
   const repaired = repairSpaceDrops(text);
   const applied = repaired !== text;
-  return {
-    repaired,
-    applied,
-    note: applied
-      ? "Space-drop artefacts repaired before scoring (fused function words reconnected — rhetoric score reflects cleaned text)."
-      : undefined,
-  };
+  const spaceDropCount = applied ? detectSpaceDrops(text) : 0;
+  const hasCjkInline = CJK_RE.test(text) && !ALL_CJK_RE.test(text);
+
+  let severity: ArtifactSeverity = "none";
+  let note: string | undefined;
+
+  if (hasCjkInline) {
+    severity = "severe";
+    note = `CJK characters detected inline with Latin text — likely tokeniser encoding failure. Rhetoric score capped; encoding artefacts are not repairable by space-drop repair.${applied ? " Space-drop artefacts also repaired." : ""}`;
+  } else if (spaceDropCount >= 3) {
+    severity = "moderate";
+    note = `${spaceDropCount} space-drop artefacts repaired before scoring (fused function words reconnected). Moderate artefact count may indicate residual noise; rhetoric score reflects cleaned text.`;
+  } else if (applied) {
+    severity = "minor";
+    note = "Space-drop artefacts repaired before scoring (fused function words reconnected — rhetoric score reflects cleaned text).";
+  }
+
+  return { repaired, applied, severity, note };
 }
 
 // ── Evidence detection ────────────────────────────────────────────────────────
@@ -221,4 +250,46 @@ export function detectEvidence(text: string): EvidenceDetectionResult {
     ? `EVIDENCE DETECTED: Turn contains ${citations.length} citation(s)/reference(s): ${preview}. Citations satisfy the evidentiary-grounding requirement for empirical claims when the turn also supplies a mechanism chain — apply the +1 grounded-precision bonus where the chain is present. Do NOT additionally penalise for hollow specificity on claims that are directly covered by a citation.`
     : "EVIDENCE NOTE: Turn contains no inline citations, DOIs, or URLs. Hollow-specificity penalties apply without mitigation from implied evidentiary support. A gesture toward 'recent work' or 'studies show' without a citation receives the standard −1 penalty.";
   return { hasEvidence, citations, gatingNote };
+}
+
+// ── Empirical claim detection ─────────────────────────────────────────────────
+
+export interface EmpiricalClaimResult {
+  /** True when the turn contains phrases that assert empirical facts. */
+  hasEmpirical: boolean;
+  /** De-duplicated list of matched empirical-claim phrases. */
+  claims: string[];
+}
+
+// Compiled at module load — patterns that signal a factual/empirical assertion.
+// Designed for high recall (may match normative uses of "data suggests") so that
+// the code-level evidence gate only fires when NO citations are present — the
+// combination of "empirical language + zero citations" is the reliable signal.
+const _EMPIRICAL_PATTERNS: readonly RegExp[] = [
+  /\bstudi(?:es|y)\s+(?:show|suggest|find|demonstrate|reveal|indicate|confirm)/gi,
+  /\bresearch\s+(?:show|suggest|find|confirm|indicate|demonstrate)/gi,
+  /\bdata\s+(?:show|suggest|indicate|confirm|demonstrate)/gi,
+  /\bevidence\s+(?:show|suggest|indicate|supports?|demonstrate)/gi,
+  /\baccording\s+to\s+(?:data|research|studies|experts|scientists|experts)/gi,
+  /\b\d+\s*%\s+(?:of\b|reduction|increase|improvement|higher|lower|more|fewer)/gi,
+  /\bmeta-analysis|systematic\s+review|randomized\s+(?:controlled\s+)?trial|clinical\s+trial/gi,
+  /\bscientifically\s+(?:proven|established|validated)/gi,
+  /\bproven\s+(?:that|to\b|effective|ineffective)/gi,
+  /\bstatistic(?:s|ally)|empirically\b/gi,
+];
+
+/**
+ * Detect phrases in a turn that assert empirical facts without inline citations.
+ * Used as the second condition in the code-level evidence gate: the penalty only
+ * fires when BOTH `detectEvidence` returns `hasEvidence=false` AND this returns
+ * `hasEmpirical=true`.  Pure normative/conceptual turns receive no penalty.
+ */
+export function detectEmpiricalClaims(text: string): EmpiricalClaimResult {
+  const hits: string[] = [];
+  for (const re of _EMPIRICAL_PATTERNS) {
+    const matches = text.match(new RegExp(re.source, re.flags)) ?? [];
+    hits.push(...matches);
+  }
+  const claims = [...new Set(hits.map((s) => s.trim()))];
+  return { hasEmpirical: claims.length > 0, claims };
 }
