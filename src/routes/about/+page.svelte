@@ -50,9 +50,9 @@
     <div class="flex flex-col gap-2">
       <h3 class="text-base font-semibold text-[--color-accent]">1 — Per-turn absolute scoring</h3>
       <p class="text-sm text-[--color-muted-fg] leading-relaxed">
-        Each turn receives independent scores on five dimensions —
+        Each turn receives independent scores on three dimensions —
         <strong class="text-white">Logical Coherence</strong> (0–40),
-        <strong class="text-white">Rhetorical Force</strong> (0–30),
+        <strong class="text-white">Rhetorical Force</strong> (0–30), and 
         <strong class="text-white">Tactical Effectiveness</strong> (0–30), weighted into a composite 0–100
         grade. Logic uses a component-chain model: a top score requires a complete cause → process →
         measurable consequence chain with the opponent's weakest premise explicitly addressed.
