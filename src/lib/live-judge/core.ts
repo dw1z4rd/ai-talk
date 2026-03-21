@@ -780,25 +780,6 @@ export class LiveJudgeSystem {
                   rhetoricWinner: updatedRound.rhetoricWinner,
                 };
               }
-
-              // Re-compute harmonization flags using post-penalty absolute scores
-              // and the (possibly reconciled) pairwise winners. Flags computed at
-              // round-processing time used pre-penalty lastAbsoluteScores and
-              // become stale when retroactive penalties or restores mutate
-              // absoluteScoreHistory — causing the export to show a flag whose
-              // absolute-score leader disagrees with the current score table.
-              const postPenaltyRound = this.panel.scorecard.rounds[ri];
-              const recomputedFlags = computeHarmonizationFlags(
-                postPenaltyRound,
-                curAbs,
-                contextualizeScoreForRound(postPenaltyRound, prevAbs),
-                prevAbs, // raw prevHistScore for draw spread check
-              );
-              this.panel.scorecard.rounds[ri] = {
-                ...postPenaltyRound,
-                harmonizationFlags:
-                  recomputedFlags.length > 0 ? recomputedFlags : undefined,
-              };
             }
 
             // Recompute overallWinner after tally adjustments
@@ -1047,43 +1028,14 @@ export class LiveJudgeSystem {
       generateAdaptivePressure(analysis, momentumShift, frameControlShift),
     );
 
-    // Compute harmonization flags for this round (synchronous, no LLM).
-    // prevTurn's score is contextualized to this round's pairwise outcomes
-    // via contextualizeScoreForRound so the comparison is always within the
-    // same outcome band — eliminating structural discrepancies caused by the
-    // sliding-window design (a turn's frozen per-turn score may sit in the
-    // wrong band when it reappears as prevTurn with the opposite outcome).
-    const harmonizationFlags: HarmonizationFlag[] =
-      pairwiseRound && !pairwiseRound.isFallback
-        ? computeHarmonizationFlags(
-            pairwiseRound,
-            absoluteScores,
-            contextualizeScoreForRound(
-              pairwiseRound,
-              this.panel.absoluteScoreHistory[
-                pairwiseRound.prevTurn.turnNumber
-              ],
-            ),
-            this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber], // raw prevHistScore for draw spread check
-          )
-        : [];
-    if (harmonizationFlags.length > 0) {
-      harmonizationFlags.forEach((f) =>
-        console.warn(
-          `[Harmonization] Round ${f.roundNumber} ${f.dimension}: pairwise winner diverges from absolute scores by ${f.divergenceMagnitude} — ${f.note}`,
-        ),
-      );
-      // Attach flags to the round and keep the scorecard's stored copy in sync
-      // so the export and UI can surface them.
-      if (pairwiseRound) {
-        pairwiseRound = { ...pairwiseRound, harmonizationFlags };
-        this.panel.scorecard = {
-          ...this.panel.scorecard,
-          rounds: this.panel.scorecard.rounds.map((r) =>
-            r.roundNumber === pairwiseRound!.roundNumber ? pairwiseRound! : r,
-          ),
-        };
-      }
+    // ── Post-scoring harmonization pass ──────────────────────────────────────
+    // All absolute scores for the current turn (and any retroactive adjustments
+    // to earlier turns' history entries) are now settled.  Run a single pass
+    // over every round using the final absoluteScoreHistory snapshot so that
+    // Draw-spread and directional-inversion flags always reflect the values
+    // visible in the score table — not pre-penalty or pre-gap-enforcement values.
+    if (pairwiseRound && !pairwiseRound.isFallback) {
+      this.recomputeAllHarmonizationFlags();
     }
 
     // Derive opts for hidden directive: counterfactual and mechanism pressure.
@@ -1206,7 +1158,11 @@ export class LiveJudgeSystem {
       scorecard: pairwiseRound ? { ...this.panel.scorecard } : undefined,
       absoluteScores,
       harmonizationFlags:
-        harmonizationFlags.length > 0 ? harmonizationFlags : undefined,
+        pairwiseRound && !pairwiseRound.isFallback
+          ? this.panel.scorecard.rounds.find(
+              (r) => r.roundNumber === pairwiseRound!.roundNumber,
+            )?.harmonizationFlags
+          : undefined,
       retroactiveDeltas:
         pairwiseRound?.flagUpdates && pairwiseRound.flagUpdates.length > 0
           ? { ...this.panel.retroactiveDeltas }
@@ -1220,6 +1176,58 @@ export class LiveJudgeSystem {
   /**
    * Create a TurnAnalysis-compatible object from pairwise scores for pressure.ts.
    */
+  /**
+   * Recompute harmonization flags for every non-fallback round using the
+   * current absoluteScoreHistory as ground truth.
+   *
+   * Called once at the end of each processTurn, after all absolute scores,
+   * penalties, and gap-enforcement adjustments are fully settled.  This
+   * guarantees every flag references the same score values visible in the
+   * scorecard table — no flag can reference a value that was later overwritten.
+   *
+   * Two check types per round:
+   *   - Draw spread:       pairwise = tie AND |curScore − prevScore| ≥ threshold
+   *   - Directional inversion: pairwise winner scores lower than loser by ≥ threshold
+   *
+   * prevTurn scores are contextualized for the inversion check (to avoid
+   * false positives caused by the sliding-window design) but raw for the
+   * draw-spread check (to reflect the actual table values).
+   */
+  private recomputeAllHarmonizationFlags(): void {
+    const snapshot = this.panel.absoluteScoreHistory;
+    const updatedRounds = this.panel.scorecard.rounds.map((round) => {
+      if (round.isFallback) return round;
+      const rawPrev = snapshot[round.prevTurn.turnNumber];
+      const rawCur = snapshot[round.curTurn.turnNumber];
+      if (!rawPrev || !rawCur) return round;
+
+      const flags = computeHarmonizationFlags(
+        round,
+        rawCur,
+        contextualizeScoreForRound(round, rawPrev), // contextualized for inversion check
+        rawPrev,                                     // raw for draw-spread check
+      );
+
+      if (flags.length > 0) {
+        flags.forEach((f) =>
+          console.warn(
+            `[Harmonization] R${f.roundNumber} ${f.dimension}: ${f.note}`,
+          ),
+        );
+      }
+
+      return {
+        ...round,
+        harmonizationFlags: flags.length > 0 ? flags : undefined,
+      };
+    });
+
+    this.panel.scorecard = {
+      ...this.panel.scorecard,
+      rounds: updatedRounds,
+    };
+  }
+
   private synthTurnAnalysis(
     judge: LiveJudge,
     agent: Agent,
