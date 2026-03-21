@@ -264,8 +264,4 @@
     </ul>
   </section>
 
-  <footer class="text-center text-xs text-[--color-muted] pb-6">
-    <a href="/" class="hover:text-[--color-accent] transition-colors">← back to the debate</a>
-  </footer>
-
 </div>
