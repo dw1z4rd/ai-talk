@@ -325,9 +325,15 @@ export const POST: RequestHandler = async ({ request }) => {
         const debateAgentHistory = history.filter(
           (m) => m.agentId !== "moderator",
         );
-        const scorecard = getDebateScorecard(debateId);
+        // Pre-verdict scorecard: used only to decide whether a verdict should run.
+        // The FINAL scorecard (sent in the finalScorecard event) is captured AFTER
+        // generateDebateNarrativeVerdict returns, so it reflects the post-enforcement
+        // absoluteScoreHistory mutations (enforceAllLogicGaps + recomputeAllHarmonizationFlags).
+        // Using the pre-verdict capture here would produce a stale finalScorecard missing
+        // Draw-spread flags and WIN-gap flags computed after enforcement.
+        const preVerdictScorecard = getDebateScorecard(debateId);
 
-        if (scorecard.rounds.length > 0) {
+        if (preVerdictScorecard.rounds.length > 0) {
           send({ type: "judgeStatus", status: "writing_verdict" });
           try {
             const narrativeVerdict = await generateDebateNarrativeVerdict(
@@ -376,7 +382,10 @@ export const POST: RequestHandler = async ({ request }) => {
             console.error("[Server] Narrative verdict failed:", err);
           }
 
-          // Send final scorecard summary
+          // Send final scorecard summary — captured AFTER generateDebateNarrativeVerdict
+          // so it includes post-enforcement harmonization flags (Draw-spread, WIN-gap)
+          // and updated round winners from enforceAllLogicGaps + recomputeAllHarmonizationFlags.
+          const scorecard = getDebateScorecard(debateId);
           send({
             type: "finalScorecard",
             scorecard,

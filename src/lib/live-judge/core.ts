@@ -1325,22 +1325,42 @@ export class LiveJudgeSystem {
       const loserLogic = loserEntry.logicalCoherence;
 
       if (winnerLogic - loserLogic < MIN_LOGIC_WIN_GAP) {
-        const adjustedLoser = Math.max(10, winnerLogic - MIN_LOGIC_WIN_GAP);
-        if (adjustedLoser !== loserLogic) {
-          this.panel.absoluteScoreHistory[loserTurn] = {
-            ...loserEntry,
-            logicalCoherence: adjustedLoser,
-          };
-          adjustments.push({
-            targetTurn: loserTurn,
-            agentId: loserAgentId,
-            deltaLogic: adjustedLoser - loserLogic, // negative (downward adjustment)
-            roundNumber: round.roundNumber,
-          });
+        // Guard: only enforce when the winner ACTUALLY scores higher than the loser.
+        // A cascade-induced directional inversion (winnerLogic ≤ loserLogic) means the
+        // pairwise-winner's absolute score was already at or below the loser's after
+        // earlier cascade adjustments.  Blindly pushing the loser down to
+        // max(10, winnerLogic−MIN_LOGIC_WIN_GAP) can equalise both scores at the band
+        // floor (10), causing reconcileRoundWinners to flip the round to "tie" while
+        // also emitting a misleading "Gap enforcement (Round N)" note for a Draw round.
+        // Directional inversions are surfaced independently by harmonization flags;
+        // enforcement must not compound them by creating an artificial tie.
+        if (winnerLogic > loserLogic) {
+          const adjustedLoser = Math.max(10, winnerLogic - MIN_LOGIC_WIN_GAP);
+          if (adjustedLoser !== loserLogic) {
+            this.panel.absoluteScoreHistory[loserTurn] = {
+              ...loserEntry,
+              logicalCoherence: adjustedLoser,
+            };
+            adjustments.push({
+              targetTurn: loserTurn,
+              agentId: loserAgentId,
+              deltaLogic: adjustedLoser - loserLogic, // negative (downward adjustment)
+              roundNumber: round.roundNumber,
+            });
+            console.log(
+              `[Logic Gap Pass] R${round.roundNumber} ` +
+                `T${loserTurn} Logic ${loserLogic}→${adjustedLoser} ` +
+                `(winner T${winnerTurn}=${winnerLogic}, gap was ${winnerLogic - loserLogic})`,
+            );
+          }
+        } else {
+          // winnerLogic ≤ loserLogic: cascade-induced directional inversion — log and skip.
+          // reconcileRoundWinners below will correct the round's stored winner using the
+          // post-cascade absoluteScoreHistory values; harmonization flags will surface it.
           console.log(
-            `[Logic Gap Pass] R${round.roundNumber} ` +
-              `T${loserTurn} Logic ${loserLogic}→${adjustedLoser} ` +
-              `(winner T${winnerTurn}=${winnerLogic}, gap was ${winnerLogic - loserLogic})`,
+            `[Logic Gap Pass] R${round.roundNumber} skipped — directional inversion ` +
+              `(winner T${winnerTurn}=${winnerLogic} ≤ loser T${loserTurn}=${loserLogic}); ` +
+              `harmonization flag will surface this`,
           );
         }
       }
