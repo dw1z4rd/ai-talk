@@ -89,7 +89,7 @@
     ...(narrativeVerdict ? [{ id: 'verdict' }] : []),
     ...(liveJudgeResults.some((r) => r.absoluteScores) ? [{ id: 'scores' }] : []),
   ] as section (section.id)}
-    <div animate:flip={{ duration: 1000, easing: quintOut }}>
+    <div in:flyInFromLeft={{ duration: 1000, distance: 100 }} out:flyOutToBottom={{ duration: 500, distance: 100 }} animate:flip={{ duration: 1000, easing: quintOut }}>
 
       {#if section.id === 'verdict'}
         <!-- Narrative verdict (shown after debate completes) -->
