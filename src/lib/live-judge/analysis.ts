@@ -34,7 +34,7 @@ import {
 
 export { repairSpaceDrops } from "./text-utils";
 
-const DEFAULT_JUDGE_MODEL = "kimi-k2-thinking:cloud";
+const DEFAULT_JUDGE_MODEL = "kimi-k2.5:cloud";
 
 // ── Shared text-processing helpers ───────────────────────────────────────────
 // Module-level regex — compiled once, not on every call.
@@ -1914,8 +1914,9 @@ export async function analyzeTurn(
       // Empirical claims (used by core.ts for code-level enforcement)
       empiricalClaimsWithoutCitations:
         !evidenceResult.hasEvidence && empiricalResult.hasEmpirical,
-      empiricalClaimsList:
-        empiricalResult.hasEmpirical ? empiricalResult.claims : undefined,
+      empiricalClaimsList: empiricalResult.hasEmpirical
+        ? empiricalResult.claims
+        : undefined,
       // Artifact remediation
       artifactRepairApplied: repairResult.applied,
       artifactRepairNote: repairResult.note,
