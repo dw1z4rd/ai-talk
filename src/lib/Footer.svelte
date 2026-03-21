@@ -2,8 +2,8 @@
   const year = new Date().getFullYear();
 </script>
 
-<footer class="w-full max-w-3xl mx-auto mt-auto pt-10 pb-6">
-  <div class="border-t border-[--color-border] pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[--color-muted]">
-    <span>© {year} Ian Buchanan. All Rights Reserved.</span>
+<footer class="fixed bottom-0 left-0 right-0 z-50 backdrop-blur-md bg-[--color-surface]/80">
+  <div class="max-w-3xl mx-auto px-5 sm:px-8 border-t border-[--color-border] py-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[--color-muted]">
+    <span class="font-extrabold text-xl">© {year} Ian Buchanan. All Rights Reserved.</span>
   </div>
 </footer>

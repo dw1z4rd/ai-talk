@@ -3,10 +3,10 @@
   import Footer from "$lib/Footer.svelte";
 </script>
 
-<div class="min-h-dvh flex flex-col items-center px-5 sm:px-8 py-10 sm:py-14">
+<div class="min-h-dvh flex flex-col items-center px-5 sm:px-8 pt-10 sm:pt-14 pb-20">
   <slot />
-  <Footer />
 </div>
+<Footer />
 
 <style>
   :global {
