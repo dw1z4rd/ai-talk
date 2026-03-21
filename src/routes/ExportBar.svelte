@@ -181,10 +181,10 @@
               if (bd.pairwiseFloorApplied) content += `> ⚡ ${bd.pairwiseFloorNote}\n\n`;
               if (bd.evidenceEnforcementNote) content += `> ⚖ ${bd.evidenceEnforcementNote}\n\n`;
               if (bd.postPenaltyGapNote) content += `> 🔒 ${bd.postPenaltyGapNote}\n\n`;
-              if (r.gapEnforcementNotes?.length) {
-                for (const gn of r.gapEnforcementNotes) {
-                  content += `> 🔻 **Gap enforcement (Round ${gn.roundNumber}):** Logic adjusted ${gn.deltaLogic > 0 ? '+' : ''}${gn.deltaLogic} to maintain the minimum 6-point winner separation.\n\n`;
-                }
+            }
+            if (r.gapEnforcementNotes?.length) {
+              for (const gn of r.gapEnforcementNotes) {
+                content += `> 🔻 **Gap enforcement (Round ${gn.roundNumber}):** Logic adjusted ${gn.deltaLogic > 0 ? '+' : ''}${gn.deltaLogic} to maintain the minimum 6-point winner separation.\n\n`;
               }
             }
 
@@ -326,10 +326,10 @@
               if (bd.pairwiseFloorApplied) content += `    ⚡ ${bd.pairwiseFloorNote}\n`;
               if (bd.evidenceEnforcementNote) content += `    ⚖ ${bd.evidenceEnforcementNote}\n`;
               if (bd.postPenaltyGapNote) content += `    🔒 ${bd.postPenaltyGapNote}\n`;
-              if (r.gapEnforcementNotes?.length) {
-                for (const gn of r.gapEnforcementNotes) {
-                  content += `    🔻 Gap enforcement (Round ${gn.roundNumber}): ${gn.deltaLogic > 0 ? '+' : ''}${gn.deltaLogic} — minimum 6-pt winner separation\n`;
-                }
+            }
+            if (r.gapEnforcementNotes?.length) {
+              for (const gn of r.gapEnforcementNotes) {
+                content += `    🔻 Gap enforcement (Round ${gn.roundNumber}): ${gn.deltaLogic > 0 ? '+' : ''}${gn.deltaLogic} — minimum 6-pt winner separation\n`;
               }
             }
 
@@ -518,6 +518,11 @@
             if (bd.evidenceEnforcementNote) scoresHtml += `<div style="font-size:0.74rem;color:#dc2626;margin-bottom:0.3rem">⚖ ${escapeHtml(bd.evidenceEnforcementNote)}</div>`;
             if (bd.postPenaltyGapNote) scoresHtml += `<div style="font-size:0.74rem;color:#3b82f6;margin-bottom:0.3rem">🔒 ${escapeHtml(bd.postPenaltyGapNote)}</div>`;
           }
+          if (r.gapEnforcementNotes?.length) {
+            for (const gn of r.gapEnforcementNotes) {
+              scoresHtml += `<div style="font-size:0.74rem;color:#a855f7;margin-bottom:0.3rem">🔻 <strong>Gap enforcement (Round ${gn.roundNumber}):</strong> Logic adjusted ${gn.deltaLogic > 0 ? '+' : ''}${gn.deltaLogic} to maintain the minimum 6-point winner separation.</div>`;
+            }
+          }
 
           // Rhetoric components
           if (bd.rhetoricalComponents) {
@@ -621,24 +626,7 @@ ${body}${scoreHtml}${verdictHtml}${scoresHtml}
     >
     Markdown
   </button>
-  <button
-    onclick={() => exportDebate("txt")}
-    class="flex items-center gap-1.5 bg-[--color-panel] border border-[--color-border] hover:border-[--color-accent] hover:text-white text-[--color-muted-fg] text-xs font-medium px-3.5 py-2 rounded-lg transition-all cursor-pointer"
-  >
-    <svg
-      class="w-3.5 h-3.5"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      ><path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1m-4-4-4 4m0 0-4-4m4 4V4"
-      /></svg
-    >
-    Plain text
-  </button>
+  
   <button
     onclick={exportDebatePdf}
     class="flex items-center gap-1.5 bg-[--color-panel] border border-[--color-border] hover:border-[#f87171] hover:text-white text-[--color-muted-fg] text-xs font-medium px-3.5 py-2 rounded-lg transition-all cursor-pointer"
