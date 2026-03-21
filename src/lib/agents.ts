@@ -78,7 +78,11 @@ export interface LiveJudgeResult {
    */
   absoluteScores?: import("$lib/live-judge/types").JudgeScores;
   scoreBreakdown?: import("$lib/live-judge/types").TurnScoreBreakdown;
-  logicGapAdjustment?: { targetTurn: number; targetAgentId: string; deltaLogic: number };
+  logicGapAdjustment?: {
+    targetTurn: number;
+    targetAgentId: string;
+    deltaLogic: number;
+  };
 }
 
 interface ModelDef {
@@ -112,6 +116,26 @@ export const MODEL_CATALOG: Record<string, ModelDef> = {
       }),
   },
 
+  "deepseek-v3.2:cloud": {
+    name: "DeepSeek V3.2",
+    color: "#F59E0B",
+    makeProvider: () =>
+      createOllamaProvider({
+        baseUrl: OLLAMA_CLOUD_URL,
+        apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+        model: "deepseek-v3.2:cloud",
+      }),
+  },
+  "deepseek-v3.1:671b-cloud": {
+    name: "DeepSeek V3.1 671B",
+    color: "#F59E0B",
+    makeProvider: () =>
+      createOllamaProvider({
+        baseUrl: OLLAMA_CLOUD_URL,
+        apiKey: OLLAMA_CLOUD_API_KEY || undefined,
+        model: "deepseek-v3.1:671b-cloud",
+      }),
+  },
   "kimi-k2.5:cloud": {
     name: "Kimi K2.5",
     color: "#F59E0B",

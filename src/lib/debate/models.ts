@@ -13,6 +13,16 @@ export const MODEL_OPTIONS = [
         color: "#FF7000",
       },
       {
+        id: "deepseek-v3.2:cloud",
+        name: "DeepSeek V3.2",
+        color: "#F59E0B",
+      },
+      {
+        id: "deepseek-v3.1:671b-cloud",
+        name: "DeepSeek V3.1 671B",
+        color: "#A5111B", 
+      }
+      {
         id: "kimi-k2.5:cloud",
         name: "Kimi K2.5",
         color: "#F59E0B",
