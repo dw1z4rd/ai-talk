@@ -775,16 +775,6 @@
     justify-content: center;
   }
 
-  .left-col {
-    width: 45vw;
-    max-width: 760px;
-    min-width: min(280px, 100%);
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
   .right-col {
     width: 45vw;
     max-width: 760px;
@@ -794,6 +784,19 @@
     flex-direction: column;
     gap: 1rem;
     overflow: hidden;
+    max-height: calc(100dvh - 14rem);
+  }
+
+  .left-col {
+    width: 45vw;
+    max-width: 760px;
+    min-width: min(280px, 100%);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: calc(100dvh - 14rem);
+    overflow-y: auto;
   }
 
   @media (max-width: 1023px) {
