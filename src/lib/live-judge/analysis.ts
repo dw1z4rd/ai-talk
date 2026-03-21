@@ -1878,7 +1878,12 @@ export async function analyzeTurn(
         evidenceResult.citations.length > 0
           ? evidenceResult.citations
           : undefined,
-      evidenceGatingNote: evidenceResult.gatingNote,
+      // Only store the "no citations" note when there are empirical claims to penalise;
+      // without empirical claims the warning is noise. Always store the positive note.
+      evidenceGatingNote:
+        evidenceResult.hasEvidence || empiricalResult.hasEmpirical
+          ? evidenceResult.gatingNote
+          : undefined,
       // Empirical claims (used by core.ts for code-level enforcement)
       empiricalClaimsWithoutCitations:
         !evidenceResult.hasEvidence && empiricalResult.hasEmpirical,
