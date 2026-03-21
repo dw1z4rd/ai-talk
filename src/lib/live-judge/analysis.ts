@@ -1217,13 +1217,21 @@ export function reconcileRoundWinners(
  *            warrants a larger gap before a draw is considered meaningfully inconsistent)
  *   tactics/rhetoric: drawThreshold = 4  (default)
  *
+ * Win-gap thresholds (minimum gap required for a valid WIN; below this the margin is
+ * suspiciously small — typically caused by retroactive gap enforcement in
+ * applyPairwiseFloors pulling the winner's score down toward the loser):
+ *   logic:   winMinGap = 4  (matches applyPairwiseFloors winMinGap)
+ *   tactics: winMinGap = 6  (idem)
+ *   rhetoric: winMinGap = 6 (idem)
+ *   overall: not checked (no matching enforcement gap)
+ *
  * rawPrevAbsolute: the un-contextualized prevHistScore straight from absoluteScoreHistory.
- * Used exclusively for the draw spread check. The directional-inversion check uses
- * prevAbsolute (contextualized) to avoid spurious band-mismatch flags. The draw spread
- * check must use raw scores because contextualizeScoreForRound applies DRAW-band clamping
- * to prevHistScore after reconcile forces "tie" from equal raw scores — creating an
- * artificial gap between the WIN-clamped curScore and the DRAW-clamped prevScore that
- * does not exist in the actual stored scores.
+ * Used for the draw spread check and the WIN near-zero gap check. The directional-inversion
+ * check uses prevAbsolute (contextualized) to avoid spurious band-mismatch flags. The draw
+ * spread / WIN gap checks must use raw scores because contextualizeScoreForRound applies
+ * DRAW-band clamping to prevHistScore after reconcile forces "tie" from equal raw scores —
+ * creating an artificial gap between the WIN-clamped curScore and the DRAW-clamped
+ * prevScore that does not exist in the actual stored scores.
  */
 export function computeHarmonizationFlags(
   round: PairwiseRound,
@@ -1245,6 +1253,7 @@ export function computeHarmonizationFlags(
     threshold: number,
     drawThreshold: number = 4,
     rawPrevScore?: number,
+    winMinGap?: number,
   ) => {
     const gap = Math.abs(curScore - prevScore);
 
@@ -1325,6 +1334,30 @@ export function computeHarmonizationFlags(
         note: `${dimension} pairwise winner (${winnerName}) had lower absolute score by ${gap} (prev=${prevScore}, cur=${curScore})`,
       });
     }
+
+    // WIN with near-zero gap: pairwise direction is correct but the absolute margin is
+    // below the minimum enforced by applyPairwiseFloors. This catches rounds where
+    // retroactive gap enforcement collapsed the winner's lead down to (or below) the
+    // enforcement threshold, effectively erasing the win signal. Uses rawPrevScore so
+    // contextualization artifacts don't silently mask the collapsed margin.
+    if (winMinGap !== undefined && pairwiseWinnerId === absoluteLeaderId) {
+      const rawGap =
+        rawPrevScore !== undefined ? Math.abs(curScore - rawPrevScore) : gap;
+      if (rawGap < winMinGap) {
+        const winnerName =
+          pairwiseWinnerId === prevId
+            ? round.prevTurn.agentName
+            : round.curTurn.agentName;
+        flags.push({
+          roundNumber: round.roundNumber,
+          dimension,
+          pairwiseWinner: pairwiseWinnerId,
+          absoluteScoreLeader: pairwiseWinnerId,
+          divergenceMagnitude: rawGap,
+          note: `${dimension} WIN (${winnerName}) margin ${rawGap} is below minimum ${winMinGap} — retroactive gap enforcement may have collapsed the lead (rawPrev=${rawPrevScore ?? prevScore}, cur=${curScore})`,
+        });
+      }
+    }
   };
 
   check(
@@ -1335,6 +1368,7 @@ export function computeHarmonizationFlags(
     5,
     6, // Logic scale 0–40: gap ≥ 6 on a Draw flags meaningful spread
     rawPrevAbsolute?.logicalCoherence,
+    4, // winMinGap: matches applyPairwiseFloors logic winMinGap
   );
   check(
     "tactics",
@@ -1344,6 +1378,7 @@ export function computeHarmonizationFlags(
     6,
     4, // default drawThreshold
     rawPrevAbsolute?.tacticalEffectiveness,
+    6, // winMinGap: matches applyPairwiseFloors tactics winMinGap
   );
   check(
     "rhetoric",
@@ -1353,6 +1388,7 @@ export function computeHarmonizationFlags(
     6,
     4, // default drawThreshold
     rawPrevAbsolute?.rhetoricalForce,
+    6, // winMinGap: matches applyPairwiseFloors rhetoric winMinGap
   );
 
   // Derive the overall pairwise winner as the agent that won a majority of

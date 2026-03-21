@@ -215,7 +215,12 @@ export class LiveJudgeSystem {
     let absoluteScores: JudgeScores | undefined;
     let scoreBreakdown: import("./types").TurnScoreBreakdown | undefined;
     let logicGapAdjustment:
-      | { targetTurn: number; targetAgentId: string; deltaLogic: number; roundNumber: number }
+      | {
+          targetTurn: number;
+          targetAgentId: string;
+          deltaLogic: number;
+          roundNumber: number;
+        }
       | undefined;
 
     if (isOpeningTurn) {
@@ -1185,13 +1190,15 @@ export class LiveJudgeSystem {
    * guarantees every flag references the same score values visible in the
    * scorecard table — no flag can reference a value that was later overwritten.
    *
-   * Two check types per round:
+   * Three check types per round:
    *   - Draw spread:       pairwise = tie AND |curScore − prevScore| ≥ threshold
    *   - Directional inversion: pairwise winner scores lower than loser by ≥ threshold
+   *   - WIN near-zero gap: pairwise direction is correct but margin < winMinGap
+   *     (catches retroactive gap enforcement collapsing a WIN to near-tie level)
    *
    * prevTurn scores are contextualized for the inversion check (to avoid
    * false positives caused by the sliding-window design) but raw for the
-   * draw-spread check (to reflect the actual table values).
+   * draw-spread and near-zero gap checks (to reflect actual table values).
    */
   private recomputeAllHarmonizationFlags(): void {
     const snapshot = this.panel.absoluteScoreHistory;
@@ -1205,7 +1212,7 @@ export class LiveJudgeSystem {
         round,
         rawCur,
         contextualizeScoreForRound(round, rawPrev), // contextualized for inversion check
-        rawPrev,                                     // raw for draw-spread check
+        rawPrev, // raw for draw-spread check
       );
 
       if (flags.length > 0) {

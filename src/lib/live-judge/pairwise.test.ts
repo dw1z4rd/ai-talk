@@ -993,6 +993,73 @@ describe("computeHarmonizationFlags", () => {
       computeHarmonizationFlags(round, cur, ctxPrev, rawPrev),
     ).toHaveLength(0);
   });
+
+  // ── WIN near-zero gap ─────────────────────────────────────────────────────
+
+  it("flags tactics WIN when margin is below winMinGap (6)", () => {
+    // Pairwise: 'b' (curTurn) wins tactics; absolute scores: cur=22, prev=19 → gap=3 < 6
+    const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "b");
+    const prev = makeAbsScores({ tacticalEffectiveness: 19 });
+    const cur = makeAbsScores({ tacticalEffectiveness: 22 });
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    const tacticsFlag = flags.find((f) => f.dimension === "tactics");
+    expect(tacticsFlag).toBeDefined();
+    expect(tacticsFlag?.pairwiseWinner).toBe("b");
+    expect(tacticsFlag?.absoluteScoreLeader).toBe("b");
+    expect(tacticsFlag?.divergenceMagnitude).toBe(3);
+  });
+
+  it("flags rhetoric WIN when margin is below winMinGap (6)", () => {
+    // Pairwise: 'a' (prevTurn) wins rhetoric; absolute scores: prev=24, cur=20 → gap=4 < 6
+    const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "a");
+    const prev = makeAbsScores({ rhetoricalForce: 24 });
+    const cur = makeAbsScores({ rhetoricalForce: 20 });
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    const rhetoricFlag = flags.find((f) => f.dimension === "rhetoric");
+    expect(rhetoricFlag).toBeDefined();
+    expect(rhetoricFlag?.pairwiseWinner).toBe("a");
+    expect(rhetoricFlag?.absoluteScoreLeader).toBe("a");
+    expect(rhetoricFlag?.divergenceMagnitude).toBe(4);
+  });
+
+  it("flags logic WIN when margin is below winMinGap (4)", () => {
+    // Pairwise: 'b' (curTurn) wins logic; absolute scores: cur=26, prev=23 → gap=3 < 4
+    const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "b");
+    const prev = makeAbsScores({ logicalCoherence: 23 });
+    const cur = makeAbsScores({ logicalCoherence: 26 });
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    const logicFlag = flags.find((f) => f.dimension === "logic");
+    expect(logicFlag).toBeDefined();
+    expect(logicFlag?.divergenceMagnitude).toBe(3);
+  });
+
+  it("does NOT flag tactics WIN when margin meets winMinGap (6)", () => {
+    // gap = 6 = winMinGap → no flag
+    const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "b");
+    const prev = makeAbsScores({ tacticalEffectiveness: 18 });
+    const cur = makeAbsScores({ tacticalEffectiveness: 24 });
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    expect(flags.find((f) => f.dimension === "tactics")).toBeUndefined();
+  });
+
+  it("WIN near-zero gap check uses rawPrevAbsolute to compute margin", () => {
+    // Scenario: contextualized prevScore is 22 (DRAW band), raw prevScore is 20.
+    // curScore = 24, winner = 'b' (cur). Using prevScore: gap = 2 < 6 → would flag.
+    // Using rawPrevScore: rawGap = 4 < 6 → still flags, but divergenceMagnitude reflects reality.
+    // Verify that when raw scores produce a gap ≥ winMinGap, no flag fires.
+    const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "b");
+    const cur = makeAbsScores({ tacticalEffectiveness: 24 });
+    const ctxPrev = makeAbsScores({ tacticalEffectiveness: 22 }); // contextualized
+    const rawPrev = makeAbsScores({ tacticalEffectiveness: 18 }); // rawGap = |24-18| = 6 = winMinGap → no flag
+
+    const flagsWithRaw = computeHarmonizationFlags(
+      round,
+      cur,
+      ctxPrev,
+      rawPrev,
+    );
+    expect(flagsWithRaw.find((f) => f.dimension === "tactics")).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
