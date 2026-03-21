@@ -1,5 +1,6 @@
 <script lang="ts">
   import { flip } from "svelte/animate";
+  import { slide } from "svelte/transition";
   import {
     flyInFromTop,
     flyInFromLeft,
@@ -31,6 +32,13 @@
     if (next.has(turnNumber)) next.delete(turnNumber);
     else next.add(turnNumber);
     expandedBreakdowns = next;
+  }
+  let expandedRounds = $state<Set<number>>(new Set());
+  function toggleRound(roundNumber: number) {
+    const next = new Set(expandedRounds);
+    if (next.has(roundNumber)) next.delete(roundNumber);
+    else next.add(roundNumber);
+    expandedRounds = next;
   }
   function ratingColor(r: string) {
     return r === "above" ? "#34d399" : r === "below" ? "#f87171" : "#9ca3af";
@@ -535,99 +543,96 @@
       {@const logicWinnerInfo = resolveAgent(round.logicWinner)}
       {@const tacticsWinnerInfo = resolveAgent(round.tacticsWinner)}
       {@const rhetoricWinnerInfo = resolveAgent(round.rhetoricWinner)}
+      {@const isRoundExpanded = expandedRounds.has(round.roundNumber)}
       <div
-        class="rounded-xl border bg-[--color-panel] p-3 judge-card"
+        class="rounded-xl border bg-[--color-panel] judge-card cursor-pointer select-none overflow-hidden"
         style="border-color: #7c6af720; animation-delay: {i * 45}ms"
         in:flyInFromTop={{ duration: 1000, delay: 1000 + i * 50, distance: 100, easing: quintOut }}
         out:flyOutToBottom={{ duration: 1000, distance: 100, easing: quintOut }}
         animate:flip={{ duration: 2000, easing: quintOut }}
+        onclick={() => toggleRound(round.roundNumber)}
+        role="button"
+        tabindex="0"
+        onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleRound(round.roundNumber)}
       >
-        <!-- Round header -->
-        <div class="flex items-center gap-2 mb-3 min-w-0">
-          <span
-            class="text-[10px] font-bold uppercase tracking-widest text-[--color-muted] shrink-0"
+        <!-- Collapsed header: always visible -->
+        <div class="flex items-center gap-2 px-3 py-2.5 min-w-0">
+          <span class="text-[10px] font-bold uppercase tracking-widest text-[--color-muted] shrink-0"
             >Round {round.roundNumber}</span
           >
           <span class="text-[10px] text-[--color-muted] shrink-0">·</span>
-          <span class="text-[10px] text-[--color-muted] min-w-0 truncate"
-            >T{round.prevTurn.turnNumber} ({round.prevTurn.agentName})
-            vs T{round.curTurn.turnNumber} ({round.curTurn.agentName})</span
-          >
+          <span class="text-xs font-semibold shrink-0" style="color: {logicWinnerInfo.color}">{logicWinnerInfo.name}</span>
+          <span class="text-[10px] text-[--color-muted] shrink-0">/</span>
+          <span class="text-xs font-semibold shrink-0" style="color: {tacticsWinnerInfo.color}">{tacticsWinnerInfo.name}</span>
+          <span class="text-[10px] text-[--color-muted] shrink-0">/</span>
+          <span class="text-xs font-semibold shrink-0" style="color: {rhetoricWinnerInfo.color}">{rhetoricWinnerInfo.name}</span>
           {#if round.isFallback}
-            <span class="ml-auto shrink-0 text-[10px] text-yellow-500"
-              >fallback</span
-            >
+            <span class="text-[10px] text-yellow-500 shrink-0">fallback</span>
           {/if}
+          <span
+            class="ml-auto shrink-0 text-[--color-muted] text-xs transition-transform duration-200"
+            style="display:inline-block; transform: rotate({isRoundExpanded ? 180 : 0}deg)"
+          >▾</span>
         </div>
 
-        <!-- Winner chips -->
-        <div class="flex flex-wrap gap-x-4 gap-y-2 mb-3">
-          <div class="flex flex-col gap-1">
-            <span
-              class="text-[10px] text-[--color-muted] uppercase tracking-wide"
-              >Logic</span
-            >
-            <span
-              class="text-xs font-semibold truncate"
-              style="color: {logicWinnerInfo.color}"
-              >{logicWinnerInfo.name}</span
-            >
+        <!-- Expanded content -->
+        {#if isRoundExpanded}
+        <div transition:slide={{ duration: 250 }} class="px-3 pb-3 flex flex-col gap-3">
+          <!-- Turn info -->
+          <div class="text-[10px] text-[--color-muted] -mt-1">
+            T{round.prevTurn.turnNumber} ({round.prevTurn.agentName})
+            vs T{round.curTurn.turnNumber} ({round.curTurn.agentName})
           </div>
-          <div class="flex flex-col gap-1">
-            <span
-              class="text-[10px] text-[--color-muted] uppercase tracking-wide"
-              >Tactics</span
-            >
-            <span
-              class="text-xs font-semibold truncate"
-              style="color: {tacticsWinnerInfo.color}"
-              >{tacticsWinnerInfo.name}</span
-            >
-          </div>
-          <div class="flex flex-col gap-1">
-            <span
-              class="text-[10px] text-[--color-muted] uppercase tracking-wide"
-              >Rhetoric</span
-            >
-            <span
-              class="text-xs font-semibold truncate"
-              style="color: {rhetoricWinnerInfo.color}"
-              >{rhetoricWinnerInfo.name}</span
-            >
-          </div>
-        </div>
 
-        <!-- Pairwise rubric deltas -->
-        <div class="pt-2 border-t border-[--color-border] flex flex-col gap-2">
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-0.5">Logic</p>
-            <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.logicDelta}</p>
+          <!-- Winner chips -->
+          <div class="flex flex-wrap gap-x-4 gap-y-2">
+            <div class="flex flex-col gap-1">
+              <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Logic</span>
+              <span class="text-xs font-semibold truncate" style="color: {logicWinnerInfo.color}">{logicWinnerInfo.name}</span>
+            </div>
+            <div class="flex flex-col gap-1">
+              <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Tactics</span>
+              <span class="text-xs font-semibold truncate" style="color: {tacticsWinnerInfo.color}">{tacticsWinnerInfo.name}</span>
+            </div>
+            <div class="flex flex-col gap-1">
+              <span class="text-[10px] text-[--color-muted] uppercase tracking-wide">Rhetoric</span>
+              <span class="text-xs font-semibold truncate" style="color: {rhetoricWinnerInfo.color}">{rhetoricWinnerInfo.name}</span>
+            </div>
           </div>
-          {#if round.tacticsDelta}
+
+          <!-- Pairwise rubric deltas -->
+          <div class="pt-2 border-t border-[--color-border] flex flex-col gap-2">
             <div>
-              <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-0.5">Tactics</p>
-              <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.tacticsDelta}</p>
+              <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-0.5">Logic</p>
+              <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.logicDelta}</p>
             </div>
-          {/if}
-          {#if round.rhetoricDelta}
-            <div>
-              <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-0.5">Rhetoric</p>
-              <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.rhetoricDelta}</p>
-            </div>
-          {/if}
-          {#if round.mechanismDelta}
-            <div class="rounded-lg border border-amber-500/20 bg-amber-500/5 px-2 py-1.5">
-              <p class="text-[10px] font-bold text-amber-400 mb-0.5">Mechanism</p>
-              <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.mechanismDelta}</p>
-            </div>
-          {/if}
-          {#if round.epistemicNote}
-            <div class="rounded-lg border border-sky-500/20 bg-sky-500/5 px-2 py-1.5">
-              <p class="text-[10px] font-bold text-sky-400 mb-0.5">Epistemic</p>
-              <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.epistemicNote}</p>
-            </div>
-          {/if}
+            {#if round.tacticsDelta}
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-0.5">Tactics</p>
+                <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.tacticsDelta}</p>
+              </div>
+            {/if}
+            {#if round.rhetoricDelta}
+              <div>
+                <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-0.5">Rhetoric</p>
+                <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.rhetoricDelta}</p>
+              </div>
+            {/if}
+            {#if round.mechanismDelta}
+              <div class="rounded-lg border border-amber-500/20 bg-amber-500/5 px-2 py-1.5">
+                <p class="text-[10px] font-bold text-amber-400 mb-0.5">Mechanism</p>
+                <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.mechanismDelta}</p>
+              </div>
+            {/if}
+            {#if round.epistemicNote}
+              <div class="rounded-lg border border-sky-500/20 bg-sky-500/5 px-2 py-1.5">
+                <p class="text-[10px] font-bold text-sky-400 mb-0.5">Epistemic</p>
+                <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{round.epistemicNote}</p>
+              </div>
+            {/if}
+          </div>
         </div>
+        {/if}
       </div>
       {/each}
       </div>
