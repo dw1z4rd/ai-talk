@@ -16,6 +16,8 @@ import type { Agent, Message } from "$lib/agents";
 import { MODEL_CATALOG } from "$lib/agents";
 import { withRetry } from "$lib/llm-agent/retry";
 
+const DEFAULT_JUDGE_MODEL = "kimi-k2-thinking:cloud";
+
 // ── Shared text-processing helpers ───────────────────────────────────────────
 // Module-level regex — compiled once, not on every call.
 const CJK_DETECT_RE =
@@ -50,6 +52,22 @@ function repairTruncatedJson(jsonString: string): string {
   const open = (jsonString.match(/\{/g) ?? []).length;
   const close = (jsonString.match(/\}/g) ?? []).length;
   return open > close ? jsonString + "}".repeat(open - close) : jsonString;
+}
+
+/**
+ * Parse a JSON string, attempting brace repair on first failure.
+ * Returns the parsed value, or null if both attempts fail.
+ */
+function tryParseJson(jsonString: string): unknown {
+  try {
+    return JSON.parse(jsonString);
+  } catch {
+    try {
+      return JSON.parse(repairTruncatedJson(jsonString));
+    } catch {
+      return null;
+    }
+  }
 }
 
 /**
@@ -438,64 +456,50 @@ export async function compareTurns(
   );
 
   const judgeProvider = createJudgeProviderWithRetry(
-    judge.modelId || "kimi-k2-thinking:cloud",
+    judge.modelId || DEFAULT_JUDGE_MODEL,
   );
-  const start = Date.now();
-
-  try {
-    const responseText = await judgeProvider.generateText(prompt, {
-      systemPrompt: generatePairwiseSystemPrompt(
+  return callWithTiming(
+    () =>
+      judgeProvider.generateText(prompt, {
+        systemPrompt: generatePairwiseSystemPrompt(
+          prevAgentName,
+          curAgentName,
+          domainNote,
+          mode,
+        ),
+        temperature: 0.3,
+        maxTokens: 1200,
+        signal,
+      }),
+    `[Pairwise Judge] Round ${roundNumber}`,
+    (responseText) =>
+      parsePairwiseResponse(
+        responseText,
+        prevAgentId,
         prevAgentName,
+        prevMessage,
+        prevTurnNumber,
+        curAgentId,
         curAgentName,
-        domainNote,
-        mode,
+        curMessage,
+        curTurnNumber,
+        roundNumber,
+        langCheck.warning,
       ),
-      temperature: 0.3,
-      maxTokens: 1200,
-      signal,
-    });
-
-    console.log(
-      `[Pairwise Judge] Round ${roundNumber} completed in ${Date.now() - start}ms`,
-    );
-    return parsePairwiseResponse(
-      responseText,
-      prevAgentId,
-      prevAgentName,
-      prevMessage,
-      prevTurnNumber,
-      curAgentId,
-      curAgentName,
-      curMessage,
-      curTurnNumber,
-      roundNumber,
-      langCheck.warning,
-    );
-  } catch (error: any) {
-    const elapsed = Date.now() - start;
-    if (error?.name === "AbortError") {
-      console.warn(
-        `[Pairwise Judge] Round ${roundNumber} aborted after ${elapsed}ms`,
-      );
-    } else {
-      console.error(
-        `[Pairwise Judge] Round ${roundNumber} failed after ${elapsed}ms:`,
-        error,
-      );
-    }
-    return createFallbackPairwiseRound(
-      prevAgentId,
-      prevAgentName,
-      prevMessage,
-      prevTurnNumber,
-      curAgentId,
-      curAgentName,
-      curMessage,
-      curTurnNumber,
-      roundNumber,
-      langCheck.warning,
-    );
-  }
+    () =>
+      createFallbackPairwiseRound(
+        prevAgentId,
+        prevAgentName,
+        prevMessage,
+        prevTurnNumber,
+        curAgentId,
+        curAgentName,
+        curMessage,
+        curTurnNumber,
+        roundNumber,
+        langCheck.warning,
+      ),
+  );
 }
 
 // Cache for the large pairwise system prompt (~10KB) — the rubric is fully static;
@@ -725,23 +729,28 @@ function parsePairwiseResponse(
   roundNumber: number,
   languageWarning?: string,
 ): PairwiseRound {
+  const mkFallback = () =>
+    createFallbackPairwiseRound(
+      prevAgentId,
+      prevAgentName,
+      prevMessage,
+      prevTurnNumber,
+      curAgentId,
+      curAgentName,
+      curMessage,
+      curTurnNumber,
+      roundNumber,
+      languageWarning,
+    );
+  const strOrDefault = (v: unknown) =>
+    typeof v === "string" && v.trim() ? v.trim() : "No analysis provided.";
+
   try {
     if (!responseText?.trim()) {
       console.warn(
         `[Pairwise Judge] Round ${roundNumber}: null/empty response`,
       );
-      return createFallbackPairwiseRound(
-        prevAgentId,
-        prevAgentName,
-        prevMessage,
-        prevTurnNumber,
-        curAgentId,
-        curAgentName,
-        curMessage,
-        curTurnNumber,
-        roundNumber,
-        languageWarning,
-      );
+      return mkFallback();
     }
 
     const jsonString = extractJsonObject(stripThinkingBlocks(responseText));
@@ -749,43 +758,13 @@ function parsePairwiseResponse(
       console.warn(
         `[Pairwise Judge] Round ${roundNumber}: no JSON found. Raw: ${responseText.slice(0, 200)}`,
       );
-      return createFallbackPairwiseRound(
-        prevAgentId,
-        prevAgentName,
-        prevMessage,
-        prevTurnNumber,
-        curAgentId,
-        curAgentName,
-        curMessage,
-        curTurnNumber,
-        roundNumber,
-        languageWarning,
-      );
+      return mkFallback();
     }
 
-    let data: any;
-    try {
-      data = JSON.parse(jsonString);
-    } catch {
-      try {
-        data = JSON.parse(repairTruncatedJson(jsonString));
-      } catch {
-        console.warn(
-          `[Pairwise Judge] Round ${roundNumber}: JSON repair failed`,
-        );
-        return createFallbackPairwiseRound(
-          prevAgentId,
-          prevAgentName,
-          prevMessage,
-          prevTurnNumber,
-          curAgentId,
-          curAgentName,
-          curMessage,
-          curTurnNumber,
-          roundNumber,
-          languageWarning,
-        );
-      }
+    const data: any = tryParseJson(jsonString);
+    if (!data) {
+      console.warn(`[Pairwise Judge] Round ${roundNumber}: JSON repair failed`);
+      return mkFallback();
     }
 
     const resolveWinner = (winnerField: string): string => {
@@ -816,18 +795,9 @@ function parsePairwiseResponse(
       logicWinner: resolveWinner(data.logic_winner),
       tacticsWinner: resolveWinner(data.tactics_winner),
       rhetoricWinner: resolveWinner(data.rhetoric_winner),
-      logicDelta:
-        typeof data.logic_delta === "string"
-          ? data.logic_delta.trim()
-          : "No analysis provided.",
-      tacticsDelta:
-        typeof data.tactics_delta === "string"
-          ? data.tactics_delta.trim()
-          : "No analysis provided.",
-      rhetoricDelta:
-        typeof data.rhetoric_delta === "string"
-          ? data.rhetoric_delta.trim()
-          : "No analysis provided.",
+      logicDelta: strOrDefault(data.logic_delta),
+      tacticsDelta: strOrDefault(data.tactics_delta),
+      rhetoricDelta: strOrDefault(data.rhetoric_delta),
       mechanismDelta:
         typeof data.mechanism_delta === "string"
           ? data.mechanism_delta.trim() || undefined
@@ -903,18 +873,7 @@ function parsePairwiseResponse(
     };
   } catch (error) {
     console.error("[Pairwise Judge] parsePairwiseResponse threw:", error);
-    return createFallbackPairwiseRound(
-      prevAgentId,
-      prevAgentName,
-      prevMessage,
-      prevTurnNumber,
-      curAgentId,
-      curAgentName,
-      curMessage,
-      curTurnNumber,
-      roundNumber,
-      languageWarning,
-    );
+    return mkFallback();
   }
 }
 
@@ -1601,41 +1560,33 @@ ${transcriptText}
 
 Write your verdict now:`;
   const judgeProvider = createJudgeProvider(
-    judge.modelId || "kimi-k2-thinking:cloud",
+    judge.modelId || DEFAULT_JUDGE_MODEL,
   );
-  const start = Date.now();
-
-  try {
-    const text = await judgeProvider.generateText(prompt, {
-      systemPrompt: generateNarrativeSystemPrompt(agentAName, agentBName),
-      temperature: 0.5,
-      maxTokens: 1200,
-      signal,
-    });
-    console.log(
-      `[Narrative Judge] Verdict completed in ${Date.now() - start}ms`,
-    );
-    return parseNarrativeVerdict(
-      text,
-      agentAId,
-      agentAName,
-      agentBId,
-      agentBName,
-      scorecard,
-    );
-  } catch (error: any) {
-    const elapsed = Date.now() - start;
-    if (error?.name === "AbortError") {
-      console.warn(`[Narrative Judge] Aborted after ${elapsed}ms`);
-    } else {
-      console.error(`[Narrative Judge] Failed after ${elapsed}ms:`, error);
-    }
-    return {
-      text: "Narrative verdict unavailable — judge analysis failed.",
-      favouredAgentId: scorecard.overallWinner,
-      agreesWithScorecard: true,
-    };
-  }
+  return callWithTiming<NarrativeVerdict>(
+    () =>
+      judgeProvider.generateText(prompt, {
+        systemPrompt: generateNarrativeSystemPrompt(agentAName, agentBName),
+        temperature: 0.5,
+        maxTokens: 1200,
+        signal,
+      }),
+    "[Narrative Judge] Verdict",
+    (text) =>
+      parseNarrativeVerdict(
+        text,
+        agentAId,
+        agentAName,
+        agentBId,
+        agentBName,
+        scorecard,
+      ),
+    () =>
+      ({
+        text: "Narrative verdict unavailable — judge analysis failed.",
+        favouredAgentId: scorecard.overallWinner,
+        agreesWithScorecard: true,
+      }) satisfies NarrativeVerdict,
+  );
 }
 
 function generateNarrativeSystemPrompt(nameA: string, nameB: string): string {
@@ -1734,7 +1685,7 @@ CUMULATIVE POINTS LEADER: ${pointsLeaderName}
 Write your split analysis:`;
 
   const judgeProvider = createJudgeProvider(
-    judge.modelId || "kimi-k2-thinking:cloud",
+    judge.modelId || DEFAULT_JUDGE_MODEL,
   );
   try {
     const text = await judgeProvider.generateText(prompt, {
@@ -1819,7 +1770,7 @@ ${narrativeText.slice(0, 1500)}
 Write your adjudication:`;
 
   const judgeProvider = createJudgeProvider(
-    judge.modelId || "kimi-k2-thinking:cloud",
+    judge.modelId || DEFAULT_JUDGE_MODEL,
   );
   try {
     const text = await judgeProvider.generateText(prompt, {
@@ -1885,7 +1836,7 @@ ${roundSummaries}${narrativeBlock}
 Write your consistency report:`;
 
   const judgeProvider = createJudgeProvider(
-    judge.modelId || "kimi-k2-thinking:cloud",
+    judge.modelId || DEFAULT_JUDGE_MODEL,
   );
   try {
     const text = await judgeProvider.generateText(prompt, {
@@ -1935,52 +1886,40 @@ export async function analyzeTurn(
     pairwiseCalibration,
   );
   const domainNote = buildDomainNoteForTopic(topic);
-
   const judgeProvider = createJudgeProviderWithRetry(
-    judge.modelId || "kimi-k2-thinking:cloud",
+    judge.modelId || DEFAULT_JUDGE_MODEL,
   );
-  const start = Date.now();
-
-  try {
-    const analysisText = await judgeProvider.generateText(judgePrompt, {
-      systemPrompt: generateJudgeSystemPrompt(domainNote),
-      temperature: 0.5,
-      maxTokens: 600,
-      signal,
-    });
-    console.log(
-      `[Adaptive Judge] ${judge.name} completed in ${Date.now() - start}ms`,
-    );
-    return parseJudgeAnalysis(
-      analysisText,
-      judge,
-      agent,
-      opponent,
-      turnNumber,
-      message,
-      opponentMessage,
-      referenceContext,
-    );
-  } catch (error: any) {
-    const elapsed = Date.now() - start;
-    if (error?.name === "AbortError") {
-      console.warn(`[Adaptive Judge] ${judge.name} aborted after ${elapsed}ms`);
-    } else {
-      console.error(
-        `[Adaptive Judge] ${judge.name} failed after ${elapsed}ms:`,
-        error,
-      );
-    }
-    return createFallbackAnalysis(
-      judge,
-      agent,
-      opponent,
-      turnNumber,
-      message,
-      opponentMessage,
-      referenceContext,
-    );
-  }
+  return callWithTiming(
+    () =>
+      judgeProvider.generateText(judgePrompt, {
+        systemPrompt: generateJudgeSystemPrompt(domainNote),
+        temperature: 0.5,
+        maxTokens: 600,
+        signal,
+      }),
+    `[Adaptive Judge] ${judge.name}`,
+    (analysisText) =>
+      parseJudgeAnalysis(
+        analysisText,
+        judge,
+        agent,
+        opponent,
+        turnNumber,
+        message,
+        opponentMessage,
+        referenceContext,
+      ),
+    () =>
+      createFallbackAnalysis(
+        judge,
+        agent,
+        opponent,
+        turnNumber,
+        message,
+        opponentMessage,
+        referenceContext,
+      ),
+  );
 }
 
 function generateJudgePrompt(
@@ -2122,49 +2061,30 @@ export function parseJudgeAnalysis(
   opponentMessage: string,
   context: string,
 ): TurnAnalysis {
+  const mkFallback = () =>
+    createFallbackAnalysis(
+      judge,
+      agent,
+      opponent,
+      turnNumber,
+      message,
+      opponentMessage,
+      context,
+    );
+
   try {
     if (!analysisText?.trim()) {
-      return createFallbackAnalysis(
-        judge,
-        agent,
-        opponent,
-        turnNumber,
-        message,
-        opponentMessage,
-        context,
-      );
+      return mkFallback();
     }
 
     const jsonString = extractJsonObject(stripThinkingBlocks(analysisText));
     if (!jsonString) {
-      return createFallbackAnalysis(
-        judge,
-        agent,
-        opponent,
-        turnNumber,
-        message,
-        opponentMessage,
-        context,
-      );
+      return mkFallback();
     }
 
-    let data: any;
-    try {
-      data = JSON.parse(jsonString);
-    } catch {
-      try {
-        data = JSON.parse(repairTruncatedJson(jsonString));
-      } catch {
-        return createFallbackAnalysis(
-          judge,
-          agent,
-          opponent,
-          turnNumber,
-          message,
-          opponentMessage,
-          context,
-        );
-      }
+    const data: any = tryParseJson(jsonString);
+    if (!data) {
+      return mkFallback();
     }
 
     const logicRaw = Math.max(
@@ -2222,15 +2142,7 @@ export function parseJudgeAnalysis(
     };
   } catch (error) {
     console.error("[Adaptive Judge] parseJudgeAnalysis threw:", error);
-    return createFallbackAnalysis(
-      judge,
-      agent,
-      opponent,
-      turnNumber,
-      message,
-      opponentMessage,
-      context,
-    );
+    return mkFallback();
   }
 }
 
@@ -2280,49 +2192,6 @@ export function createFallbackAnalysis(
   };
 }
 
-export function aggregateJudgeScores(
-  judgeAnalyses: TurnAnalysis[],
-): JudgeScores {
-  if (judgeAnalyses.length === 0) {
-    return {
-      logicalCoherence: 0,
-      rhetoricalForce: 0,
-      frameControl: 0,
-      credibilityScore: 0,
-      tacticalEffectiveness: 0,
-      overallScore: 0,
-    };
-  }
-  const sum = judgeAnalyses.reduce(
-    (acc, a) => {
-      acc.logicalCoherence += a.scores.logicalCoherence;
-      acc.rhetoricalForce += a.scores.rhetoricalForce;
-      acc.frameControl += a.scores.frameControl;
-      acc.credibilityScore += a.scores.credibilityScore;
-      acc.tacticalEffectiveness += a.scores.tacticalEffectiveness;
-      acc.overallScore += a.scores.overallScore;
-      return acc;
-    },
-    {
-      logicalCoherence: 0,
-      rhetoricalForce: 0,
-      frameControl: 0,
-      credibilityScore: 0,
-      tacticalEffectiveness: 0,
-      overallScore: 0,
-    },
-  );
-  const d = judgeAnalyses.length;
-  return {
-    logicalCoherence: Math.round(sum.logicalCoherence / d),
-    rhetoricalForce: Math.round(sum.rhetoricalForce / d),
-    frameControl: Math.round(sum.frameControl / d),
-    credibilityScore: Math.round(sum.credibilityScore / d),
-    tacticalEffectiveness: Math.round(sum.tacticalEffectiveness / d),
-    overallScore: Math.round(sum.overallScore / d),
-  };
-}
-
 export function calculateMomentumShift(
   scores: JudgeScores,
   momentumTracker: MomentumTracker,
@@ -2357,6 +2226,33 @@ export function calculateFrameControlShift(
     -20,
     Math.min(20, (baseControl + tacticalModifier + inertiaFactor) * 0.4),
   );
+}
+
+/**
+ * Run a timed LLM call, logging elapsed time on success and distinguishing
+ * AbortError from other failures on the error path. Eliminates the repeated
+ * try/catch timing boilerplate across the three main judge-call functions.
+ */
+async function callWithTiming<T>(
+  generate: () => Promise<string | null>,
+  label: string,
+  onSuccess: (text: string | null) => T,
+  onFallback: () => T,
+): Promise<T> {
+  const start = Date.now();
+  try {
+    const text = await generate();
+    console.log(`${label} completed in ${Date.now() - start}ms`);
+    return onSuccess(text);
+  } catch (error: unknown) {
+    const elapsed = Date.now() - start;
+    if ((error as { name?: string }).name === "AbortError") {
+      console.warn(`${label} aborted after ${elapsed}ms`);
+    } else {
+      console.error(`${label} failed after ${elapsed}ms:`, error);
+    }
+    return onFallback();
+  }
 }
 
 // Provider cache — the judge model is stable for the entire debate. Reusing the
@@ -2491,7 +2387,7 @@ Analyse positional convergence and respond with JSON only:`;
 
   try {
     const judgeProvider = createJudgeProvider(
-      judge.modelId || "kimi-k2-thinking:cloud",
+      judge.modelId || DEFAULT_JUDGE_MODEL,
     );
     const text = await judgeProvider.generateText(prompt, {
       systemPrompt,
