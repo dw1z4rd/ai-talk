@@ -1393,10 +1393,24 @@ export async function generateDebateNarrativeVerdict(
   agentA: Agent,
   agentB: Agent,
   debateId?: string,
+  onGapAdjustments?: (
+    adjustments: Array<{
+      targetTurn: number;
+      agentId: string;
+      deltaLogic: number;
+      roundNumber: number;
+    }>,
+  ) => void,
 ) {
   return (
     debateId ? getSessionSystem(debateId) : getLiveJudgeSystem()
-  ).generateNarrativeVerdict(fullTranscript, topic, agentA, agentB);
+  ).generateNarrativeVerdict(
+    fullTranscript,
+    topic,
+    agentA,
+    agentB,
+    onGapAdjustments,
+  );
 }
 
 /**

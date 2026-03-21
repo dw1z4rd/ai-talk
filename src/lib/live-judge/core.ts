@@ -1356,6 +1356,14 @@ export class LiveJudgeSystem {
     topic: string,
     agentA: Agent,
     agentB: Agent,
+    onGapAdjustments?: (
+      adjustments: Array<{
+        targetTurn: number;
+        agentId: string;
+        deltaLogic: number;
+        roundNumber: number;
+      }>,
+    ) => void,
   ): Promise<NarrativeVerdict | null> {
     if (this.panel.scorecard.rounds.length === 0) return null;
 
@@ -1365,9 +1373,10 @@ export class LiveJudgeSystem {
     // round.  Reverse order ensures that when a turn is shared between two rounds
     // (winner in R_N, loser in R_{N+1}), R_{N+1}'s adjustment is applied first so
     // R_N can cascade down correctly without creating new ties.
-    // The returned adjustments are attached to the verdict so the server can emit
-    // scoreUpdate SSE events to keep the client's per-turn score table in sync.
+    // The callback fires immediately so the caller can emit SSE events BEFORE the
+    // verdict LLM call begins — ensuring the client sees corrected scores first.
     const gapAdjustments = this.enforceAllLogicGaps();
+    if (gapAdjustments.length > 0) onGapAdjustments?.(gapAdjustments);
 
     const judge = this.panel.judges[0];
     const VERDICT_TIMEOUT_MS = 60_000;
