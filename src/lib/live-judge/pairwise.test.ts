@@ -998,6 +998,30 @@ describe("computeHarmonizationFlags", () => {
     ).toHaveLength(0);
   });
 
+  it("draw spread fires when rawPrev genuinely higher than cur (post-enforcement scenario)", () => {
+    // Scenario: Round N had equal Logic scores (36 vs 36) → reconcile forced "tie".
+    // Later, enforceAllLogicGaps pulled curTurn's score from 36 → 26 (as loser of Round N+1).
+    // recomputeAllHarmonizationFlags re-runs: rawPrev=36, rawCur=26, logicWinner="tie".
+    // contextualizeScoreForRound clamps prevHistScore into DRAW band: max(18, min(30, 36)) = 30.
+    // spreadGap = |26 - 36| = 10 ≥ drawThreshold(6) → genuine draw spread flag must fire.
+    const round = makeRound("a", "A", "b", "B", "tie", "tie", "tie");
+    const curAfterEnforcement = makeAbsScores({ logicalCoherence: 26 });
+    const ctxPrev = makeAbsScores({ logicalCoherence: 30 }); // DRAW band: max(18, min(30, 36)) = 30
+    const rawPrev = makeAbsScores({ logicalCoherence: 36 }); // true stored score before enforcement
+
+    const flags = computeHarmonizationFlags(
+      round,
+      curAfterEnforcement,
+      ctxPrev,
+      rawPrev,
+    );
+    const logicFlag = flags.find((f) => f.dimension === "logic");
+    expect(logicFlag).toBeDefined();
+    expect(logicFlag?.pairwiseWinner).toBe("tie");
+    expect(logicFlag?.absoluteScoreLeader).toBe("a"); // rawPrev(a)=36 > rawCur(b)=26
+    expect(logicFlag?.divergenceMagnitude).toBe(10);
+  });
+
   // ── WIN near-zero gap ─────────────────────────────────────────────────────
 
   it("flags tactics WIN when margin is below winMinGap (6)", () => {
@@ -1026,8 +1050,8 @@ describe("computeHarmonizationFlags", () => {
     expect(rhetoricFlag?.divergenceMagnitude).toBe(4);
   });
 
-  it("flags logic WIN when margin is below winMinGap (4)", () => {
-    // Pairwise: 'b' (curTurn) wins logic; absolute scores: cur=26, prev=23 → gap=3 < 4
+  it("flags logic WIN when margin is below winMinGap (6)", () => {
+    // Pairwise: 'b' (curTurn) wins logic; absolute scores: cur=26, prev=23 → gap=3 < 6
     const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "b");
     const prev = makeAbsScores({ logicalCoherence: 23 });
     const cur = makeAbsScores({ logicalCoherence: 26 });
@@ -1035,6 +1059,26 @@ describe("computeHarmonizationFlags", () => {
     const logicFlag = flags.find((f) => f.dimension === "logic");
     expect(logicFlag).toBeDefined();
     expect(logicFlag?.divergenceMagnitude).toBe(3);
+  });
+
+  it("flags logic WIN when margin is gap=4 (below winMinGap of 6)", () => {
+    // gap=4 was the old winMinGap — it should NOW flag since MIN_LOGIC_WIN_GAP = 6
+    const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "b");
+    const prev = makeAbsScores({ logicalCoherence: 22 });
+    const cur = makeAbsScores({ logicalCoherence: 26 }); // gap = 4 < winMinGap(6) → flag
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    const logicFlag = flags.find((f) => f.dimension === "logic");
+    expect(logicFlag).toBeDefined();
+    expect(logicFlag?.divergenceMagnitude).toBe(4);
+  });
+
+  it("does NOT flag logic WIN when margin meets winMinGap (6)", () => {
+    // gap = 6 = winMinGap → no flag
+    const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "b");
+    const prev = makeAbsScores({ logicalCoherence: 22 });
+    const cur = makeAbsScores({ logicalCoherence: 28 }); // gap = 6 = winMinGap → no flag
+    const flags = computeHarmonizationFlags(round, cur, prev);
+    expect(flags.find((f) => f.dimension === "logic")).toBeUndefined();
   });
 
   it("does NOT flag tactics WIN when margin meets winMinGap (6)", () => {

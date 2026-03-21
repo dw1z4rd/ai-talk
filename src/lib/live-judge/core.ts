@@ -1419,6 +1419,9 @@ export class LiveJudgeSystem {
     // stale. This catches Draw spread flags where a curTurn score was pulled
     // down into a spread with prevTurn, and WIN near-zero gap flags where the
     // reverse-pass cascade left a margin below MIN_LOGIC_WIN_GAP.
+    console.log(
+      `[Harmonization] Post-enforcement pass — ${gapAdjustments.length} gap adjustment(s) applied; recomputing flags against final settled scores`,
+    );
     this.recomputeAllHarmonizationFlags();
 
     const judge = this.panel.judges[0];
