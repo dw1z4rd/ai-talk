@@ -174,6 +174,27 @@ export const POST: RequestHandler = async ({ request }) => {
               updateType: update.updateType,
             });
           }
+
+          // Emit a scoreUpdate SSE when applyPairwiseFloors pulled prevTurn's
+          // Logic score down to open a WIN gap (scaleCeil case).
+          if (jr.logicGapAdjustment) {
+            const adj = jr.logicGapAdjustment;
+            const adjAgent = agents.find((a) => a.id === adj.targetAgentId);
+            const def = adjAgent
+              ? { name: adjAgent.name, color: adjAgent.color }
+              : (MODEL_CATALOG[adj.targetAgentId] ??
+                MODEL_CATALOG["kimi-k2:1t-cloud"]);
+            send({
+              type: "scoreUpdate",
+              targetTurn: adj.targetTurn,
+              agentId: adj.targetAgentId,
+              agentName: def.name,
+              agentColor: def.color,
+              deltaLogic: adj.deltaLogic,
+              reason: `Logic WIN gap enforced: opponent's score adjusted ${adj.deltaLogic > 0 ? "+" : ""}${adj.deltaLogic} to open a 6-point separation`,
+              updateType: "logicGapAdjustment",
+            });
+          }
         };
 
         while (turn < totalTurns && !request.signal.aborted) {

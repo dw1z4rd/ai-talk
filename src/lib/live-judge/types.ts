@@ -483,6 +483,13 @@ export interface JudgeAnalysisResult {
    * (evidence gating, artifact repair) so users can audit every scoring decision.
    */
   scoreBreakdown?: TurnScoreBreakdown;
+  /**
+   * Retroactive Logic gap adjustment for prevTurn.  Set when curTurn wins Logic
+   * but prevTurn's logicalCoherence was pulled down to open a MIN_LOGIC_WIN_GAP.
+   * deltaLogic is negative (the amount subtracted).  Consumers should emit a
+   * scoreUpdate SSE so the client display reflects the retroactive change.
+   */
+  logicGapAdjustment?: { targetTurn: number; targetAgentId: string; deltaLogic: number };
 }
 
 // Judge specialization configurations

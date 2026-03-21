@@ -214,6 +214,9 @@ export class LiveJudgeSystem {
     let judgeAnalyses: any[] = [];
     let absoluteScores: JudgeScores | undefined;
     let scoreBreakdown: import("./types").TurnScoreBreakdown | undefined;
+    let logicGapAdjustment:
+      | { targetTurn: number; targetAgentId: string; deltaLogic: number }
+      | undefined;
 
     if (isOpeningTurn) {
       // Turn 1: no opponent to compare against — store this turn and use neutral scores
@@ -835,6 +838,7 @@ export class LiveJudgeSystem {
           // Only curTurn's scores are modified.  PrevTurn's scores are frozen
           // (they were set in a prior processTurn call and may carry retroactive
           // penalties that we must not silently undo here).
+
           if (!pairwiseRound.isFallback) {
             const clamped = applyPairwiseFloors(
               pairwiseRound.logicWinner,
@@ -869,53 +873,38 @@ export class LiveJudgeSystem {
                 };
               }
             }
-          }
 
-          // ── Logic WIN gap enforcement ───────────────────────────────────────
-          // winMinGap in clampAbsDim cannot create a gap when prevTurn's stored
-          // Logic is at scaleCeil (40): the winner is capped at 40, ties prevTurn,
-          // and reconcileRoundWinners forces "tie".  Fix: after both sides are
-          // independently clamped, pull the loser's Logic score down to open a
-          // MIN_LOGIC_WIN_GAP of 6 points.  The loser has room to move; the
-          // ceiling blocks the winner.
-          const MIN_LOGIC_WIN_GAP = 6;
-          if (
-            !pairwiseRound.isFallback &&
-            pairwiseRound.logicWinner !== "tie"
-          ) {
-            const prevHistEntry =
-              this.panel.absoluteScoreHistory[
-                pairwiseRound.prevTurn.turnNumber
-              ];
-            if (prevHistEntry !== undefined) {
-              const winnerIsCur = pairwiseRound.logicWinner === agent.id;
-              // Use the already-clamped stored value directly — applyPairwiseFloors
-              // already placed it in the correct band; re-clamping with different
-              // parameters would compute the gap against a phantom reference.
-              const prevLogic = prevHistEntry.logicalCoherence;
-              const winnerLogic = winnerIsCur
-                ? absoluteScores.logicalCoherence
-                : prevLogic;
-              const loserLogic = winnerIsCur
-                ? prevLogic
-                : absoluteScores.logicalCoherence;
-              if (winnerLogic - loserLogic < MIN_LOGIC_WIN_GAP) {
-                const adjustedLoser = Math.max(
-                  10,
-                  winnerLogic - MIN_LOGIC_WIN_GAP,
-                );
-                if (winnerIsCur) {
-                  // prevTurn is the loser — update absoluteScoreHistory so
-                  // reconcileRoundWinners sees a non-zero gap.
-                  this.panel.absoluteScoreHistory[
-                    pairwiseRound.prevTurn.turnNumber
-                  ] = { ...prevHistEntry, logicalCoherence: adjustedLoser };
-                } else {
-                  // curTurn is the loser — update absoluteScores in-place.
-                  absoluteScores = {
-                    ...absoluteScores,
-                    logicalCoherence: adjustedLoser,
+            // ── Logic WIN gap enforcement (scaleCeil case) ──────────────────
+            // applyPairwiseFloors sets prevLogicOverride when curTurn wins Logic
+            // but the clampAbsDim winMinGap was capped at scaleCeil=40 (both
+            // sides land at 40, reconcileRoundWinners forces "tie").
+            // Pull prevTurn's logicalCoherence down and emit a scoreUpdate SSE
+            // so the client display is patched to reflect the retroactive change.
+            if (clamped.prevLogicOverride !== undefined) {
+              const prevTurnNum = pairwiseRound.prevTurn.turnNumber;
+              const prevAgentId = pairwiseRound.prevTurn.agentId;
+              const prevHist =
+                this.panel.absoluteScoreHistory[prevTurnNum];
+              if (prevHist !== undefined) {
+                const delta =
+                  clamped.prevLogicOverride - prevHist.logicalCoherence;
+                if (delta !== 0) {
+                  this.panel.absoluteScoreHistory[prevTurnNum] = {
+                    ...prevHist,
+                    logicalCoherence: clamped.prevLogicOverride,
                   };
+                  logicGapAdjustment = {
+                    targetTurn: prevTurnNum,
+                    targetAgentId: prevAgentId,
+                    deltaLogic: delta,
+                  };
+                  console.log(
+                    `[Logic WIN Gap] R${pairwiseRound.roundNumber} ` +
+                      `T${prevTurnNum} (${prevAgentId}) Logic ` +
+                      `${prevHist.logicalCoherence}→${clamped.prevLogicOverride} ` +
+                      `(delta=${delta}) — gap opened below ` +
+                      `T${turnNumber} Logic=${absoluteScores.logicalCoherence}`,
+                  );
                 }
               }
             }
@@ -1244,6 +1233,7 @@ export class LiveJudgeSystem {
           : undefined,
       convergenceWarning,
       scoreBreakdown,
+      logicGapAdjustment,
     };
   }
 

@@ -659,12 +659,15 @@ describe("applyPairwiseFloors", () => {
     expect(result.logicalCoherence).toBe(36);
   });
 
-  it("WIN path: gap enforcement is capped at scaleCeil (40)", () => {
-    // prevVal = 40 → prevVal + 4 = 44, must not exceed 40
+  it("WIN path: gap enforcement is capped at scaleCeil (40), prevLogicOverride set", () => {
+    // prevVal = 40 → prevVal + 4 = 44, must not exceed 40.
+    // clampAbsDim caps winner at 40, so gap = 40-40 = 0 < MIN_LOGIC_WIN_GAP(6).
+    // prevLogicOverride = max(10, 40-6) = 34 so the caller can pull prevTurn down.
     const cur = makeScores(40, 22, 20);
     const prev = makeScores(40, 20, 18);
     const result = applyPairwiseFloors("b", "b", "b", "b", "a", cur, prev);
     expect(result.logicalCoherence).toBe(40);
+    expect(result.prevLogicOverride).toBe(34);
   });
 
   it("WIN path: Tactics/Rhetoric gap enforcement is capped at scaleCeil (30)", () => {

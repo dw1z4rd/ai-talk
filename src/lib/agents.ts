@@ -78,6 +78,7 @@ export interface LiveJudgeResult {
    */
   absoluteScores?: import("$lib/live-judge/types").JudgeScores;
   scoreBreakdown?: import("$lib/live-judge/types").TurnScoreBreakdown;
+  logicGapAdjustment?: { targetTurn: number; targetAgentId: string; deltaLogic: number };
 }
 
 interface ModelDef {
@@ -1326,6 +1327,7 @@ export async function generateAdaptiveReply(
         scorecard: judgeResult.scorecard,
         absoluteScores: judgeResult.absoluteScores,
         scoreBreakdown: judgeResult.scoreBreakdown,
+        logicGapAdjustment: judgeResult.logicGapAdjustment,
       };
 
       return simplifiedResult;
