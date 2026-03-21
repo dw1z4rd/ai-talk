@@ -858,6 +858,50 @@ export class LiveJudgeSystem {
             }
           }
 
+          // ── Logic WIN gap enforcement ───────────────────────────────────────
+          // winMinGap in clampAbsDim cannot create a gap when prevTurn's stored
+          // Logic is at scaleCeil (40): the winner is capped at 40, ties prevTurn,
+          // and reconcileRoundWinners forces "tie".  Fix: after both sides are
+          // independently clamped, pull the loser's Logic score down to open a
+          // MIN_LOGIC_WIN_GAP of 6 points.  The loser has room to move; the
+          // ceiling blocks the winner.
+          const MIN_LOGIC_WIN_GAP = 6;
+          if (!pairwiseRound.isFallback && pairwiseRound.logicWinner !== "tie") {
+            const prevHistEntry =
+              this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber];
+            if (prevHistEntry !== undefined) {
+              const winnerIsCur = pairwiseRound.logicWinner === agent.id;
+              // Clamp prevTurn's Logic into whichever band the pairwise verdict
+              // assigned it (LOSS [10,22] when curTurn wins; WIN [24,40] when
+              // prevTurn wins).
+              const prevLogicClamped = winnerIsCur
+                ? Math.max(10, Math.min(22, prevHistEntry.logicalCoherence))
+                : Math.max(24, Math.min(40, prevHistEntry.logicalCoherence));
+              const winnerLogic = winnerIsCur
+                ? absoluteScores.logicalCoherence
+                : prevLogicClamped;
+              const loserLogic = winnerIsCur
+                ? prevLogicClamped
+                : absoluteScores.logicalCoherence;
+              if (winnerLogic - loserLogic < MIN_LOGIC_WIN_GAP) {
+                const adjustedLoser = Math.max(10, winnerLogic - MIN_LOGIC_WIN_GAP);
+                if (winnerIsCur) {
+                  // prevTurn is the loser — update absoluteScoreHistory so
+                  // reconcileRoundWinners sees a non-zero gap.
+                  this.panel.absoluteScoreHistory[
+                    pairwiseRound.prevTurn.turnNumber
+                  ] = { ...prevHistEntry, logicalCoherence: adjustedLoser };
+                } else {
+                  // curTurn is the loser — update absoluteScores in-place.
+                  absoluteScores = {
+                    ...absoluteScores,
+                    logicalCoherence: adjustedLoser,
+                  };
+                }
+              }
+            }
+          }
+
           // Persist for next round's harmonization check and retroactive re-reconciliation
           this.panel.lastAbsoluteScores[agent.id] = absoluteScores;
           this.panel.absoluteScoreHistory[turnNumber] = absoluteScores;

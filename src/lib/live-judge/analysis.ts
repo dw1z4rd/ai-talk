@@ -1120,6 +1120,8 @@ export function applyPairwiseFloors(
     7, // lossFloor
     16, // lossCeil
     30, // scaleCeil
+    prevScores?.tacticalEffectiveness, // gap enforcement: winner ≥ prevTurn + 6
+    6, // winMinGap = 2 raw points on 1–10 scale
   );
   const newRhetoric = clampAbsDim(
     rhetoricWinner,
@@ -1132,6 +1134,8 @@ export function applyPairwiseFloors(
     7, // lossFloor
     16, // lossCeil
     30, // scaleCeil
+    prevScores?.rhetoricalForce, // gap enforcement: winner ≥ prevTurn + 6
+    6, // winMinGap = 2 raw points on 1–10 scale
   );
 
   if (
@@ -1349,10 +1353,14 @@ export function computeHarmonizationFlags(
     // to avoid false positives: contextualizeScoreForRound applies DRAW-band
     // clamping to prevHistScore after reconcile forces "tie" from equal raw
     // scores, creating an artificial gap between the WIN-clamped curScore and
-    // the DRAW-clamped prevScore. Comparing against raw scores eliminates this
-    // band-mismatch artifact — when raw scores are equal (the common reconcile
-    // path), spreadGap = 0 and the flag correctly stays silent.
+    // the DRAW-clamped prevScore.
+    //
+    // Gate: when raw scores are exactly equal, reconcile forced "tie" from
+    // identical stored values — this is never a genuine spread, so skip it
+    // entirely.  For all other cases (genuinely different raw scores), compare
+    // against raw scores so the DRAW-band artifact does not silence real gaps.
     if (pairwiseWinnerId === "tie") {
+      if (rawPrevScore !== undefined && rawPrevScore === curScore) return;
       const spreadGap =
         rawPrevScore !== undefined ? Math.abs(curScore - rawPrevScore) : gap;
       if (spreadGap >= drawThreshold) {
