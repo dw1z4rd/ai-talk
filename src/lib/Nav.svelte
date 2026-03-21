@@ -2,21 +2,15 @@
   import { page } from '$app/stores';
 
   const NAV_ITEMS = [
-    { href: '/', label: '⚔ Debate' },
-    { href: '/assistant', label: '🤖 Ask' },
-    { href: '/escape-room', label: '🗝️ Escape Room' },
-    { href: '/story', label: '📖 Story' },
-    { href: '/stories', label: '📚 Published' },
+    { href: '/', label: '⚔️ Debate' },
+    { href: '/about', label: '🤔 About' },
   ];
 
   function isActive(href: string): boolean {
-    const path = $page.url.pathname;
-    if (href === '/stories') return path === '/stories' || path.startsWith('/stories/');
-    return path === href;
+    return $page.url.pathname === href;
   }
 
-  function activeColor(href: string): string {
-    if (href === '/story' || href === '/stories') return '#34d399';
+  function activeColor(_href: string): string {
     return 'var(--color-accent)';
   }
 </script>

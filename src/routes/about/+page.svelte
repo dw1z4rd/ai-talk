@@ -1,24 +1,25 @@
-import { index } from './../../../.svelte-kit/output/server/nodes/9.js';
+<script lang="ts">
+  import Nav from "$lib/Nav.svelte";
+</script>
+
 <div class="w-full max-w-3xl mx-auto flex flex-col gap-12">
 
-  <!-- Header — links back to / -->
+  <!-- Header -->
   <header class="text-center flex flex-col items-center gap-2">
     <div class="relative">
       <div
         class="absolute inset-0 blur-2xl opacity-30 rounded-full scale-150"
         style="background-color: #7c6af7"
       ></div>
-      <a
-        href="/"
-        class="relative block font-display text-5xl sm:text-6xl font-bold tracking-tight hover:opacity-80 transition-opacity"
-      >
+      <h1 class="relative font-display text-5xl sm:text-6xl font-bold tracking-tight">
         <span class="text-white">AI </span><span
           class="text-transparent bg-clip-text bg-gradient-to-r from-[#7c6af7] to-[#c084fc]"
           >Debate</span
         >
-      </a>
+      </h1>
     </div>
     <p class="text-sm text-[--color-muted] tracking-wide">two AIs, one topic, no mercy</p>
+    <Nav />
   </header>
 
   <!-- What is aitalk -->
