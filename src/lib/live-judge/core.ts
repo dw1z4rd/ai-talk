@@ -36,6 +36,41 @@ import {
 import { generateAdaptivePressure, generateHiddenDirective } from "./pressure";
 import { MODEL_CATALOG } from "$lib/agents";
 
+// ── Harmonization helpers ─────────────────────────────────────────────────────
+
+/**
+ * Returns prevTurn's historical absolute scores re-clamped to the pairwise
+ * band the judge actually assigned it in `round`.
+ *
+ * The structural tension in the sliding-window design is that a turn's frozen
+ * per-turn absolute score (set when it was curTurn) may sit in the wrong band
+ * for a later round where it appears as prevTurn with the opposite outcome.
+ * Passing the raw history score to computeHarmonizationFlags then fires a
+ * spurious "absolute score leader disagrees with pairwise winner" flag.
+ *
+ * Contextualizing by calling applyPairwiseFloors with prevTurn in the "cur"
+ * slot places prevTurn's score in the band consistent with this round's
+ * outcome — so harmonization only flags genuine inconsistencies, not
+ * structural ones.
+ *
+ * absoluteScoreHistory is NOT mutated; this contextualized copy is used solely
+ * for harmonization flag computation.
+ */
+function contextualizeScoreForRound(
+  round: PairwiseRound,
+  prevHistScore: JudgeScores | undefined,
+): JudgeScores | undefined {
+  if (!prevHistScore || round.isFallback) return prevHistScore;
+  return applyPairwiseFloors(
+    round.logicWinner,
+    round.tacticsWinner,
+    round.rhetoricWinner,
+    round.prevTurn.agentId, // prevTurn plays "cur" so its scores get clamped
+    round.curTurn.agentId,
+    prevHistScore,
+  );
+}
+
 // ── Judge model selection ─────────────────────────────────────────────────────
 
 const JUDGE_MODEL_ID = "kimi-k2:1t-cloud";
@@ -247,7 +282,11 @@ export class LiveJudgeSystem {
               dimension === "Rhetoric"
                 ? ` Both turns competed evenly on rhetoric — neither should score dramatically above or below 5–6.`
                 : "";
-            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge called this a DRAW. Your ${dim}_score should reflect a genuinely competitive turn — a score below 4 would contradict the draw verdict unless you find a specific failure the comparative judge missed.${rhetoricNote}`;
+            const logicNote =
+              dimension === "Logic"
+                ? ` LOGIC DRAW — override "Start at 6": use 5 as your baseline. Expected range is 5–6; both turns supplied comparable mechanism quality. Scoring 7 requires naming a specific above-average element not captured by the draw result; ≥8 directly contradicts the draw verdict.`
+                : "";
+            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge called this a DRAW. Your ${dim}_score should reflect a genuinely competitive turn — a score below 4 would contradict the draw verdict unless you find a specific failure the comparative judge missed.${rhetoricNote}${logicNote}`;
           } else {
             const rhetoricNote =
               dimension === "Rhetoric"
@@ -255,7 +294,7 @@ export class LiveJudgeSystem {
                 : "";
             const logicNote =
               dimension === "Logic"
-                ? ` On a logic loss, 3 or below is appropriate when the argument is circular, incomplete, or wholly unsubstantiated; scoring 4–5 requires naming one genuine mechanism element that was present despite losing overall; scoring ≥ 6 here would imply ${agent.name} matched or exceeded ${prevAgentName} on Logic, directly contradicting the pairwise verdict.`
+                ? ` LOGIC LOSS — override "Start at 6": use 4 as your baseline. Graduated scoring: 3 = argument circular, wholly unsubstantiated, or no mechanism present; 4 = structural claim present but mechanism absent or demonstrably weaker than ${prevAgentName}'s — this is the expected score for a coherent turn that lost on mechanism quality; 5 = at least one named mechanism element present but causal chain incomplete; 6 = requires explicit reconciliation — name the specific mechanism quality that matched or exceeded ${prevAgentName}'s and state why the verdict still went the other way; ≥7 directly contradicts the pairwise verdict.`
                 : "";
             return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${prevAgentName} (opponent). ${agent.name}'s ${dim}_score may be below average — apply the normal rubric, but note that a score ≥ 7 here would imply ${agent.name} actually outperformed ${prevAgentName} on ${dimension}, contradicting the pairwise verdict.${rhetoricNote}${logicNote}`;
           }
@@ -545,12 +584,37 @@ export class LiveJudgeSystem {
                       r.prevTurn.agentId === update.agentId)) &&
                   (r.logicWinnerRaw ?? r.logicWinner) === update.agentId,
               );
-              const capFraction = wasPairwiseLogicWinner ? 0.25 : 0.5;
-              const maxPenalty = -Math.ceil(originalScore * capFraction);
+              // Determine the pairwise Logic band this turn belongs to so the
+              // penalty cannot push the score below the band's lower bound.
+              // Logic bands: WIN [24,40]  DRAW [18,30]  LOSS [10,22]
+              const wasPairwiseLogicDraw =
+                !wasPairwiseLogicWinner &&
+                this.panel.scorecard.rounds.some(
+                  (r) =>
+                    ((r.curTurn.turnNumber === targetTurn &&
+                      r.curTurn.agentId === update.agentId) ||
+                      (r.prevTurn.turnNumber === targetTurn &&
+                        r.prevTurn.agentId === update.agentId)) &&
+                    (r.logicWinnerRaw ?? r.logicWinner) === "tie",
+                );
+              const bandFloor = wasPairwiseLogicWinner
+                ? 24
+                : wasPairwiseLogicDraw
+                  ? 18
+                  : 10;
+              // For winners: also apply 25% fractional cap (prevents artificial
+              // ties from open-flag penalties contradicting a clear logic win).
+              // For non-winners: band floor is the sole constraint.
+              const maxPenalty = wasPairwiseLogicWinner
+                ? Math.max(
+                    -Math.ceil(originalScore * 0.25),
+                    -(originalScore - bandFloor),
+                  )
+                : -(originalScore - bandFloor);
               if (existing + scaledDelta < maxPenalty) {
                 cappedScaledDelta = maxPenalty - existing;
                 console.log(
-                  `[Claim Flags] Penalty on T${targetTurn} capped: Δ${scaledDelta} → ${cappedScaledDelta} (original=${originalScore}, cap=${Math.round(capFraction * 100)}%${wasPairwiseLogicWinner ? " — pairwise winner" : ""})`,
+                  `[Claim Flags] Penalty on T${targetTurn} capped: Δ${scaledDelta} → ${cappedScaledDelta} (original=${originalScore}, bandFloor=${bandFloor}${wasPairwiseLogicWinner ? ", winner 25%" : ""})`,
                 );
                 cappedFlagDeltaRaw.set(flagId, cappedScaledDelta / 4);
               }
@@ -681,7 +745,7 @@ export class LiveJudgeSystem {
               const recomputedFlags = computeHarmonizationFlags(
                 postPenaltyRound,
                 curAbs,
-                prevAbs,
+                contextualizeScoreForRound(postPenaltyRound, prevAbs),
               );
               this.panel.scorecard.rounds[ri] = {
                 ...postPenaltyRound,
@@ -854,15 +918,20 @@ export class LiveJudgeSystem {
     );
 
     // Compute harmonization flags for this round (synchronous, no LLM).
-    // absoluteScoreHistory[prevTurn.turnNumber] is used rather than
-    // lastAbsoluteScores[agentId] so that any retroactive penalty applied to
-    // prevTurn during this same round's flagUpdates is already reflected here.
+    // prevTurn's score is contextualized to this round's pairwise outcomes
+    // via contextualizeScoreForRound so the comparison is always within the
+    // same outcome band — eliminating structural discrepancies caused by the
+    // sliding-window design (a turn's frozen per-turn score may sit in the
+    // wrong band when it reappears as prevTurn with the opposite outcome).
     const harmonizationFlags: HarmonizationFlag[] =
       pairwiseRound && !pairwiseRound.isFallback
         ? computeHarmonizationFlags(
             pairwiseRound,
             absoluteScores,
-            this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber],
+            contextualizeScoreForRound(
+              pairwiseRound,
+              this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber],
+            ),
           )
         : [];
     if (harmonizationFlags.length > 0) {
