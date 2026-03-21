@@ -1929,7 +1929,11 @@ function generateJudgePrompt(
     ? `\n${pairwiseCalibration}\n`
     : "";
   const evidenceBlock = evidenceResult
-    ? `\n${evidenceResult.gatingNote}\n`
+    ? evidenceResult.hasEvidence
+      ? `\n${evidenceResult.gatingNote}\n` // always show the positive citations note
+      : agentClaims.length > 0
+        ? `\n${evidenceResult.gatingNote}\n` // only show the "no citations" note when there are flagged claims
+        : ""
     : "";
   return `DEBATE TOPIC: ${topic || "General debate"}
 TURN: ${turnNumber}${contextBlock}
