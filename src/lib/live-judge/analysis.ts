@@ -975,22 +975,9 @@ function clampAbsDim(
 }
 
 /**
- * Return type for applyPairwiseFloors.  Extends JudgeScores with an optional
- * prevLogicOverride field that, when set, indicates curTurn won Logic but the
- * WIN gap could not be opened by raising curTurn (scaleCeil cap).  The caller
- * must pull prevTurn's logicalCoherence down to this value and emit a scoreUpdate
- * SSE so the client display reflects the retroactive adjustment.
- */
-export interface ApplyFloorsResult extends JudgeScores {
-  /** When set: prevTurn's logicalCoherence should be pulled down to this value. */
-  prevLogicOverride?: number;
-}
-
-/**
  * Apply pairwise-verdict bands to the current turn's absolute scores.
- * Returns a (possibly new) ApplyFloorsResult; returns the same reference
- * (as JudgeScores) if no value changed AND no prevLogicOverride is needed,
- * so callers can skip logging.
+ * Returns a (possibly new) JudgeScores object; returns the same reference if
+ * no value changed so callers can skip logging.
  *
  * prevScores: when provided, gap enforcement pushes each WIN score to at least
  * prevTurn's score + a per-dimension minimum gap, preventing reconcileRoundWinners
@@ -998,14 +985,10 @@ export interface ApplyFloorsResult extends JudgeScores {
  *   Logic    winMinGap = 4 (= 1 raw point × 4 scale factor)
  *   Tactics  winMinGap = 6 (= 2 raw points × 3 scale factor)
  *   Rhetoric winMinGap = 6 (= 2 raw points × 3 scale factor)
- * All three are capped at scaleCeil.  For Logic, when prevTurn's score is near
- * the ceiling (e.g. prevLogic=40 → gap target=44, cap to 40) clampAbsDim cannot
- * open a gap from above.  In that case, prevLogicOverride is set to
- * max(10, newLogic − MIN_LOGIC_WIN_GAP) so the caller can pull prevTurn down
- * instead and emit a scoreUpdate SSE to patch the client display.
- * For Tactics/Rhetoric the ceiling is 30 and prevLogicOverride is not used
- * (those two dimensions' ceiling hits are accepted as "tie" — documented
- * expected behaviour, see test "gap enforcement is capped at scaleCeil").
+ * All three are capped at scaleCeil, so when prevTurn's score is already near the
+ * ceiling (e.g. prevLogic=40 → gap target=44, cap to 40) the gap may not open here.
+ * The caller is responsible for a post-penalty pull-down pass that handles this case
+ * (see "Post-penalty Logic gap enforcement" block in core.ts processTurn).
  * Omit prevScores for contextualization calls where gap enforcement is not wanted.
  *
  * Scale parameters used (WIN/DRAW/LOSS bands as [floor, ceil]):
@@ -1021,9 +1004,7 @@ export function applyPairwiseFloors(
   prevId: string,
   curScores: JudgeScores,
   prevScores?: JudgeScores,
-): ApplyFloorsResult {
-  /** Minimum visible Logic gap between winner and loser. */
-  const MIN_LOGIC_WIN_GAP = 6;
+): JudgeScores {
   const newLogic = clampAbsDim(
     logicWinner,
     curId,
@@ -1067,22 +1048,10 @@ export function applyPairwiseFloors(
     6, // winMinGap = 2 raw points on 1–10 scale
   );
 
-  // Check whether curTurn won Logic but the gap cannot be opened from above
-  // (scaleCeil=40 cap).  If so, set prevLogicOverride so the caller can pull
-  // prevTurn's logicalCoherence down and emit a scoreUpdate SSE.
-  let prevLogicOverride: number | undefined;
-  if (logicWinner === curId && prevScores !== undefined) {
-    const gap = newLogic - prevScores.logicalCoherence;
-    if (gap < MIN_LOGIC_WIN_GAP) {
-      prevLogicOverride = Math.max(10, newLogic - MIN_LOGIC_WIN_GAP);
-    }
-  }
-
   if (
     newLogic === curScores.logicalCoherence &&
     newTactics === curScores.tacticalEffectiveness &&
-    newRhetoric === curScores.rhetoricalForce &&
-    prevLogicOverride === undefined
+    newRhetoric === curScores.rhetoricalForce
   ) {
     return curScores; // no change — return same reference
   }
@@ -1096,7 +1065,6 @@ export function applyPairwiseFloors(
     overallScore: newTotal,
     frameControl: newTotal,
     credibilityScore: newTotal,
-    prevLogicOverride,
   };
 }
 

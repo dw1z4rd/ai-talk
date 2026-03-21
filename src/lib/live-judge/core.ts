@@ -874,39 +874,6 @@ export class LiveJudgeSystem {
               }
             }
 
-            // ── Logic WIN gap enforcement (scaleCeil case) ──────────────────
-            // applyPairwiseFloors sets prevLogicOverride when curTurn wins Logic
-            // but the clampAbsDim winMinGap was capped at scaleCeil=40 (both
-            // sides land at 40, reconcileRoundWinners forces "tie").
-            // Pull prevTurn's logicalCoherence down and emit a scoreUpdate SSE
-            // so the client display is patched to reflect the retroactive change.
-            if (clamped.prevLogicOverride !== undefined) {
-              const prevTurnNum = pairwiseRound.prevTurn.turnNumber;
-              const prevAgentId = pairwiseRound.prevTurn.agentId;
-              const prevHist = this.panel.absoluteScoreHistory[prevTurnNum];
-              if (prevHist !== undefined) {
-                const delta =
-                  clamped.prevLogicOverride - prevHist.logicalCoherence;
-                if (delta !== 0) {
-                  this.panel.absoluteScoreHistory[prevTurnNum] = {
-                    ...prevHist,
-                    logicalCoherence: clamped.prevLogicOverride,
-                  };
-                  logicGapAdjustment = {
-                    targetTurn: prevTurnNum,
-                    targetAgentId: prevAgentId,
-                    deltaLogic: delta,
-                  };
-                  console.log(
-                    `[Logic WIN Gap] R${pairwiseRound.roundNumber} ` +
-                      `T${prevTurnNum} (${prevAgentId}) Logic ` +
-                      `${prevHist.logicalCoherence}→${clamped.prevLogicOverride} ` +
-                      `(delta=${delta}) — gap opened below ` +
-                      `T${turnNumber} Logic=${absoluteScores.logicalCoherence}`,
-                  );
-                }
-              }
-            }
           }
 
           // ── Evidence gating enforcement ─────────────────────────────────────
@@ -966,77 +933,71 @@ export class LiveJudgeSystem {
             };
           }
 
-          // ── Post-penalty gap re-enforcement ─────────────────────────────────
-          // Evidence gating and artifact cap (above) may have reduced curTurn's
-          // scores after applyPairwiseFloors already ran, collapsing the WIN gap
-          // to zero so reconcileRoundWinners silently downgrades the win to "tie".
-          // Re-run applyPairwiseFloors with the now-final absoluteScores and the
-          // current absoluteScoreHistory entry for prevTurn (which may itself have
-          // already been pulled down by the first prevLogicOverride pass).
-          if (!pairwiseRound.isFallback) {
-            const prevTurnNumPP = pairwiseRound.prevTurn.turnNumber;
-            const prevScoresPP = this.panel.absoluteScoreHistory[prevTurnNumPP];
-            if (prevScoresPP !== undefined) {
-              const reGapped = applyPairwiseFloors(
-                pairwiseRound.logicWinner,
-                pairwiseRound.tacticsWinner,
-                pairwiseRound.rhetoricWinner,
-                agent.id,
-                pairwiseRound.prevTurn.agentId,
-                absoluteScores,
-                prevScoresPP,
-              );
-              if (reGapped !== absoluteScores) {
-                const ppNote =
-                  `Post-penalty gap re-enforced — ` +
-                  `Logic: ${absoluteScores.logicalCoherence}→${reGapped.logicalCoherence} ` +
-                  `Tactics: ${absoluteScores.tacticalEffectiveness}→${reGapped.tacticalEffectiveness} ` +
-                  `Rhetoric: ${absoluteScores.rhetoricalForce}→${reGapped.rhetoricalForce}`;
-                console.log(
-                  `[Post-Penalty Gap] R${pairwiseRound.roundNumber} T${turnNumber} ` +
-                    `(${agent.name}) — ${ppNote}`,
+          // ── Post-penalty Logic gap enforcement ───────────────────────────────
+          // Evidence gating and artifact cap (above) run after applyPairwiseFloors,
+          // so they may collapse the Logic WIN gap to zero (e.g. both sides land at
+          // 34 after independent penalties).  Fix: after all penalties are final,
+          // check the gap once and pull the LOSER down only — never push the winner
+          // up, which would silently undo the penalty.
+          //
+          // This also handles the scaleCeil (40) case where clampAbsDim's winMinGap
+          // was capped: pulling prevTurn down is the only valid way to open the gap.
+          const MIN_LOGIC_WIN_GAP = 6;
+          if (!pairwiseRound.isFallback && pairwiseRound.logicWinner !== "tie") {
+            const prevTurnNumFinal = pairwiseRound.prevTurn.turnNumber;
+            const prevHistFinal =
+              this.panel.absoluteScoreHistory[prevTurnNumFinal];
+            if (prevHistFinal !== undefined) {
+              const winnerIsCur = pairwiseRound.logicWinner === agent.id;
+              const curLogic = absoluteScores.logicalCoherence;
+              const prevLogic = prevHistFinal.logicalCoherence;
+              const winnerLogic = winnerIsCur ? curLogic : prevLogic;
+              const loserLogic = winnerIsCur ? prevLogic : curLogic;
+              if (winnerLogic - loserLogic < MIN_LOGIC_WIN_GAP) {
+                const adjustedLoser = Math.max(
+                  10,
+                  winnerLogic - MIN_LOGIC_WIN_GAP,
                 );
-                absoluteScores = reGapped;
-                if (scoreBreakdown) {
-                  scoreBreakdown = {
-                    ...scoreBreakdown,
-                    postPenaltyGapNote: ppNote,
-                  };
-                }
-                // If the ceiling cap still prevents opening the gap from above,
-                // pull prevTurn Logic down — accumulate into logicGapAdjustment
-                // so a single SSE carries the total delta.
-                if (reGapped.prevLogicOverride !== undefined) {
-                  const prevHistPP =
-                    this.panel.absoluteScoreHistory[prevTurnNumPP];
-                  if (prevHistPP !== undefined) {
-                    const deltaPP =
-                      reGapped.prevLogicOverride - prevHistPP.logicalCoherence;
-                    if (deltaPP !== 0) {
-                      this.panel.absoluteScoreHistory[prevTurnNumPP] = {
-                        ...prevHistPP,
-                        logicalCoherence: reGapped.prevLogicOverride,
-                      };
-                      if (logicGapAdjustment) {
-                        logicGapAdjustment = {
+                if (winnerIsCur) {
+                  // prevTurn is the loser — pull it down and emit a scoreUpdate SSE.
+                  const delta = adjustedLoser - prevHistFinal.logicalCoherence;
+                  if (delta !== 0) {
+                    this.panel.absoluteScoreHistory[prevTurnNumFinal] = {
+                      ...prevHistFinal,
+                      logicalCoherence: adjustedLoser,
+                    };
+                    logicGapAdjustment = logicGapAdjustment
+                      ? {
                           ...logicGapAdjustment,
-                          deltaLogic: logicGapAdjustment.deltaLogic + deltaPP,
-                        };
-                      } else {
-                        logicGapAdjustment = {
-                          targetTurn: prevTurnNumPP,
+                          deltaLogic: logicGapAdjustment.deltaLogic + delta,
+                        }
+                      : {
+                          targetTurn: prevTurnNumFinal,
                           targetAgentId: pairwiseRound.prevTurn.agentId,
-                          deltaLogic: deltaPP,
+                          deltaLogic: delta,
                         };
-                      }
-                      console.log(
-                        `[Post-Penalty Gap Override] R${pairwiseRound.roundNumber} ` +
-                          `T${prevTurnNumPP} (${pairwiseRound.prevTurn.agentId}) Logic ` +
-                          `${prevHistPP.logicalCoherence}→${reGapped.prevLogicOverride} ` +
-                          `(delta=${deltaPP})`,
-                      );
-                    }
+                    console.log(
+                      `[Logic WIN Gap] R${pairwiseRound.roundNumber} ` +
+                        `T${prevTurnNumFinal} (${pairwiseRound.prevTurn.agentId}) Logic ` +
+                        `${prevHistFinal.logicalCoherence}→${adjustedLoser} ` +
+                        `(delta=${delta}) — gap opened below ` +
+                        `T${turnNumber} Logic=${absoluteScores.logicalCoherence}`,
+                    );
                   }
+                } else {
+                  // curTurn is the loser — pull it down in-place.
+                  const oldLogic = absoluteScores.logicalCoherence;
+                  absoluteScores = {
+                    ...absoluteScores,
+                    logicalCoherence: adjustedLoser,
+                  };
+                  console.log(
+                    `[Logic WIN Gap] R${pairwiseRound.roundNumber} ` +
+                      `T${turnNumber} (${agent.name}) Logic ` +
+                      `${oldLogic}→${adjustedLoser} ` +
+                      `— pulled down to open gap below ` +
+                      `T${prevTurnNumFinal} Logic=${prevLogic}`,
+                  );
                 }
               }
             }
