@@ -138,6 +138,7 @@ export const POST: RequestHandler = async ({ request }) => {
             pairwiseRound: jr.pairwiseRound ?? null,
             scorecard: jr.scorecard ?? null,
             absoluteScores: jr.absoluteScores ?? null,
+            scoreBreakdown: jr.scoreBreakdown ?? null,
           });
         };
 

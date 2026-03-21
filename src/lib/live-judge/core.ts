@@ -213,6 +213,7 @@ export class LiveJudgeSystem {
     let aggregatedScores: JudgeScores;
     let judgeAnalyses: any[] = [];
     let absoluteScores: JudgeScores | undefined;
+    let scoreBreakdown: import("./types").TurnScoreBreakdown | undefined;
 
     if (isOpeningTurn) {
       // Turn 1: no opponent to compare against — store this turn and use neutral scores
@@ -253,6 +254,7 @@ export class LiveJudgeSystem {
         judgeAnalyses = [openingAnalysis];
         aggregatedScores = openingAnalysis.scores;
         absoluteScores = openingAnalysis.scores;
+        scoreBreakdown = openingAnalysis.breakdown;
         // Persist so Turn 2 harmonization check has a prevAbsolute to compare against
         this.panel.lastAbsoluteScores[agent.id] = absoluteScores;
         this.panel.absoluteScoreHistory[turnNumber] = absoluteScores;
@@ -821,6 +823,7 @@ export class LiveJudgeSystem {
 
         if (absoluteAnalysis) {
           absoluteScores = absoluteAnalysis.scores;
+          scoreBreakdown = absoluteAnalysis.breakdown;
 
           // ── Pairwise-calibrated floor enforcement ──────────────────────────
           // After the absolute LLM scorer runs, enforce structural consistency
@@ -845,16 +848,26 @@ export class LiveJudgeSystem {
               ],
             );
             if (clamped !== absoluteScores) {
+              const floorNote =
+                `Logic: ${absoluteScores.logicalCoherence}→${clamped.logicalCoherence} ` +
+                `Tactics: ${absoluteScores.tacticalEffectiveness}→${clamped.tacticalEffectiveness} ` +
+                `Rhetoric: ${absoluteScores.rhetoricalForce}→${clamped.rhetoricalForce}`;
               console.log(
                 `[Floor Calibration] R${pairwiseRound.roundNumber} T${turnNumber} ` +
-                  `(${agent.name}) — Logic: ${absoluteScores.logicalCoherence}→${clamped.logicalCoherence} ` +
-                  `Tactics: ${absoluteScores.tacticalEffectiveness}→${clamped.tacticalEffectiveness} ` +
-                  `Rhetoric: ${absoluteScores.rhetoricalForce}→${clamped.rhetoricalForce} ` +
+                  `(${agent.name}) — ${floorNote} ` +
                   `[pairwise L:${pairwiseRound.logicWinner === agent.id ? "WIN" : pairwiseRound.logicWinner === "tie" ? "DRAW" : "LOSS"} ` +
                   `T:${pairwiseRound.tacticsWinner === agent.id ? "WIN" : pairwiseRound.tacticsWinner === "tie" ? "DRAW" : "LOSS"} ` +
                   `R:${pairwiseRound.rhetoricWinner === agent.id ? "WIN" : pairwiseRound.rhetoricWinner === "tie" ? "DRAW" : "LOSS"}]`,
               );
               absoluteScores = clamped;
+              // Record the floor adjustment in the breakdown for the audit panel
+              if (scoreBreakdown) {
+                scoreBreakdown = {
+                  ...scoreBreakdown,
+                  pairwiseFloorApplied: true,
+                  pairwiseFloorNote: `Pairwise floor applied — ${floorNote}`,
+                };
+              }
             }
           }
 
@@ -1176,6 +1189,7 @@ export class LiveJudgeSystem {
           ? { ...this.panel.retroactiveDeltas }
           : undefined,
       convergenceWarning,
+      scoreBreakdown,
     };
   }
 

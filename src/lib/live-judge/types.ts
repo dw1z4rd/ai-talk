@@ -59,6 +59,9 @@ export interface TurnAnalysis {
   judgeId: string;
   judgeSpecialization: JudgeSpecialization;
   reasoning: string;
+
+  /** Full rubric audit trail — populated when the LLM returns structured breakdown fields. */
+  breakdown?: TurnScoreBreakdown;
 }
 
 // ── Pairwise comparison types ─────────────────────────────────────────────────
@@ -173,6 +176,61 @@ export interface FlagUpdate {
   deltaRaw: number;
   reason: string;
   updateType: "penalty" | "partial_restore";
+}
+
+// ── Rubric transparency types ─────────────────────────────────────────────────
+
+/** A single step in the rubric scoring process, for audit trail display. */
+export interface ScoreStep {
+  /** Human-readable rule name, e.g. "base", "Hollow specificity: 'studies in Finland'", "Complete causal chain" */
+  rule: string;
+  /** Point delta on the 1–10 scale, e.g. 6 (base), +1 (bonus), -1 (deduction) */
+  delta: number;
+}
+
+/**
+ * Four-component rhetoric breakdown, mirroring the 4-component SCORING METHOD
+ * in the judge system prompt. rhetoric_score = 5 + aboveCount − belowCount.
+ */
+export interface RhetoricalComponents {
+  expression: "above" | "average" | "below"; // Component 1: expression quality
+  structure: "above" | "average" | "below"; // Component 2: structural clarity
+  audience: "above" | "average" | "below"; // Component 3: audience awareness
+  framing: "above" | "average" | "below"; // Component 4: framing quality
+}
+
+/**
+ * Full rubric audit trail for one turn's absolute score.
+ * Lets users inspect exactly why a turn received, say, 28/40 on Logic.
+ * Populated by parseJudgeAnalysis from structured fields the LLM returns alongside scores.
+ */
+export interface TurnScoreBreakdown {
+  // Logic audit trail
+  logicSteps: ScoreStep[]; // e.g. [{rule:"base",delta:6},{rule:"Hollow specificity: 'X'",delta:-1}]
+  logicRaw: number; // 1–10 LLM score before ×4 mapping
+
+  // Rhetoric audit trail
+  rhetoricalComponents: RhetoricalComponents;
+  rhetoricalAboveCount: number; // A in formula: 5 + A − B
+  rhetoricalBelowCount: number; // B in formula: 5 + A − B
+  rhetoricalRaw: number; // 1–10 LLM score before ×3
+
+  // Tactics audit trail
+  tacticsNote: string; // one-sentence reason for the tactics score
+  tacticsRaw: number; // 1–10 LLM score before ×3
+
+  // Pairwise floor adjustment (populated in core.ts after floor enforcement)
+  pairwiseFloorApplied?: boolean;
+  pairwiseFloorNote?: string; // e.g. "Logic floored to WIN band [24–40]: 16 → 24"
+
+  // Evidence gating (populated in analyzeTurn before prompt construction)
+  evidenceDetected?: boolean;
+  evidenceCitations?: string[]; // citation strings found in the turn text
+  evidenceGatingNote?: string; // note shown in the audit panel
+
+  // Artifact remediation (populated in analyzeTurn before prompt construction)
+  artifactRepairApplied?: boolean;
+  artifactRepairNote?: string; // what was repaired and how
 }
 
 /** Running win tally for one agent across all pairwise rounds. */
@@ -409,6 +467,12 @@ export interface JudgeAnalysisResult {
    * signal the debate should re-anchor or conclude.
    */
   convergenceWarning?: string;
+  /**
+   * Full rubric audit trail for the current turn's absolute score.
+   * Mirrors absoluteScores but with per-step breakdowns and pre-scoring metadata
+   * (evidence gating, artifact repair) so users can audit every scoring decision.
+   */
+  scoreBreakdown?: TurnScoreBreakdown;
 }
 
 // Judge specialization configurations

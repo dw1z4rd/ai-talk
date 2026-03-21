@@ -22,6 +22,18 @@
 
   let { liveJudgeResults, pairwiseRounds, narrativeVerdict, currentLeader, finalScorecard = null, judgeStatus = null, scoreDeltas = {}, agentOverrides = {} }: Props = $props();
 
+  // Track which turn audit panels are expanded (turn number → boolean)
+  let expandedBreakdowns = $state<Set<number>>(new Set());
+  function toggleBreakdown(turnNumber: number) {
+    const next = new Set(expandedBreakdowns);
+    if (next.has(turnNumber)) next.delete(turnNumber);
+    else next.add(turnNumber);
+    expandedBreakdowns = next;
+  }
+  function ratingColor(r: string) {
+    return r === "above" ? "#34d399" : r === "below" ? "#f87171" : "#9ca3af";
+  }
+
   // Recompute agreement against the FINAL scorecard (not at generation time)
   // to avoid false flags caused by fallback rounds skewing mid-run tallies.
   const verdictAgreesWithScorecard = $derived(
@@ -204,48 +216,145 @@
             {#each scoredTurns as r, i (r.turnNumber)}
               {@const info = resolveAgent(r.agentId)}
               {@const s = r.absoluteScores}
+              {@const bd = r.scoreBreakdown}
+              {@const isExpanded = expandedBreakdowns.has(r.turnNumber)}
               <div
-                class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row turn-scores-grid"
-                style="animation-delay: {i * 50}ms"
+                class="border-b border-[--color-border] last:border-0"
                 in:flyInFromLeft={{ duration: 240, distance: 18 }}
                 out:flyOutToRight={{ duration: 180, distance: 18 }}
               >
-                <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
-                <span class="font-medium truncate" style="color: {info.color}"
-                  >{info.name}</span
+                <!-- Score row -->
+                <div
+                  class="grid items-center px-3 py-2 text-xs gap-1 judge-row turn-scores-grid"
+                  style="animation-delay: {i * 50}ms"
                 >
-                <span
-                  class="flex flex-col items-center leading-tight"
-                  title="Logic: {s.logicalCoherence}/40{scoreDeltas[r.turnNumber] ? ' (retroactively adjusted: ' + (scoreDeltas[r.turnNumber] > 0 ? '+' : '') + scoreDeltas[r.turnNumber] + ')' : ''}"
-                >
-                  <span class="font-mono text-[12px]">{s.logicalCoherence}</span>
-                  <span class="text-[9px] text-[--color-muted]">/40</span>
-                  {#if scoreDeltas[r.turnNumber]}
-                    {@const d = scoreDeltas[r.turnNumber]}
-                    <span
-                      class="font-mono text-[9px] font-bold mt-0.5 px-1 rounded"
-                      style="color: {d < 0 ? '#f87171' : '#34d399'}; background: {d < 0 ? '#f8717118' : '#34d39918'}"
-                    >{d > 0 ? '+' : ''}{d}</span>
-                  {/if}
-                </span>
-                <span
-                  class="flex flex-col items-center leading-tight"
-                  title="Rhetoric: {s.rhetoricalForce}/30"
-                >
-                  <span class="font-mono text-[12px]">{s.rhetoricalForce}</span>
-                  <span class="text-[9px] text-[--color-muted]">/30</span>
-                </span>
-                <span
-                  class="flex flex-col items-center leading-tight"
-                  title="Tactics: {s.tacticalEffectiveness}/30"
-                >
-                  <span class="font-mono text-[12px]">{s.tacticalEffectiveness}</span>
-                  <span class="text-[9px] text-[--color-muted]">/30</span>
-                </span>
-                <span
-                  class="text-center font-mono text-[11px] font-semibold"
-                  style="color: {info.color}">{s.logicalCoherence + s.rhetoricalForce + s.tacticalEffectiveness}</span
-                >
+                  <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
+                  <span class="font-medium truncate" style="color: {info.color}"
+                    >{info.name}</span
+                  >
+                  <span
+                    class="flex flex-col items-center leading-tight"
+                    title="Logic: {s.logicalCoherence}/40{scoreDeltas[r.turnNumber] ? ' (retroactively adjusted: ' + (scoreDeltas[r.turnNumber] > 0 ? '+' : '') + scoreDeltas[r.turnNumber] + ')' : ''}"
+                  >
+                    <span class="font-mono text-[12px]">{s.logicalCoherence}</span>
+                    <span class="text-[9px] text-[--color-muted]">/40</span>
+                    {#if scoreDeltas[r.turnNumber]}
+                      {@const d = scoreDeltas[r.turnNumber]}
+                      <span
+                        class="font-mono text-[9px] font-bold mt-0.5 px-1 rounded"
+                        style="color: {d < 0 ? '#f87171' : '#34d399'}; background: {d < 0 ? '#f8717118' : '#34d39918'}"
+                      >{d > 0 ? '+' : ''}{d}</span>
+                    {/if}
+                  </span>
+                  <span
+                    class="flex flex-col items-center leading-tight"
+                    title="Rhetoric: {s.rhetoricalForce}/30"
+                  >
+                    <span class="font-mono text-[12px]">{s.rhetoricalForce}</span>
+                    <span class="text-[9px] text-[--color-muted]">/30</span>
+                  </span>
+                  <span
+                    class="flex flex-col items-center leading-tight"
+                    title="Tactics: {s.tacticalEffectiveness}/30"
+                  >
+                    <span class="font-mono text-[12px]">{s.tacticalEffectiveness}</span>
+                    <span class="text-[9px] text-[--color-muted]">/30</span>
+                  </span>
+                  <!-- Score total + audit toggle -->
+                  <button
+                    onclick={() => toggleBreakdown(r.turnNumber)}
+                    class="flex items-center justify-center gap-1 font-mono text-[11px] font-semibold rounded hover:opacity-80 transition-opacity"
+                    style="color: {info.color}"
+                    title="{bd ? 'Show/hide scoring rubric' : 'No breakdown available'}"
+                    disabled={!bd}
+                  >
+                    {s.logicalCoherence + s.rhetoricalForce + s.tacticalEffectiveness}
+                    {#if bd}
+                      <span class="text-[9px] text-[--color-muted] transition-transform" style="transform: rotate({isExpanded ? '90deg' : '0deg'})">▸</span>
+                    {/if}
+                  </button>
+                </div>
+
+                <!-- Audit breakdown panel (collapsible) -->
+                {#if isExpanded && bd}
+                  <div
+                    class="px-3 pb-3 border-t border-[--color-border] bg-[--color-panel]"
+                    style="background: #7c6af705"
+                  >
+                    <div class="pt-2 flex flex-col gap-3">
+
+                      <!-- Logic steps -->
+                      {#if bd.logicSteps?.length > 0}
+                        <div>
+                          <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-1">Logic rubric · {s.logicalCoherence}/40 (raw {bd.logicRaw}/10)</p>
+                          <div class="flex flex-col gap-0.5">
+                            {#each bd.logicSteps as step}
+                              <div class="flex items-baseline justify-between gap-2 text-[11px]">
+                                <span class="text-[--color-muted-fg] leading-relaxed">{step.rule}</span>
+                                <span
+                                  class="font-mono font-bold shrink-0"
+                                  style="color: {step.delta > 0 ? '#34d399' : step.delta < 0 ? '#f87171' : '#9ca3af'}"
+                                >{step.delta > 0 ? '+' : ''}{step.delta}</span>
+                              </div>
+                            {/each}
+                          </div>
+                          {#if bd.pairwiseFloorApplied}
+                            <p class="text-[10px] text-amber-400 mt-1.5 leading-relaxed">⚡ {bd.pairwiseFloorNote}</p>
+                          {/if}
+                        </div>
+                      {/if}
+
+                      <!-- Rhetoric components -->
+                      {#if bd.rhetoricalComponents}
+                        {@const rc = bd.rhetoricalComponents}
+                        <div>
+                          <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-1">
+                            Rhetoric rubric · {s.rhetoricalForce}/30 (raw {bd.rhetoricalRaw}/10 = 5+{bd.rhetoricalAboveCount}−{bd.rhetoricalBelowCount})
+                          </p>
+                          <div class="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                            {#each [['Expression', rc.expression], ['Structure', rc.structure], ['Audience', rc.audience], ['Framing', rc.framing]] as [label, rating]}
+                              <div class="flex items-center justify-between text-[11px]">
+                                <span class="text-[--color-muted-fg]">{label}</span>
+                                <span class="font-semibold capitalize" style="color: {ratingColor(rating)}">{rating}</span>
+                              </div>
+                            {/each}
+                          </div>
+                        </div>
+                      {/if}
+
+                      <!-- Tactics note -->
+                      {#if bd.tacticsNote}
+                        <div>
+                          <p class="text-[10px] font-bold uppercase tracking-wide text-[--color-muted] mb-1">Tactics · {s.tacticalEffectiveness}/30 (raw {bd.tacticsRaw}/10)</p>
+                          <p class="text-[11px] text-[--color-muted-fg] leading-relaxed">{bd.tacticsNote}</p>
+                        </div>
+                      {/if}
+
+                      <!-- Evidence gating -->
+                      {#if bd.evidenceGatingNote}
+                        <div class="rounded-lg border px-2.5 py-2" style="border-color: {bd.evidenceDetected ? '#34d39930' : '#f8717130'}; background: {bd.evidenceDetected ? '#34d39908' : '#f8717108'}">
+                          <p class="text-[10px] font-bold mb-0.5" style="color: {bd.evidenceDetected ? '#34d399' : '#f87171'}">
+                            {bd.evidenceDetected ? '✓ Citations detected' : '⚠ No citations'}
+                          </p>
+                          {#if bd.evidenceCitations?.length}
+                            <p class="text-[10px] text-[--color-muted] mb-1 leading-relaxed font-mono break-all">{bd.evidenceCitations.slice(0, 3).join(' · ')}{bd.evidenceCitations.length > 3 ? ` +${bd.evidenceCitations.length - 3} more` : ''}</p>
+                          {/if}
+                          <p class="text-[10px] text-[--color-muted-fg] leading-relaxed">{bd.evidenceGatingNote}</p>
+                        </div>
+                      {/if}
+
+                      <!-- Artifact repair -->
+                      {#if bd.artifactRepairApplied}
+                        <div class="rounded-lg border border-sky-500/20 bg-sky-500/5 px-2.5 py-2">
+                          <p class="text-[10px] font-bold text-sky-400 mb-0.5">🔧 Artifact repair applied</p>
+                          <p class="text-[10px] text-[--color-muted-fg] leading-relaxed">{bd.artifactRepairNote}</p>
+                        </div>
+                      {/if}
+
+                    </div>
+                  </div>
+                {/if}
+
               </div>
             {/each}
           </div>

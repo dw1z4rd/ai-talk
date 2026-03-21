@@ -406,6 +406,7 @@
                 tacticalAnalysis: data.tacticalAnalysis,
                 reasoning: data.reasoning,
                 absoluteScores: data.absoluteScores ?? null,
+                scoreBreakdown: data.scoreBreakdown ?? null,
             });
 
             if (data.pairwiseRound) {

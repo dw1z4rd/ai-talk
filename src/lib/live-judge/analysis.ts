@@ -11,6 +11,9 @@ import {
   type OpenFlag,
   type FlagUpdate,
   type PositionalConvergenceAnalysis,
+  type TurnScoreBreakdown,
+  type ScoreStep,
+  type RhetoricalComponents,
 } from "./types";
 import type { Agent, Message } from "$lib/agents";
 import { MODEL_CATALOG } from "$lib/agents";
@@ -21,6 +24,10 @@ import {
   SPACE_DROP_THRESHOLD,
   detectSpaceDrops,
   repairSpaceDrops,
+  repairAndTrackArtefacts,
+  detectEvidence,
+  type ArtifactRepairResult,
+  type EvidenceDetectionResult,
 } from "./text-utils";
 
 export { repairSpaceDrops } from "./text-utils";
@@ -305,24 +312,52 @@ export async function compareTurns(
   openFlags?: OpenFlag[],
   mode?: "debate" | "document_audit",
 ): Promise<PairwiseRound> {
-  const langCheck = detectLanguageMismatch(prevMessage, curMessage);
+  // ── Artifact remediation: repair space-drops before rhetoric scoring ──────
+  const prevRepair = repairAndTrackArtefacts(prevMessage);
+  const curRepair = repairAndTrackArtefacts(curMessage);
+  const repairedPrev = prevRepair.repaired;
+  const repairedCur = curRepair.repaired;
+  const artifactWarningParts: string[] = [];
+  if (prevRepair.applied)
+    artifactWarningParts.push(
+      `T${prevTurnNumber} (${prevAgentName}): space-drop artefacts repaired`,
+    );
+  if (curRepair.applied)
+    artifactWarningParts.push(
+      `T${curTurnNumber} (${curAgentName}): space-drop artefacts repaired`,
+    );
+
+  // ── Evidence gating: detect citations in both turns ───────────────────────
+  const prevEvidence = detectEvidence(repairedPrev);
+  const curEvidence = detectEvidence(repairedCur);
+
+  const langCheck = detectLanguageMismatch(repairedPrev, repairedCur);
   if (!langCheck.isConsistent) {
     console.warn(`[Pairwise Judge] ${langCheck.warning}`);
   }
+
+  const langWarningParts: string[] = [];
+  if (langCheck.warning) langWarningParts.push(langCheck.warning);
+  langWarningParts.push(...artifactWarningParts);
+  // Combine language + artifact repair warnings into a single field
+  const combinedWarning =
+    langWarningParts.length > 0 ? langWarningParts.join("; ") : undefined;
 
   const isOpeningRound = prevTurnNumber === 1;
   const domainNote = buildDomainNoteForTopic(topic);
   const prompt = generatePairwisePrompt(
     prevAgentName,
-    prevMessage,
+    repairedPrev,
     prevTurnNumber,
     curAgentName,
-    curMessage,
+    repairedCur,
     curTurnNumber,
     topic,
     isOpeningRound,
     undefined,
     openFlags,
+    prevEvidence,
+    curEvidence,
   );
 
   const judgeProvider = createJudgeProviderWithRetry(
@@ -347,27 +382,27 @@ export async function compareTurns(
         responseText,
         prevAgentId,
         prevAgentName,
-        prevMessage,
+        repairedPrev,
         prevTurnNumber,
         curAgentId,
         curAgentName,
-        curMessage,
+        repairedCur,
         curTurnNumber,
         roundNumber,
-        langCheck.warning,
+        combinedWarning,
       ),
     () =>
       createFallbackPairwiseRound(
         prevAgentId,
         prevAgentName,
-        prevMessage,
+        repairedPrev,
         prevTurnNumber,
         curAgentId,
         curAgentName,
-        curMessage,
+        repairedCur,
         curTurnNumber,
         roundNumber,
-        langCheck.warning,
+        combinedWarning,
       ),
   );
 }
@@ -534,6 +569,8 @@ export function generatePairwisePrompt(
   isOpeningRound: boolean,
   previousLogicDelta?: string,
   openFlags?: OpenFlag[],
+  evidenceA?: EvidenceDetectionResult,
+  evidenceB?: EvidenceDetectionResult,
 ): string {
   const openingNote = isOpeningRound
     ? `\n[NOTE: Turn ${turnA} is the OPENING statement — ${nameA} spoke first with no opponent yet. Apply OPENING TURN rules to their turn.]`
@@ -565,12 +602,21 @@ export function generatePairwisePrompt(
           )}\nSee OPEN FLAGS section in the system prompt for instructions on how to handle these.`
       : "";
 
+  // Evidence gating notes — injected per-agent so the judge knows whether to
+  // apply the hollow-specificity penalty without mitigation.
+  const evidenceNoteA = evidenceA
+    ? `\n[${nameA} evidence: ${evidenceA.hasEvidence ? `${evidenceA.citations.length} citation(s) detected — hollow-specificity penalty suppressed for cited claims with mechanism chains` : "no citations detected — hollow-specificity rules apply without mitigation"}]`
+    : "";
+  const evidenceNoteB = evidenceB
+    ? `\n[${nameB} evidence: ${evidenceB.hasEvidence ? `${evidenceB.citations.length} citation(s) detected — hollow-specificity penalty suppressed for cited claims with mechanism chains` : "no citations detected — hollow-specificity rules apply without mitigation"}]`
+    : "";
+
   return `DEBATE TOPIC: ${topic}${openingNote}${previousDeltaNote}${openFlagsNote}
 
-TURN ${turnA} — ${nameA}:
+TURN ${turnA} — ${nameA}:${evidenceNoteA}
 "${messageA}"
 
-TURN ${turnB} — ${nameB}:
+TURN ${turnB} — ${nameB}:${evidenceNoteB}
 "${messageB}"
 
 Respond with JSON only:`;
@@ -1742,10 +1788,14 @@ export async function analyzeTurn(
   suspectClaims?: string[],
   pairwiseCalibration?: string,
 ): Promise<TurnAnalysis> {
+  // ── Pre-scoring: artifact remediation & evidence gating ──────────────────
+  const repairResult = repairAndTrackArtefacts(message);
+  const evidenceResult = detectEvidence(repairResult.repaired);
+
   const judgePrompt = generateJudgePrompt(
     judge,
     agent,
-    message,
+    repairResult.repaired,
     opponent,
     opponentMessage,
     turnNumber,
@@ -1754,17 +1804,18 @@ export async function analyzeTurn(
     messageHistory,
     suspectClaims,
     pairwiseCalibration,
+    evidenceResult,
   );
   const domainNote = buildDomainNoteForTopic(topic);
   const judgeProvider = createJudgeProviderWithRetry(
     judge.modelId || DEFAULT_JUDGE_MODEL,
   );
-  return callWithTiming(
+  const result = await callWithTiming(
     () =>
       judgeProvider.generateText(judgePrompt, {
         systemPrompt: generateJudgeSystemPrompt(domainNote),
         temperature: 0.5,
-        maxTokens: 600,
+        maxTokens: 900,
         signal,
       }),
     `[Adaptive Judge] ${judge.name}`,
@@ -1790,6 +1841,40 @@ export async function analyzeTurn(
         referenceContext,
       ),
   );
+
+  // Attach pre-scoring metadata to the breakdown (repair + evidence gating)
+  if (repairResult.applied || evidenceResult.hasEvidence !== undefined) {
+    const existingBreakdown =
+      result.breakdown ?? ({} as Partial<TurnScoreBreakdown>);
+    result.breakdown = {
+      logicSteps: existingBreakdown.logicSteps ?? [],
+      logicRaw: existingBreakdown.logicRaw ?? 5,
+      rhetoricalComponents: existingBreakdown.rhetoricalComponents ?? {
+        expression: "average",
+        structure: "average",
+        audience: "average",
+        framing: "average",
+      },
+      rhetoricalAboveCount: existingBreakdown.rhetoricalAboveCount ?? 0,
+      rhetoricalBelowCount: existingBreakdown.rhetoricalBelowCount ?? 0,
+      rhetoricalRaw: existingBreakdown.rhetoricalRaw ?? 5,
+      tacticsNote: existingBreakdown.tacticsNote ?? "",
+      tacticsRaw: existingBreakdown.tacticsRaw ?? 5,
+      ...existingBreakdown,
+      // Evidence gating
+      evidenceDetected: evidenceResult.hasEvidence,
+      evidenceCitations:
+        evidenceResult.citations.length > 0
+          ? evidenceResult.citations
+          : undefined,
+      evidenceGatingNote: evidenceResult.gatingNote,
+      // Artifact remediation
+      artifactRepairApplied: repairResult.applied,
+      artifactRepairNote: repairResult.note,
+    };
+  }
+
+  return result;
 }
 
 function generateJudgePrompt(
@@ -1804,6 +1889,7 @@ function generateJudgePrompt(
   messageHistory: Message[],
   suspectClaims?: string[],
   pairwiseCalibration?: string,
+  evidenceResult?: EvidenceDetectionResult,
 ): string {
   const contextBlock = referenceContext
     ? `\nREFERENCE MATERIAL: ${referenceContext}\n`
@@ -1824,9 +1910,12 @@ function generateJudgePrompt(
   const calibrationBlock = pairwiseCalibration
     ? `\n${pairwiseCalibration}\n`
     : "";
+  const evidenceBlock = evidenceResult
+    ? `\n${evidenceResult.gatingNote}\n`
+    : "";
   return `DEBATE TOPIC: ${topic || "General debate"}
 TURN: ${turnNumber}${contextBlock}
-${opponentBlock}${flaggedBlock}${calibrationBlock}
+${opponentBlock}${flaggedBlock}${calibrationBlock}${evidenceBlock}
 
 NOW EVALUATE — ${agent.name}'s response: "${message}"
 
@@ -1849,7 +1938,12 @@ function _buildJudgeSystemPrompt(domainNote: string): string {
   return `You are a debate scoring system. Your entire response must be a single JSON object — no preamble, no explanation, no markdown.
 
 Required output format (integers 1–10 only):
-{"logic_score": 7, "rhetoric_score": 6, "tactics_score": 8, "analysis": "Max 2 sentences. Name the specific missing mechanism or gap."}
+{"logic_score": 7, "logic_steps": [{"rule": "base", "delta": 6}, {"rule": "Hollow specificity: \\"studies in Finland\\"", "delta": -1}, {"rule": "Complete causal chain", "delta": 1}], "rhetoric_components": {"expression": "above", "structure": "average", "audience": "average", "framing": "above"}, "rhetoric_score": 7, "tactics_score": 8, "tactics_note": "One sentence: name the specific move or failure. Max 20 words.", "analysis": "Max 2 sentences. Name the specific missing mechanism or gap."}
+
+RUBRIC AUDIT REQUIREMENTS:
+logic_steps: An ordered array of {rule, delta} objects. The first entry MUST be {"rule":"base","delta":X} where X is the starting point (6 normally; or 4/5/8 when a PAIRWISE ANCHOR overrides). Every subsequent entry represents a single deduction or bonus. The sum of all delta values must equal logic_score. Name the claim or rule specifically — do NOT write generic entries like {"rule":"deduction","delta":-1}; write {"rule":"Hollow specificity: 'studies in Finland'","delta":-1}.
+tactics_note: Exactly one sentence (≤ 20 words) naming what the turn did or failed to do tactically.
+rhetoric_components: Express each of the four components as "above", "average", or "below" exactly as specified. The formula rhetoric_score = 5 + (above_count − below_count) must hold; if your component ratings do not sum to your rhetoric_score after clamping to 1–10, revise the components first, then the score.
 
 Keep the analysis field under 50 words.
 
@@ -1990,6 +2084,77 @@ export function parseJudgeAnalysis(
       overallScore: totalScore,
     };
 
+    // ── Rubric breakdown parsing (best-effort) ────────────────────────────────
+    // Parse structured breakdown fields if present; gracefully skip when absent
+    // (e.g. fallback round, older cached response, truncated JSON).
+    let breakdown: TurnScoreBreakdown | undefined;
+    try {
+      const rawSteps = Array.isArray(data.logic_steps)
+        ? data.logic_steps
+        : null;
+      const rawComp =
+        data.rhetoric_components && typeof data.rhetoric_components === "object"
+          ? data.rhetoric_components
+          : null;
+      const tacticsNote =
+        typeof data.tactics_note === "string" && data.tactics_note.trim()
+          ? data.tactics_note.trim()
+          : null;
+
+      if (rawSteps && rawComp && tacticsNote) {
+        const isRating = (v: unknown): v is "above" | "average" | "below" =>
+          v === "above" || v === "average" || v === "below";
+
+        const logicSteps: ScoreStep[] = rawSteps
+          .filter(
+            (s: unknown): s is { rule: string; delta: number } =>
+              s !== null &&
+              typeof s === "object" &&
+              typeof (s as Record<string, unknown>).rule === "string" &&
+              typeof (s as Record<string, unknown>).delta === "number",
+          )
+          .map((s: { rule: string; delta: number }) => ({
+            rule: s.rule,
+            delta: s.delta,
+          }));
+
+        const rc: RhetoricalComponents = {
+          expression: isRating(rawComp.expression)
+            ? rawComp.expression
+            : "average",
+          structure: isRating(rawComp.structure)
+            ? rawComp.structure
+            : "average",
+          audience: isRating(rawComp.audience) ? rawComp.audience : "average",
+          framing: isRating(rawComp.framing) ? rawComp.framing : "average",
+        };
+        const ratingVal = (r: "above" | "average" | "below") =>
+          r === "above" ? 1 : r === "below" ? -1 : 0;
+        const rhetoricalAboveCount = Object.values(rc).filter(
+          (v) => v === "above",
+        ).length;
+        const rhetoricalBelowCount = Object.values(rc).filter(
+          (v) => v === "below",
+        ).length;
+
+        if (logicSteps.length > 0) {
+          breakdown = {
+            logicSteps,
+            logicRaw,
+            rhetoricalComponents: rc,
+            rhetoricalAboveCount,
+            rhetoricalBelowCount,
+            rhetoricalRaw: rhetoricRaw,
+            tacticsNote,
+            tacticsRaw,
+          };
+        }
+        void ratingVal; // used indirectly via aboveCount/belowCount
+      }
+    } catch {
+      // Non-critical — breakdown stays undefined
+    }
+
     return {
       turnNumber,
       agentId: agent.id,
@@ -2009,6 +2174,7 @@ export function parseJudgeAnalysis(
       judgeId: judge.id,
       judgeSpecialization: judge.specialization,
       reasoning: analysis,
+      breakdown,
     };
   } catch (error) {
     console.error("[Adaptive Judge] parseJudgeAnalysis threw:", error);
