@@ -876,6 +876,15 @@ export function updateScorecard(
  * wins via prevVal + winGap drove the floor past scaleCeil, locking every
  * subsequent WIN turn at exactly scaleCeil.
  *
+ * Optional prevVal + winMinGap: when provided for the WIN path, the winner's
+ * score is also pushed to at least prevVal + winMinGap so that a genuine win is
+ * visible in the absolute scores (when there is headroom below scaleCeil) even
+ * when both turns argued competently and the LLM scores them identically. This
+ * is a last-resort backstop — the primary mechanism is the WIN prompt rubric
+ * (which should already push competitive wins to 8–9). The gap is capped at
+ * scaleCeil, so when prevVal is already near the ceiling, the WIN turn may still
+ * end up numerically tied at scaleCeil.
+ *
  * Overlapping bands are intentional: a close win can numerically resemble a
  * strong draw, and a strong-draw can resemble a narrow loss. Non-overlapping
  * bands are the defect — a WIN turn scoring below a LOSS ceiling is the
@@ -897,10 +906,19 @@ function clampAbsDim(
   lossFloor: number,
   lossCeil: number,
   scaleCeil: number,
+  prevVal?: number,
+  winMinGap?: number,
 ): number {
   if (winner === curId) {
     // WIN: ensure the score sits in the win band [winFloor, scaleCeil]
-    return Math.max(winFloor, Math.min(scaleCeil, curVal));
+    const bandApplied = Math.max(winFloor, Math.min(scaleCeil, curVal));
+    // If prevTurn's score is known, enforce a minimum visible gap so the win
+    // is not erased by equal absolute scores (the reconcile step resets equal
+    // scores to "tie"). Cap at scaleCeil to prevent out-of-range values.
+    if (prevVal !== undefined && winMinGap !== undefined) {
+      return Math.min(scaleCeil, Math.max(bandApplied, prevVal + winMinGap));
+    }
+    return bandApplied;
   } else if (winner === prevId) {
     // LOSS: constrain to the loss band [lossFloor, lossCeil]
     return Math.max(lossFloor, Math.min(lossCeil, curVal));
@@ -915,6 +933,15 @@ function clampAbsDim(
  * Returns a (possibly new) JudgeScores object; returns the same reference if
  * no value changed so callers can skip logging.
  *
+ * prevScores: when provided, the Logic WIN path enforces a minimum gap of 4
+ * (= 1 raw point on the 1–10 rubric scale) between the winner's absolute score
+ * and prevTurn's absolute score. This reduces or eliminates ties between turns
+ * after a genuine pairwise win (when a gap can be created below scaleCeil),
+ * preventing reconcileRoundWinners from silently demoting the win to "tie".
+ * When prevTurn's Logic score is already at or near scaleCeil, the cap may
+ * still produce equal values.
+ * Omit prevScores for contextualization calls where gap enforcement is not wanted.
+ *
  * Scale parameters used (WIN/DRAW/LOSS bands as [floor, ceil]):
  *   Logic    (0–40): WIN [24,40]  DRAW [18,30]  LOSS [10,22]
  *   Tactics  (0–30): WIN [18,30]  DRAW [13,22]  LOSS [ 7,16]
@@ -927,6 +954,7 @@ export function applyPairwiseFloors(
   curId: string,
   prevId: string,
   curScores: JudgeScores,
+  prevScores?: JudgeScores,
 ): JudgeScores {
   const newLogic = clampAbsDim(
     logicWinner,
@@ -939,6 +967,8 @@ export function applyPairwiseFloors(
     10, // lossFloor
     22, // lossCeil
     40, // scaleCeil
+    prevScores?.logicalCoherence, // gap enforcement: winner ≥ prevTurn + 4
+    4,                            // winMinGap = 1 raw point on 1–10 scale
   );
   const newTactics = clampAbsDim(
     tacticsWinner,
