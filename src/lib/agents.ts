@@ -77,6 +77,7 @@ export interface LiveJudgeResult {
    * so consumers must handle the undefined case (matches $lib/live-judge/types).
    */
   absoluteScores?: import("$lib/live-judge/types").JudgeScores;
+  scoreBreakdown?: import("$lib/live-judge/types").TurnScoreBreakdown;
 }
 
 interface ModelDef {
@@ -1323,7 +1324,8 @@ export async function generateAdaptiveReply(
             .find((r) => r && !r.startsWith("Fallback analysis")) ?? "",
         pairwiseRound: judgeResult.pairwiseRound,
         scorecard: judgeResult.scorecard,
-        absoluteScores: judgeResult.aggregatedScores,
+        absoluteScores: judgeResult.absoluteScores,
+        scoreBreakdown: judgeResult.scoreBreakdown,
       };
 
       return simplifiedResult;
