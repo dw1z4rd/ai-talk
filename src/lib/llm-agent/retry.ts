@@ -43,10 +43,14 @@ options.onToken!(token);
 try {
 const text = await provider.generateText(prompt, wrappedOptions);
 if (text && text.length > 0) return text;
+// Abort signal fired — do not retry.
+if (options?.signal?.aborted) return null;
 // Tokens were already sent — don't retry, just return whatever we got.
 if (tokensEmitted) return text;
 config?.onRetryableFailure?.(attempt);
-} catch (e) {
+} catch (e: any) {
+// Abort is not a retryable error.
+if (e.name === 'AbortError') return null;
 // If tokens were already sent, re-throw — partial stream is committed.
 if (tokensEmitted) throw e;
 config?.onRetryableFailure?.(attempt, e);

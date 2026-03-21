@@ -23,7 +23,8 @@ export const createOpenAIProvider = (config: OpenAIProviderConfig): LLMProvider 
 					'Content-Type': 'application/json',
 					Authorization: `Bearer ${config.apiKey}`
 				},
-				body: JSON.stringify({
+				signal: options?.signal,
+			body: JSON.stringify({
 					model: config.model ?? DEFAULT_MODEL,
 					messages: [
 						...(options?.systemPrompt != null
@@ -48,6 +49,7 @@ export const createOpenAIProvider = (config: OpenAIProviderConfig): LLMProvider 
 			const data = (await response.json()) as OpenAIResponse;
 			return data.choices?.[0]?.message?.content ?? null;
 		} catch (e: any) {
+			if (e.name === 'AbortError') { console.log('[OpenAI] Request aborted'); return null; }
 			console.error('[OpenAI] Network Error:', redactKey(e.message || String(e), config.apiKey));
 			return null;
 		}

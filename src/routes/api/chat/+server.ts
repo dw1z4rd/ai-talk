@@ -163,7 +163,7 @@ export const POST: RequestHandler = async ({ request }) => {
           }
         };
 
-        while (turn < totalTurns) {
+        while (turn < totalTurns && !request.signal.aborted) {
           const agent = agents[turn % agents.length];
           const opponentAgent = agents[(turn + 1) % agents.length];
           const turnNumber = turn + 1;
@@ -221,6 +221,7 @@ export const POST: RequestHandler = async ({ request }) => {
             isDocMode && agent.id === agentAId
               ? documentSegments![Math.floor(turn / 2)]?.text
               : undefined,
+            request.signal,
           );
 
           if (!reply) {

@@ -1101,6 +1101,7 @@ export async function generateAdaptiveReply(
   onToken?: (token: string) => void,
   onReply?: (reply: string) => void,
   prebuiltReply?: string,
+  signal?: AbortSignal,
 ): Promise<{
   reply: string | null;
   judgePromise: Promise<LiveJudgeResult | undefined>;
@@ -1160,6 +1161,7 @@ export async function generateAdaptiveReply(
       systemPrompt: effectiveSystemPrompt,
       temperature: 0.9,
       maxTokens: 10000,
+      signal,
       ...(onToken
         ? {
             onToken: (token: string) =>

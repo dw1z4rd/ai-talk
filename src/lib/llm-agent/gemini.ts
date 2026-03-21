@@ -16,7 +16,8 @@ const buildGeminiUrl = (model: string) =>
 export async function callGemini<T = GeminiResponse>(
 	apiKey: string,
 	body: unknown,
-	model: string = DEFAULT_MODEL
+	model: string = DEFAULT_MODEL,
+	signal?: AbortSignal,
 ): Promise<T | null> {
 	const url = `${buildGeminiUrl(model)}?key=${apiKey}`;
 
@@ -24,6 +25,7 @@ export async function callGemini<T = GeminiResponse>(
 		const response = await fetch(url, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
+			signal,
 			body: JSON.stringify(body)
 		});
 
@@ -35,6 +37,7 @@ export async function callGemini<T = GeminiResponse>(
 
 		return await response.json() as T;
 	} catch (e: any) {
+		if (e.name === 'AbortError') { console.log('[Gemini] Request aborted'); return null; }
 		console.error('[Gemini] Network Error:', redactKey(e.message || String(e), apiKey));
 		return null;
 	}
@@ -106,6 +109,7 @@ export const createGeminiProvider = (config: GeminiProviderConfig): LLMProvider 
 const response = await fetch(url, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
+signal: options?.signal,
 body: JSON.stringify(buildGeminiBody(prompt, options, model))
 });
 				if (!response.ok) {
@@ -153,6 +157,7 @@ if (token) { fullText += token; options.onToken(token); }
 }
 return fullText || null;
 			} catch (e: any) {
+				if (e.name === 'AbortError') { console.log('[Gemini] Stream aborted'); return null; }
 				console.error('[Gemini] Stream Network Error:', redactKey(e.message || String(e), config.apiKey));
 				return null;
 			}
@@ -161,7 +166,8 @@ return fullText || null;
 const data = await callGemini<GeminiResponse>(
 config.apiKey,
 buildGeminiBody(prompt, options, config.model),
-config.model
+config.model,
+options?.signal,
 );
 		return extractCleanGeminiText(data);
 	}

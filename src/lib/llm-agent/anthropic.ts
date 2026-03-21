@@ -27,6 +27,7 @@ export const createAnthropicProvider = (config: AnthropicProviderConfig): LLMPro
 					'x-api-key': config.apiKey,
 					'anthropic-version': ANTHROPIC_VERSION
 				},
+				signal: options?.signal,
 				body: JSON.stringify({
 					model: config.model ?? DEFAULT_MODEL,
 					messages: [{ role: 'user', content: prompt }],
@@ -75,6 +76,7 @@ export const createAnthropicProvider = (config: AnthropicProviderConfig): LLMPro
 			const data = (await response.json()) as AnthropicResponse;
 			return data.content?.[0]?.text ?? null;
 		} catch (e: any) {
+			if (e.name === 'AbortError') { console.log('[Anthropic] Request aborted'); return null; }
 			console.error(
 				'[Anthropic] Network Error:',
 				redactKey(e.message || String(e), config.apiKey)
