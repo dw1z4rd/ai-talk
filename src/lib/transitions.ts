@@ -170,18 +170,32 @@ export function popIn(
 }
 
 /**
- * Matching exit for popIn — collapses down quickly.
+ * Slow zoom+fade in for chat messages — starts sluggish, accelerates in.
+ * Enter: scale 0.88→1, opacity 0→1 over 2000ms with a cubic-in-out feel.
+ * Exit: reverse — scale 1→0.88, opacity 1→0 over 1800ms.
  */
-export function popOut(
-  node: Element,
-  { duration = 180, delay = 0, easing = cubicIn } = {},
-) {
+export function msgIn(node: Element, { duration = 2000, delay = 0 } = {}) {
+  // Ease: slow start, accelerates (approximated with a manual cubic)
+  const easing = (t: number) => t * t * (3 - 2 * t); // smoothstep — slow→fast→slow end
   return {
     delay,
     duration,
     easing,
     css: (t: number) => `
-      transform: scale(${0.92 + 0.08 * t}) translateY(${(1 - t) * 12}px);
+      transform: scale(${0.88 + 0.12 * t});
+      opacity: ${t};
+    `,
+  };
+}
+
+export function msgOut(node: Element, { duration = 1800, delay = 0 } = {}) {
+  const easing = (t: number) => t * t; // slow start → fast exit
+  return {
+    delay,
+    duration,
+    easing,
+    css: (t: number) => `
+      transform: scale(${0.88 + 0.12 * t});
       opacity: ${t};
     `,
   };

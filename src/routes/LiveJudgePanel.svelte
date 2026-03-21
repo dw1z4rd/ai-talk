@@ -89,7 +89,7 @@
     ...(narrativeVerdict ? [{ id: 'verdict' }] : []),
     ...(liveJudgeResults.some((r) => r.absoluteScores) ? [{ id: 'scores' }] : []),
   ] as section (section.id)}
-    <div in:flyInFromLeft={{ duration: 1000, distance: 100 }} out:flyOutToBottom={{ duration: 500, distance: 100 }} animate:flip={{ duration: 1000, easing: quintOut }}>
+    <div in:flyInFromLeft={{ duration: 1000, distance: 100 }} out:flyOutToBottom={{ duration: 500, distance: 100 }} animate:flip={{ duration: 3500, easing: quintOut }}>
 
       {#if section.id === 'verdict'}
         <!-- Narrative verdict (shown after debate completes) -->
@@ -224,7 +224,7 @@
                 class="border-b border-[--color-border] last:border-0"
                 in:popIn={{ duration: 1000, easing: quintOut, delay: i * 50 }}
                 out:popOut={{ duration: 500, easing: quintOut, delay: i * 25 }}
-                animate:flip={{ duration: 1000, easing: quintOut }} 
+                animate:flip={{ duration: 3500, easing: quintOut }} 
               >
                 <!-- Score row -->
                 <div
@@ -528,10 +528,10 @@
   {#if pairwiseRounds.length > 0}
     <div class="col-span-full flex flex-col gap-3">
       <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
-        All Rounds
+        Recent Rounds
       </h3>
       <div class="judge-rounds-grid flex flex-col gap-3">
-      {#each pairwiseRounds.slice().reverse() as round, i (round.roundNumber)}
+      {#each pairwiseRounds.slice(-3).reverse() as round, i (round.roundNumber)}
       {@const logicWinnerInfo = resolveAgent(round.logicWinner)}
       {@const tacticsWinnerInfo = resolveAgent(round.tacticsWinner)}
       {@const rhetoricWinnerInfo = resolveAgent(round.rhetoricWinner)}
@@ -540,7 +540,7 @@
         style="border-color: #7c6af720; animation-delay: {i * 45}ms"
         in:flyInFromTop={{ duration: 1000, delay: i * 50, distance: 100 }}
         out:flyOutToBottom={{ duration: 500, distance: 100 }}
-        animate:flip={{ duration: 1000, easing: quintOut }}
+        animate:flip={{ duration: 3500, easing: quintOut }}
       >
         <!-- Round header -->
         <div class="flex items-center gap-2 mb-3 min-w-0">

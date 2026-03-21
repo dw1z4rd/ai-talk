@@ -1,5 +1,6 @@
 <script lang="ts">
   import { flip } from "svelte/animate";
+  import { quintOut } from "svelte/easing";
   import { flyInFromTop, flyOutToRight } from "$lib/transitions";
 
   interface ScoreUpdateNotification {
@@ -24,7 +25,7 @@
     <div
       class="w-72 rounded-xl border border-[--color-border] bg-[--color-panel] shadow-xl pointer-events-auto overflow-hidden"
       style="border-left: 4px solid {n.updateType === 'penalty' ? '#f87171' : '#34d399'}"
-      animate:flip={{ duration: 300 }}
+      animate:flip={{ duration: 3500, easing: quintOut }}
       in:flyInFromTop
       out:flyOutToRight
     >
