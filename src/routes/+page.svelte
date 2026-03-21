@@ -80,6 +80,7 @@
     return () => window.removeEventListener('resize', measure);
   });
 
+  let showLiveJudgePanel = $state(false);
   let rightColStyle = $derived(
     [
       rightColTop > 0 ? `min-height: calc(100dvh - ${rightColTop}px)` : 'min-height: 32rem',
@@ -104,7 +105,6 @@
 
   // ── Live Judge Phase ─────────────────────────────────────────────────────────
   let naturallyEnded = $state(false);
-  let showLiveJudgePanel = $state(false);
 
   // Scopes all live-judge reads to the debate that produced this stream.
   // Set from the 'debateId' SSE event; prevents cross-user state leakage.

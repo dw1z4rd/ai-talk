@@ -1,6 +1,7 @@
 
 <script lang="ts">
   import { flyInFromTop, flyOutToBottom } from "$lib/transitions";
+  import Nav from "$lib/Nav.svelte";
 
   interface Props {
     docAnalysisMode?: boolean;
@@ -45,4 +46,5 @@
       two AIs, one topic, no mercy
     {/if}
   </p>
+  <Nav />
 </header>
