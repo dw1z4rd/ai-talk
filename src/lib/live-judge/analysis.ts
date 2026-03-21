@@ -122,6 +122,22 @@ function buildDomainNote(domain: DebateDomain): string {
 
 // ── Language consistency check ────────────────────────────────────────────────
 
+// Module-level constants for space-drop artefact detection.
+// Defined here (not inside detectLanguageMismatch) so the Set is allocated once
+// rather than rebuilt on every pairwise call.
+const FUNCTION_WORDS = new Set([
+  "a","an","the","be","is","are","was","were","been","being","am",
+  "do","does","did","have","has","had","will","would","shall","should",
+  "may","might","can","could","must","need","dare","ought",
+  "i","you","he","she","it","we","they","me","him","her","us","them",
+  "my","your","his","its","our","their","mine","yours","ours","theirs",
+  "this","that","these","those","which","who","whom","whose","what",
+  "in","on","at","by","for","of","to","up","as","if","so","or","and",
+  "but","nor","yet","not","no","nor","than","then","when","while",
+  "with","from","into","onto","upon","out","off",
+]);
+const SPACE_DROP_THRESHOLD = 2; // ≥2 fused pairs per message
+
 /**
  * Detect if two turns appear to be written in different languages.
  * Uses CJK character ratio as the primary signal (catches the GLM Chinese-response bug).
@@ -173,23 +189,14 @@ export function detectLanguageMismatch(
   // space (e.g. "beits", "ofthe", "inthe"). Function+function merges are
   // virtually impossible in natural English prose and are a reliable signal of
   // tokeniser or word-boundary failure in the generating model.
-  const FUNCTION_WORDS = new Set([
-    "a","an","the","be","is","are","was","were","been","being","am",
-    "do","does","did","have","has","had","will","would","shall","should",
-    "may","might","can","could","must","need","dare","ought",
-    "i","you","he","she","it","we","they","me","him","her","us","them",
-    "my","your","his","its","our","their","mine","yours","ours","theirs",
-    "this","that","these","those","which","who","whom","whose","what",
-    "in","on","at","by","for","of","to","up","as","if","so","or","and",
-    "but","nor","yet","not","no","nor","than","then","when","while",
-    "with","from","into","onto","upon","out","off",
-  ]);
-
   const detectSpaceDrops = (text: string): number => {
     // Match all lowercase runs of 4–20 chars (skip proper nouns, acronyms, etc.)
     const words = text.match(/\b[a-z]{4,20}\b/g) ?? [];
     let hits = 0;
     for (const w of words) {
+      // Skip words that are themselves valid function words (e.g. "into", "onto",
+      // "upon", "with", "from") — they are legitimate tokens, not fusions.
+      if (FUNCTION_WORDS.has(w)) continue;
       // Try every split point and check if both halves are function words
       for (let i = 1; i < w.length - 1; i++) {
         const left = w.slice(0, i);
@@ -205,7 +212,6 @@ export function detectLanguageMismatch(
 
   const spaceDropA = detectSpaceDrops(messageA);
   const spaceDropB = detectSpaceDrops(messageB);
-  const SPACE_DROP_THRESHOLD = 2; // ≥2 fused pairs per message
   if (spaceDropA >= SPACE_DROP_THRESHOLD || spaceDropB >= SPACE_DROP_THRESHOLD) {
     const who =
       spaceDropA >= SPACE_DROP_THRESHOLD && spaceDropB >= SPACE_DROP_THRESHOLD
@@ -215,7 +221,7 @@ export function detectLanguageMismatch(
           : "Turn B";
     return {
       isConsistent: true, // not a language mismatch; this is a word-boundary artefact
-      warning: `⚠ SPACE-DROP ARTEFACT: ${who} contain likely fused function-word pairs (e.g. "beits", "ofthe"). This is a tokeniser word-boundary failure. Affected passages may be syntactically malformed — treat as unreliable for Rhetoric scoring.`,
+      warning: `⚠ SPACE-DROP ARTEFACT: ${who} ${who === "both turns" ? "contain" : "contains"} likely fused function-word pairs (e.g. "beits", "ofthe"). This is a tokeniser word-boundary failure. Affected passages may be syntactically malformed — treat as unreliable for Rhetoric scoring.`,
     };
   }
 
@@ -1105,11 +1111,16 @@ export function reconcileRoundWinners(
  * scores for the same round. Returns flags for dimensions where the two systems diverge
  * beyond their scale-specific thresholds. No LLM call — pure arithmetic.
  *
- * Scale thresholds (gap required to flag):
+ * Scale thresholds (gap required to flag a directional inversion):
  *   logic:   0–40,   threshold = 5
  *   tactics: 0–30,   threshold = 6  (= 2 raw points; was 3, raised to reduce noise)
  *   rhetoric: 0–30,  threshold = 6  (same rationale)
  *   overall: 0–100,  threshold = 15
+ *
+ * Draw thresholds (gap required to flag a pairwise Draw as inconsistent with absolute scores):
+ *   logic:   drawThreshold = 6  (wider than the inversion threshold; the 0–40 scale
+ *            warrants a larger gap before a draw is considered meaningfully inconsistent)
+ *   tactics/rhetoric: drawThreshold = 4  (default)
  */
 export function computeHarmonizationFlags(
   round: PairwiseRound,

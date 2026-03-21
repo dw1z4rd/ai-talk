@@ -1215,6 +1215,40 @@ describe("detectLanguageMismatch", () => {
     const result = detectLanguageMismatch("", "");
     expect(result.isConsistent).toBe(true);
   });
+
+  it("triggers space-drop warning on fused function-word pairs", () => {
+    // "beits" = "be"+"its", "ofthe" = "of"+"the", "inthe" = "in"+"the"
+    // Three fused pairs → well above SPACE_DROP_THRESHOLD of 2
+    const fused = "The argument beits ofthe point inthe first place.";
+    const normal = "This is a perfectly normal sentence.";
+    const result = detectLanguageMismatch(fused, normal);
+    expect(result.isConsistent).toBe(true);
+    expect(result.warning).toBeDefined();
+    expect(result.warning).toMatch(/SPACE-DROP ARTEFACT/);
+    expect(result.warning).toMatch(/Turn A contains/);
+  });
+
+  it("does not trigger space-drop warning on legitimate compound words like 'into', 'onto', 'upon'", () => {
+    // These words exist in FUNCTION_WORDS directly and must not be counted as fusions
+    const text =
+      "She walked into the room and climbed onto the table upon hearing the news.";
+    const result = detectLanguageMismatch(text, text);
+    expect(result.isConsistent).toBe(true);
+    expect(result.warning).toBeUndefined();
+  });
+
+  it("reports 'both turns contain' when both messages have fused pairs", () => {
+    const fused = "The argument beits ofthe point inthe first place.";
+    const result = detectLanguageMismatch(fused, fused);
+    expect(result.warning).toMatch(/both turns contain/);
+  });
+
+  it("reports 'Turn B contains' when only message B has fused pairs", () => {
+    const normal = "This is a perfectly normal sentence.";
+    const fused = "The argument beits ofthe point inthe first place.";
+    const result = detectLanguageMismatch(normal, fused);
+    expect(result.warning).toMatch(/Turn B contains/);
+  });
 });
 
 // ---------------------------------------------------------------------------

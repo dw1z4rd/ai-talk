@@ -302,7 +302,7 @@ export class LiveJudgeSystem {
         const pairwiseCalibration = pairwiseResult.isFallback
           ? undefined
           : [
-              buildDimAnchor("Logic", 40, 7, pairwiseResult.logicWinner),
+              buildDimAnchor("Logic", 40, 8, pairwiseResult.logicWinner),
               buildDimAnchor("Tactics", 30, 6, pairwiseResult.tacticsWinner),
               buildDimAnchor("Rhetoric", 30, 7, pairwiseResult.rhetoricWinner),
             ].join("\n");
