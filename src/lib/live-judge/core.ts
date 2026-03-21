@@ -274,7 +274,7 @@ export class LiveJudgeSystem {
                 : "";
             const logicNote =
               dimension === "Logic"
-                ? ` Use a graduated scale: 9 = decisive win (complete cause→process→consequence chain with explicit refutation of opponent's mechanism); 7–8 = clear win (own mechanism present and opponent's gap named); 6–7 = narrow win (both argued, one clearly stronger). Scoring exactly ${winFloor} every time signals anchoring — name the specific mechanism quality that justifies the actual score.`
+                ? ` LOGIC WIN — override "Start at 6": use 8 as your baseline. Graduated scoring: 9 = decisive win — complete cause→process→consequence chain AND opponent's load-bearing premise explicitly named and refuted; 8 = clear win — own mechanism present with causal chain, opponent's gap named or exploited — expected score for a solid Logic win; 7 = narrow win — own argument clearly better but mechanism incomplete, OR opponent's premise not directly named; 6 = barely wins — both incomplete, requires explicit reconciliation explaining why this turn's mechanism outperformed. Scoring exactly 8 every time signals anchoring — name the specific mechanism quality that justifies the actual score.`
                 : "";
             return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${agent.name} (this turn). Your ${dim}_score should be ≥ ${winFloor}.${rhetoricNote}${logicNote} Scoring below ${winFloor} would directly contradict the comparative judge's finding — only do so if you identify a specific failure the comparative judge explicitly overlooked.`;
           } else if (winner === "tie") {
@@ -302,7 +302,7 @@ export class LiveJudgeSystem {
         const pairwiseCalibration = pairwiseResult.isFallback
           ? undefined
           : [
-              buildDimAnchor("Logic", 40, 6, pairwiseResult.logicWinner),
+              buildDimAnchor("Logic", 40, 7, pairwiseResult.logicWinner),
               buildDimAnchor("Tactics", 30, 6, pairwiseResult.tacticsWinner),
               buildDimAnchor("Rhetoric", 30, 7, pairwiseResult.rhetoricWinner),
             ].join("\n");
