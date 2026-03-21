@@ -5,52 +5,52 @@ export const MODEL_OPTIONS = [
       {
         id: "minimax-m2.5:cloud",
         name: "MiniMax M2.5",
-        color: "#EF4444",
+        color: "#EF4444", // red
       },
       {
         id: "nemotron-3-super-cloud",
         name: "Nemotron 3 Super",
-        color: "#FF7000",
+        color: "#FF7000", // deep orange
       },
       {
         id: "deepseek-v3.2:cloud",
         name: "DeepSeek V3.2",
-        color: "#F59E0B",
+        color: "#F59E0B", // amber
       },
       {
         id: "deepseek-v3.1:671b-cloud",
         name: "DeepSeek V3.1 671B",
-        color: "#A5111B",
+        color: "#E11D48", // rose
       },
       {
         id: "kimi-k2.5:cloud",
         name: "Kimi K2.5",
-        color: "#F59E0B",
+        color: "#06B6D4", // cyan
       },
       {
         id: "kimi-k2:1t-cloud",
         name: "Kimi K2 1T",
-        color: "#A78BFA",
+        color: "#A78BFA", // violet
       },
       {
         id: "kimi-k2-thinking:cloud",
         name: "Kimi K2 Thinking",
-        color: "#11A1CC",
+        color: "#11A1CC", // sky blue
       },
       {
         id: "qwen3-vl:235b-cloud",
         name: "Qwen3-VL 235B",
-        color: "#10B981",
+        color: "#10B981", // emerald
       },
       {
         id: "qwen3-next:80b-cloud",
         name: "Qwen3-Next 80B",
-        color: "#8B5CF6",
+        color: "#8B5CF6", // purple
       },
       {
         id: "glm-4.6:cloud",
         name: "GLM-4.6",
-        color: "#8B5CF6",
+        color: "#F472B6", // pink
       },
     ],
   },
