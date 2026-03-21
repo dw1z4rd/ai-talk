@@ -317,7 +317,8 @@ export class LiveJudgeSystem {
         // pairwise judge credited or treated as equal.
         const pairwiseCalibration = pairwiseResult.isFallback
           ? undefined
-          : [
+          : `ROUND ${turnNumber} PAIRWISE CALIBRATION (this absolute score must reflect the same comparative verdict as Round ${turnNumber}):\n` +
+            [
               buildDimAnchor(
                 "Logic",
                 8,
