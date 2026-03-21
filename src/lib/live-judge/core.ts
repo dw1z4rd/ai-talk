@@ -36,6 +36,9 @@ import {
 import { generateAdaptivePressure, generateHiddenDirective } from "./pressure";
 import { MODEL_CATALOG } from "$lib/agents";
 
+// CJK character range used to clean non-English leakage from judge model output.
+const CJK_CLEAN_RE = /[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g;
+
 // ── Harmonization helpers ─────────────────────────────────────────────────────
 
 /**
@@ -80,6 +83,54 @@ const JUDGE_MODEL_ID = "kimi-k2:1t-cloud";
  */
 export function selectJudgeModel(_excludeModelIds: string[]): string {
   return JUDGE_MODEL_ID;
+}
+
+// ── Calibration anchor builder ────────────────────────────────────────────────
+
+/**
+ * Build a pairwise-calibration anchor string for the absolute scoring prompt.
+ * Extracted from processTurn to avoid re-creating a closure on every turn.
+ */
+function buildDimAnchor(
+  dimension: string,
+  winFloor: number,
+  winner: string,
+  curAgentId: string,
+  curAgentName: string,
+  prevAgentName: string,
+): string {
+  const dim = dimension.toLowerCase();
+  if (winner === curAgentId) {
+    const rhetoricNote =
+      dimension === "Rhetoric"
+        ? ` Use the four-component method: count above-average components (A) and below-average components (B); score = 5+A−B. A clear win (A≥2, B=0) should score 7–8; a dominant win (A≥3) should score 8–9. Scoring exactly ${winFloor} every time signals anchoring — name the components that justify the actual score.`
+        : "";
+    const logicNote =
+      dimension === "Logic"
+        ? ` LOGIC WIN — override "Start at 6": use 8 as your baseline for a clear mechanism win. Graduated scoring: 9 = decisive win — complete cause→process→consequence chain AND opponent's load-bearing premise explicitly named and refuted; 8 = clear win — own mechanism complete and causally connected, opponent's gap identified or exploited; USE THIS for competitive rounds where both turns argued well but this turn's mechanism was more complete or precise — a win in a competent exchange scores 8, not 7; 7 = narrow win — THIS TURN's own mechanism is incomplete (missing a causal link or consequence step), but structurally stronger than the opponent's; reserve 7 for cases where the win comes from relative strength despite a gap in your own argument's chain; 6 = barely wins — both mechanisms incomplete, winner only on minor framing differences, requires explicit reconciliation. IMPORTANT: score 7 only when THIS TURN's own argument has a missing step — if this turn supplied a complete mechanism that dissolved the opponent's regress or closed their gap, score 8 or 9.`
+        : "";
+    return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${curAgentName} (this turn). Your ${dim}_score should be ≥ ${winFloor}.${rhetoricNote}${logicNote} Scoring below ${winFloor} would directly contradict the comparative judge's finding — only do so if you identify a specific failure the comparative judge explicitly overlooked.`;
+  } else if (winner === "tie") {
+    const rhetoricNote =
+      dimension === "Rhetoric"
+        ? ` Both turns competed evenly on rhetoric — neither should score dramatically above or below 5–6.`
+        : "";
+    const logicNote =
+      dimension === "Logic"
+        ? ` LOGIC DRAW — override "Start at 6": use 5 as your baseline. Expected range is 5–6; both turns supplied comparable mechanism quality. Scoring 7 requires naming a specific above-average element not captured by the draw result; ≥8 directly contradicts the draw verdict.`
+        : "";
+    return `PAIRWISE ANCHOR — ${dimension}: the comparative judge called this a DRAW. Your ${dim}_score should reflect a genuinely competitive turn — a score below 4 would contradict the draw verdict unless you find a specific failure the comparative judge missed.${rhetoricNote}${logicNote}`;
+  } else {
+    const rhetoricNote =
+      dimension === "Rhetoric"
+        ? ` Since ${prevAgentName} won this dimension, ${curAgentName}'s rhetoric was comparatively weaker. Use the four-component method: a turn with no above-average and one below-average component scores 4; no above-average and no below-average scores 5. A rhetoric loss should rarely score above 5 — scoring 6 requires naming one above-average component despite losing overall; scoring 7 directly contradicts the pairwise verdict and is only valid with explicit reconciliation.`
+        : "";
+    const logicNote =
+      dimension === "Logic"
+        ? ` LOGIC LOSS — override "Start at 6": use 4 as your baseline. Graduated scoring: 3 = argument circular, wholly unsubstantiated, or no mechanism present; 4 = structural claim present but mechanism absent or demonstrably weaker than ${prevAgentName}'s — this is the expected score for a coherent turn that lost on mechanism quality; 5 = at least one named mechanism element present but causal chain incomplete; 6 = requires explicit reconciliation — name the specific mechanism quality that matched or exceeded ${prevAgentName}'s and state why the verdict still went the other way; ≥7 directly contradicts the pairwise verdict.`
+        : "";
+    return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${prevAgentName} (opponent). ${curAgentName}'s ${dim}_score may be below average — apply the normal rubric, but note that a score ≥ 7 here would imply ${curAgentName} actually outperformed ${prevAgentName} on ${dimension}, contradicting the pairwise verdict.${rhetoricNote}${logicNote}`;
+  }
 }
 
 // ── LiveJudgeSystem ───────────────────────────────────────────────────────────
@@ -259,52 +310,33 @@ export class LiveJudgeSystem {
         // concluded. Covers all three dimensions. The absolute scorer still evaluates
         // independently — these anchors prevent near-failure scores on turns the
         // pairwise judge credited or treated as equal.
-        const buildDimAnchor = (
-          dimension: string,
-          scaleMax: number,
-          winFloor: number,
-          winner: string,
-        ): string => {
-          const dim = dimension.toLowerCase();
-          if (winner === agent.id) {
-            // curTurn wins: floor raised for the winner to push the absolute score above midpoint
-            const rhetoricNote =
-              dimension === "Rhetoric"
-                ? ` Use the four-component method: count above-average components (A) and below-average components (B); score = 5+A−B. A clear win (A≥2, B=0) should score 7–8; a dominant win (A≥3) should score 8–9. Scoring exactly ${winFloor} every time signals anchoring — name the components that justify the actual score.`
-                : "";
-            const logicNote =
-              dimension === "Logic"
-                ? ` LOGIC WIN — override "Start at 6": use 8 as your baseline for a clear mechanism win. Graduated scoring: 9 = decisive win — complete cause→process→consequence chain AND opponent's load-bearing premise explicitly named and refuted; 8 = clear win — own mechanism complete and causally connected, opponent's gap identified or exploited; USE THIS for competitive rounds where both turns argued well but this turn's mechanism was more complete or precise — a win in a competent exchange scores 8, not 7; 7 = narrow win — THIS TURN's own mechanism is incomplete (missing a causal link or consequence step), but structurally stronger than the opponent's; reserve 7 for cases where the win comes from relative strength despite a gap in your own argument's chain; 6 = barely wins — both mechanisms incomplete, winner only on minor framing differences, requires explicit reconciliation. IMPORTANT: score 7 only when THIS TURN's own argument has a missing step — if this turn supplied a complete mechanism that dissolved the opponent's regress or closed their gap, score 8 or 9.`
-                : "";
-            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${agent.name} (this turn). Your ${dim}_score should be ≥ ${winFloor}.${rhetoricNote}${logicNote} Scoring below ${winFloor} would directly contradict the comparative judge's finding — only do so if you identify a specific failure the comparative judge explicitly overlooked.`;
-          } else if (winner === "tie") {
-            const rhetoricNote =
-              dimension === "Rhetoric"
-                ? ` Both turns competed evenly on rhetoric — neither should score dramatically above or below 5–6.`
-                : "";
-            const logicNote =
-              dimension === "Logic"
-                ? ` LOGIC DRAW — override "Start at 6": use 5 as your baseline. Expected range is 5–6; both turns supplied comparable mechanism quality. Scoring 7 requires naming a specific above-average element not captured by the draw result; ≥8 directly contradicts the draw verdict.`
-                : "";
-            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge called this a DRAW. Your ${dim}_score should reflect a genuinely competitive turn — a score below 4 would contradict the draw verdict unless you find a specific failure the comparative judge missed.${rhetoricNote}${logicNote}`;
-          } else {
-            const rhetoricNote =
-              dimension === "Rhetoric"
-                ? ` Since ${prevAgentName} won this dimension, ${agent.name}'s rhetoric was comparatively weaker. Use the four-component method: a turn with no above-average and one below-average component scores 4; no above-average and no below-average scores 5. A rhetoric loss should rarely score above 5 — scoring 6 requires naming one above-average component despite losing overall; scoring 7 directly contradicts the pairwise verdict and is only valid with explicit reconciliation.`
-                : "";
-            const logicNote =
-              dimension === "Logic"
-                ? ` LOGIC LOSS — override "Start at 6": use 4 as your baseline. Graduated scoring: 3 = argument circular, wholly unsubstantiated, or no mechanism present; 4 = structural claim present but mechanism absent or demonstrably weaker than ${prevAgentName}'s — this is the expected score for a coherent turn that lost on mechanism quality; 5 = at least one named mechanism element present but causal chain incomplete; 6 = requires explicit reconciliation — name the specific mechanism quality that matched or exceeded ${prevAgentName}'s and state why the verdict still went the other way; ≥7 directly contradicts the pairwise verdict.`
-                : "";
-            return `PAIRWISE ANCHOR — ${dimension}: the comparative judge gave the WIN to ${prevAgentName} (opponent). ${agent.name}'s ${dim}_score may be below average — apply the normal rubric, but note that a score ≥ 7 here would imply ${agent.name} actually outperformed ${prevAgentName} on ${dimension}, contradicting the pairwise verdict.${rhetoricNote}${logicNote}`;
-          }
-        };
         const pairwiseCalibration = pairwiseResult.isFallback
           ? undefined
           : [
-              buildDimAnchor("Logic", 40, 8, pairwiseResult.logicWinner),
-              buildDimAnchor("Tactics", 30, 6, pairwiseResult.tacticsWinner),
-              buildDimAnchor("Rhetoric", 30, 7, pairwiseResult.rhetoricWinner),
+              buildDimAnchor(
+                "Logic",
+                8,
+                pairwiseResult.logicWinner,
+                agent.id,
+                agent.name,
+                prevAgentName,
+              ),
+              buildDimAnchor(
+                "Tactics",
+                6,
+                pairwiseResult.tacticsWinner,
+                agent.id,
+                agent.name,
+                prevAgentName,
+              ),
+              buildDimAnchor(
+                "Rhetoric",
+                7,
+                pairwiseResult.rhetoricWinner,
+                agent.id,
+                agent.name,
+                prevAgentName,
+              ),
             ].join("\n");
 
         const absoluteAnalysis = await analyzeTurn(
@@ -617,10 +649,7 @@ export class LiveJudgeSystem {
               // penalty (but never introduce a bonus).
               const bandFloorDeltaCap = -Math.max(0, originalScore - bandFloor);
               const maxPenalty = wasPairwiseLogicWinner
-                ? Math.max(
-                    -Math.ceil(originalScore * 0.25),
-                    bandFloorDeltaCap,
-                  )
+                ? Math.max(-Math.ceil(originalScore * 0.25), bandFloorDeltaCap)
                 : bandFloorDeltaCap;
               if (existing + scaledDelta < maxPenalty) {
                 cappedScaledDelta = maxPenalty - existing;
@@ -811,7 +840,9 @@ export class LiveJudgeSystem {
               agent.id,
               pairwiseRound.prevTurn.agentId,
               absoluteScores,
-              this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber],
+              this.panel.absoluteScoreHistory[
+                pairwiseRound.prevTurn.turnNumber
+              ],
             );
             if (clamped !== absoluteScores) {
               console.log(
@@ -943,7 +974,9 @@ export class LiveJudgeSystem {
             absoluteScores,
             contextualizeScoreForRound(
               pairwiseRound,
-              this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber],
+              this.panel.absoluteScoreHistory[
+                pairwiseRound.prevTurn.turnNumber
+              ],
             ),
             this.panel.absoluteScoreHistory[pairwiseRound.prevTurn.turnNumber], // raw prevHistScore for draw spread check
           )
@@ -1165,9 +1198,8 @@ export class LiveJudgeSystem {
       ).finally(() => clearTimeout(timer));
 
       // Strip CJK characters that may leak through from non-English judge models.
-      const cjkPattern = /[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g;
       verdict.text = verdict.text
-        .replace(cjkPattern, " ") // space not empty-string to prevent word-boundary merges
+        .replace(CJK_CLEAN_RE, " ") // space not empty-string to prevent word-boundary merges
         .replace(/  +/g, " ")
         .trim();
 
@@ -1240,7 +1272,7 @@ export class LiveJudgeSystem {
             adjController.signal,
           ).finally(() => clearTimeout(adjTimer));
           const cjkClean = conflictResolutionText
-            .replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, " ") // space not empty-string
+            .replace(CJK_CLEAN_RE, " ") // space not empty-string
             .replace(/  +/g, " ")
             .trim();
           if (cjkClean.length > 0) {
@@ -1480,6 +1512,10 @@ export class LiveJudgeSystem {
     };
     this.panel.previousTurn = null;
     this.panel.lastAbsoluteScores = {};
+    this.panel.absoluteScoreHistory = {};
+    this.panel.claimFlagRegister = [];
+    this.panel.retroactiveDeltas = {};
+    this.panel.convergenceDetectedTurn = undefined;
   }
 
   getPanelState(): LiveJudgePanel {

@@ -15,6 +15,51 @@ import type { Agent, Message } from "$lib/agents";
 import { MODEL_CATALOG } from "$lib/agents";
 import { withRetry } from "$lib/llm-agent/retry";
 
+// ── Shared text-processing helpers ───────────────────────────────────────────
+// Module-level regex — compiled once, not on every call.
+const CJK_DETECT_RE =
+  /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]/g;
+const THINKING_BLOCK_RE =
+  /<thinking>[\s\S]*?<\/thinking>|<think>[\s\S]*?<\/think>|<reasoning>[\s\S]*?<\/reasoning>/gi;
+const VERDICT_LINE_RE = /^VERDICT:\s*(.+?)$/gim;
+const VERDICT_DISPLAY_RE = /^VERDICT:\s*.+?$/gim;
+const LOWERCASE_WORD_RE = /\b[a-z]{4,20}\b/g;
+
+/** Strip model thinking/reasoning wrapper blocks from a response string. */
+function stripThinkingBlocks(text: string): string {
+  return text.replace(THINKING_BLOCK_RE, "").trim();
+}
+
+/**
+ * Extract the outermost JSON object from an LLM response string.
+ * Returns null when no balanced braces are found.
+ */
+function extractJsonObject(text: string): string | null {
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace === -1 || lastBrace <= firstBrace) return null;
+  return text.substring(firstBrace, lastBrace + 1);
+}
+
+/**
+ * Count likely function-word fusions in text (e.g. "beits", "ofthe").
+ * Defined at module level to avoid closure re-creation on every detectLanguageMismatch call.
+ */
+function detectSpaceDrops(text: string): number {
+  const words = text.match(LOWERCASE_WORD_RE) ?? [];
+  let hits = 0;
+  for (const w of words) {
+    if (FUNCTION_WORDS.has(w)) continue;
+    for (let i = 1; i < w.length - 1; i++) {
+      if (FUNCTION_WORDS.has(w.slice(0, i)) && FUNCTION_WORDS.has(w.slice(i))) {
+        hits++;
+        break;
+      }
+    }
+  }
+  return hits;
+}
+
 // ── Debate domain classification ─────────────────────────────────────────────
 
 export type DebateDomain = "empirical" | "philosophical" | "policy" | "mixed";
@@ -252,10 +297,8 @@ export function detectLanguageMismatch(
   messageA: string,
   messageB: string,
 ): { isConsistent: boolean; warning?: string } {
-  const cjkRegex =
-    /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff66-\uff9f]/g;
-  const cjkA = (messageA.match(cjkRegex) || []).length;
-  const cjkB = (messageB.match(cjkRegex) || []).length;
+  const cjkA = (messageA.match(CJK_DETECT_RE) || []).length;
+  const cjkB = (messageB.match(CJK_DETECT_RE) || []).length;
   const ratioA = messageA.length > 0 ? cjkA / messageA.length : 0;
   const ratioB = messageB.length > 0 ? cjkB / messageB.length : 0;
   const THRESHOLD = 0.08; // 8% CJK characters → likely non-English
@@ -295,27 +338,6 @@ export function detectLanguageMismatch(
   // space (e.g. "beits", "ofthe", "inthe"). Function+function merges are
   // virtually impossible in natural English prose and are a reliable signal of
   // tokeniser or word-boundary failure in the generating model.
-  const detectSpaceDrops = (text: string): number => {
-    // Match all lowercase runs of 4–20 chars (skip proper nouns, acronyms, etc.)
-    const words = text.match(/\b[a-z]{4,20}\b/g) ?? [];
-    let hits = 0;
-    for (const w of words) {
-      // Skip words that are themselves valid function words (e.g. "into", "onto",
-      // "upon", "with", "from") — they are legitimate tokens, not fusions.
-      if (FUNCTION_WORDS.has(w)) continue;
-      // Try every split point and check if both halves are function words
-      for (let i = 1; i < w.length - 1; i++) {
-        const left = w.slice(0, i);
-        const right = w.slice(i);
-        if (FUNCTION_WORDS.has(left) && FUNCTION_WORDS.has(right)) {
-          hits++;
-          break; // one split match per word is enough
-        }
-      }
-    }
-    return hits;
-  };
-
   const spaceDropA = detectSpaceDrops(messageA);
   const spaceDropB = detectSpaceDrops(messageB);
   if (
@@ -686,15 +708,8 @@ function parsePairwiseResponse(
       );
     }
 
-    let jsonString = responseText
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
-      .replace(/<think>[\s\S]*?<\/think>/gi, "")
-      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
-      .trim();
-
-    const firstBrace = jsonString.indexOf("{");
-    const lastBrace = jsonString.lastIndexOf("}");
-    if (firstBrace === -1 || lastBrace <= firstBrace) {
+    const jsonString = extractJsonObject(stripThinkingBlocks(responseText));
+    if (!jsonString) {
       console.warn(
         `[Pairwise Judge] Round ${roundNumber}: no JSON found. Raw: ${responseText.slice(0, 200)}`,
       );
@@ -711,12 +726,12 @@ function parsePairwiseResponse(
         languageWarning,
       );
     }
-    jsonString = jsonString.substring(firstBrace, lastBrace + 1);
 
     let data: any;
     try {
       data = JSON.parse(jsonString);
     } catch {
+      // Attempt brace-count repair for truncated responses
       const openBraces = (jsonString.match(/\{/g) || []).length;
       const closeBraces = (jsonString.match(/\}/g) || []).length;
       let fixed = jsonString;
@@ -928,10 +943,9 @@ export function updateScorecard(
   agentBId: string,
   agentBName: string,
 ): DebateScorecard {
+  // Rounds always arrive in ascending roundNumber order — no sort needed.
   const updated: DebateScorecard = {
-    rounds: [...scorecard.rounds, round].sort(
-      (a, b) => a.roundNumber - b.roundNumber,
-    ),
+    rounds: [...scorecard.rounds, round],
     winTallies: {
       [agentAId]: scorecard.winTallies[agentAId] ?? {
         agentName: agentAName,
@@ -1630,16 +1644,12 @@ function parseNarrativeVerdict(
     };
   }
 
-  // Strip thinking blocks
-  let cleaned = text
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
-    .replace(/<think>[\s\S]*?<\/think>/gi, "")
-    .trim();
+  const cleaned = stripThinkingBlocks(text);
 
   // Extract VERDICT line — the system prompt instructs the LLM to place it at the
   // very end, but LLMs sometimes write "VERDICT: X because..." in body prose first.
   // Take the LAST match to avoid false positives from mid-prose mentions.
-  const allVerdictMatches = [...cleaned.matchAll(/^VERDICT:\s*(.+?)$/gim)];
+  const allVerdictMatches = [...cleaned.matchAll(VERDICT_LINE_RE)];
   let favouredAgentId: string | null = null;
 
   if (allVerdictMatches.length > 0) {
@@ -1661,7 +1671,7 @@ function parseNarrativeVerdict(
   // Remove all VERDICT lines from display text (covers both the terminal line and
   // any mid-prose mentions the LLM may have written).
   const displayText = cleaned
-    .replace(/^VERDICT:\s*.+?$/gim, "")
+    .replace(VERDICT_DISPLAY_RE, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
@@ -1701,10 +1711,7 @@ Write your split analysis:`;
       maxTokens: 180,
       signal,
     });
-    return (text || "")
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
-      .replace(/<think>[\s\S]*?<\/think>/gi, "")
-      .trim();
+    return stripThinkingBlocks(text || "");
   } catch {
     return "";
   }
@@ -1790,12 +1797,7 @@ Write your adjudication:`;
       signal,
     });
 
-    // Strip thinking blocks
-    const cleaned = (text || "")
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
-      .replace(/<think>[\s\S]*?<\/think>/gi, "")
-      .trim();
-    return cleaned;
+    return stripThinkingBlocks(text || "");
   } catch {
     return "";
   }
@@ -1860,11 +1862,7 @@ Write your consistency report:`;
       maxTokens: 200,
       signal,
     });
-    const cleaned = (text || "")
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
-      .replace(/<think>[\s\S]*?<\/think>/gi, "")
-      .trim();
-    return cleaned;
+    return stripThinkingBlocks(text || "");
   } catch {
     return "";
   }
@@ -2105,15 +2103,8 @@ export function parseJudgeAnalysis(
       );
     }
 
-    let jsonString = analysisText
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
-      .replace(/<think>[\s\S]*?<\/think>/gi, "")
-      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
-      .trim();
-
-    const firstBrace = jsonString.indexOf("{");
-    const lastBrace = jsonString.lastIndexOf("}");
-    if (firstBrace === -1 || lastBrace <= firstBrace) {
+    const jsonString = extractJsonObject(stripThinkingBlocks(analysisText));
+    if (!jsonString) {
       return createFallbackAnalysis(
         judge,
         agent,
@@ -2124,7 +2115,6 @@ export function parseJudgeAnalysis(
         context,
       );
     }
-    jsonString = jsonString.substring(firstBrace, lastBrace + 1);
 
     let data: any;
     try {
@@ -2479,16 +2469,10 @@ Analyse positional convergence and respond with JSON only:`;
       signal,
     });
 
-    const cleaned = (text || "")
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
-      .replace(/<think>[\s\S]*?<\/think>/gi, "")
-      .trim();
+    const extracted = extractJsonObject(stripThinkingBlocks(text || ""));
+    if (!extracted) return fallback;
 
-    const firstBrace = cleaned.indexOf("{");
-    const lastBrace = cleaned.lastIndexOf("}");
-    if (firstBrace === -1 || lastBrace <= firstBrace) return fallback;
-
-    const data = JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+    const data = JSON.parse(extracted);
     return {
       detected: Boolean(data.detected),
       convergenceTurnRange:
