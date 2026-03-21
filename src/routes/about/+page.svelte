@@ -202,6 +202,12 @@
       <li class="flex gap-3">
         <span class="text-red-400 mt-0.5 shrink-0">⚠</span>
         <span>
+          <strong class="text-white">Harmonization pass limitations. </strong> The harmonization pass occasionally misses anomaly flags on rounds where retroactive gap enforcement created an unusual score pattern. Scores are correct; the flags are informational.
+        </span>
+      </li>
+      <li class="flex gap-3">
+        <span class="text-red-400 mt-0.5 shrink-0">⚠</span>
+        <span>
           <strong class="text-white">Judge style bias.</strong> The judge is a language model and
           may prefer certain rhetorical patterns — dense analytic prose, Western academic framing,
           confident assertion — independent of the actual quality of an argument. This bias is not
