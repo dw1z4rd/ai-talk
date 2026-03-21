@@ -575,42 +575,53 @@ export class LiveJudgeSystem {
             const hist = this.panel.absoluteScoreHistory[targetTurn];
             if (hist && scaledDelta < 0) {
               const originalScore = hist.logicalCoherence - existing; // score before any retroactive adjustments
-              // Determine if this turn was a pairwise logic winner in its own round.
-              const wasPairwiseLogicWinner = this.panel.scorecard.rounds.some(
+              // Determine the round where this turn was curTurn (the turn
+              // being judged in that round). Avoid rounds where it appears as
+              // prevTurn — that reflects the opponent's context in the *next*
+              // round and would misattribute the wrong pairwise outcome to this
+              // turn's absolute score.
+              const ownRound = this.panel.scorecard.rounds.find(
                 (r) =>
-                  ((r.curTurn.turnNumber === targetTurn &&
-                    r.curTurn.agentId === update.agentId) ||
-                    (r.prevTurn.turnNumber === targetTurn &&
-                      r.prevTurn.agentId === update.agentId)) &&
-                  (r.logicWinnerRaw ?? r.logicWinner) === update.agentId,
+                  r.curTurn.turnNumber === targetTurn &&
+                  r.curTurn.agentId === update.agentId,
               );
+              const wasPairwiseLogicWinner =
+                ownRound !== undefined &&
+                (ownRound.logicWinnerRaw ?? ownRound.logicWinner) ===
+                  update.agentId;
               // Determine the pairwise Logic band this turn belongs to so the
               // penalty cannot push the score below the band's lower bound.
               // Logic bands: WIN [24,40]  DRAW [18,30]  LOSS [10,22]
+              // Opening turns have no pairwise round (ownRound === undefined);
+              // use bandFloor 0 so the only constraint is no negative scores.
               const wasPairwiseLogicDraw =
                 !wasPairwiseLogicWinner &&
-                this.panel.scorecard.rounds.some(
-                  (r) =>
-                    ((r.curTurn.turnNumber === targetTurn &&
-                      r.curTurn.agentId === update.agentId) ||
-                      (r.prevTurn.turnNumber === targetTurn &&
-                        r.prevTurn.agentId === update.agentId)) &&
-                    (r.logicWinnerRaw ?? r.logicWinner) === "tie",
-                );
-              const bandFloor = wasPairwiseLogicWinner
-                ? 24
-                : wasPairwiseLogicDraw
-                  ? 18
-                  : 10;
-              // For winners: also apply 25% fractional cap (prevents artificial
-              // ties from open-flag penalties contradicting a clear logic win).
-              // For non-winners: band floor is the sole constraint.
+                ownRound !== undefined &&
+                (ownRound.logicWinnerRaw ?? ownRound.logicWinner) === "tie";
+              const bandFloor =
+                ownRound === undefined
+                  ? 0
+                  : wasPairwiseLogicWinner
+                    ? 24
+                    : wasPairwiseLogicDraw
+                      ? 18
+                      : 10;
+              // For winners: cap at whichever is less severe — the more
+              // restrictive of a 25% fractional cap or the band floor. This
+              // prevents artificial ties from open-flag penalties contradicting
+              // a clear logic win.
+              // For non-winners: there is no extra fractional cap; only the band
+              // floor limits how far penalties can push the score down.
+              // Ensure the band-floor-based cap is never positive: if the original
+              // score is already at or below the band floor, we allow no further
+              // penalty (but never introduce a bonus).
+              const bandFloorDeltaCap = -Math.max(0, originalScore - bandFloor);
               const maxPenalty = wasPairwiseLogicWinner
                 ? Math.max(
                     -Math.ceil(originalScore * 0.25),
-                    -(originalScore - bandFloor),
+                    bandFloorDeltaCap,
                   )
-                : -(originalScore - bandFloor);
+                : bandFloorDeltaCap;
               if (existing + scaledDelta < maxPenalty) {
                 cappedScaledDelta = maxPenalty - existing;
                 console.log(

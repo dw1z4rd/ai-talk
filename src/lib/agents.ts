@@ -1160,17 +1160,25 @@ export async function generateAdaptiveReply(
       systemPrompt: effectiveSystemPrompt,
       temperature: 0.9,
       maxTokens: 10000,
-      ...(onToken ? { onToken } : {}),
+      ...(onToken
+        ? {
+            onToken: (token: string) =>
+              onToken(
+                token.replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, " "),
+              ),
+          }
+        : {}),
     }));
 
   if (!reply) {
     return { reply: reply ?? null, judgePromise: Promise.resolve(undefined) };
   }
 
-  // Strip isolated CJK characters that leak through from non-English models
+  // Strip all CJK/fullwidth characters that leak through from non-English models
   // (e.g. Moonshot/Kimi code-switching) despite the LANGUAGE REQUIREMENT
   // instruction. Space rather than empty-string preserves word boundaries.
-  // Matches the stripping already applied to narrative verdict text in core.ts.
+  // Matches the full CJK/fullwidth stripping already applied to narrative verdict
+  // text in core.ts.
   const turnText = reply
     .replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, " ")
     .replace(/ {2,}/g, " ")
