@@ -324,6 +324,16 @@ export interface NarrativeVerdict {
   rubricConsistency?: string;
   /** Positional convergence analysis. Only present for debates ≥ 10 turns. */
   convergence?: PositionalConvergenceAnalysis;
+  /**
+   * Score corrections applied by the end-of-debate Logic gap enforcement pass.
+   * Each entry is a downward adjustment to a loser turn's logicalCoherence.
+   * Emitted as scoreUpdate SSE events so the client UI and exports stay in sync.
+   */
+  gapAdjustments?: Array<{
+    targetTurn: number;
+    agentId: string;
+    deltaLogic: number;
+  }>;
 }
 
 // ── Existing types kept for adaptive pressure system ─────────────────────────

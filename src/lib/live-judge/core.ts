@@ -1267,9 +1267,18 @@ export class LiveJudgeSystem {
    * After adjusting scores, reconcileRoundWinners is re-run for any affected round so
    * rounds where the gap was already ≥ MIN_LOGIC_WIN_GAP remain unchanged.
    */
-  private enforceAllLogicGaps(): void {
+  private enforceAllLogicGaps(): Array<{
+    targetTurn: number;
+    agentId: string;
+    deltaLogic: number;
+  }> {
     const MIN_LOGIC_WIN_GAP = 6;
     const rounds = this.panel.scorecard.rounds;
+    const adjustments: Array<{
+      targetTurn: number;
+      agentId: string;
+      deltaLogic: number;
+    }> = [];
 
     // Reverse pass: last round first so shared turns cascade correctly.
     for (let i = rounds.length - 1; i >= 0; i--) {
@@ -1288,6 +1297,9 @@ export class LiveJudgeSystem {
       const loserTurn = winnerIsCur
         ? round.prevTurn.turnNumber
         : round.curTurn.turnNumber;
+      const loserAgentId = winnerIsCur
+        ? round.prevTurn.agentId
+        : round.curTurn.agentId;
 
       const winnerLogic =
         this.panel.absoluteScoreHistory[winnerTurn]!.logicalCoherence;
@@ -1301,6 +1313,11 @@ export class LiveJudgeSystem {
             ...loserEntry,
             logicalCoherence: adjustedLoser,
           };
+          adjustments.push({
+            targetTurn: loserTurn,
+            agentId: loserAgentId,
+            deltaLogic: adjustedLoser - loserLogic, // negative (downward adjustment)
+          });
           console.log(
             `[Logic Gap Pass] R${round.roundNumber} ` +
               `T${loserTurn} Logic ${loserLogic}→${adjustedLoser} ` +
@@ -1324,6 +1341,8 @@ export class LiveJudgeSystem {
         rounds[i] = reconciled;
       }
     }
+
+    return adjustments;
   }
 
   /**
@@ -1343,7 +1362,9 @@ export class LiveJudgeSystem {
     // round.  Reverse order ensures that when a turn is shared between two rounds
     // (winner in R_N, loser in R_{N+1}), R_{N+1}'s adjustment is applied first so
     // R_N can cascade down correctly without creating new ties.
-    this.enforceAllLogicGaps();
+    // The returned adjustments are attached to the verdict so the server can emit
+    // scoreUpdate SSE events to keep the client's per-turn score table in sync.
+    const gapAdjustments = this.enforceAllLogicGaps();
 
     const judge = this.panel.judges[0];
     const VERDICT_TIMEOUT_MS = 60_000;
@@ -1502,6 +1523,8 @@ export class LiveJudgeSystem {
           }
         })(),
       ]);
+
+      if (gapAdjustments.length > 0) verdict.gapAdjustments = gapAdjustments;
 
       return verdict;
     } catch (error) {

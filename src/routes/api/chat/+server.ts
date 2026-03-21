@@ -338,6 +338,28 @@ export const POST: RequestHandler = async ({ request }) => {
             );
 
             if (narrativeVerdict) {
+              // Emit scoreUpdate events for any Logic score adjustments made by the
+              // end-of-debate gap enforcement pass, so the client's per-turn score
+              // table (and exports) reflect the corrected values before the verdict
+              // text is displayed.
+              for (const adj of narrativeVerdict.gapAdjustments ?? []) {
+                const adjAgent = agents.find((a) => a.id === adj.agentId);
+                const def = adjAgent
+                  ? { name: adjAgent.name, color: adjAgent.color }
+                  : (MODEL_CATALOG[adj.agentId] ??
+                    MODEL_CATALOG["kimi-k2:1t-cloud"]);
+                send({
+                  type: "scoreUpdate",
+                  targetTurn: adj.targetTurn,
+                  agentId: adj.agentId,
+                  agentName: def.name,
+                  agentColor: def.color,
+                  deltaLogic: adj.deltaLogic,
+                  reason: `Logic gap enforced: winner separation adjusted by ${adj.deltaLogic > 0 ? "+" : ""}${adj.deltaLogic} to maintain 6-point minimum`,
+                  updateType: "logicGapAdjustment",
+                });
+              }
+
               send({
                 type: "narrativeVerdict",
                 text: narrativeVerdict.text,
