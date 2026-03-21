@@ -117,35 +117,65 @@
         the round-by-round scorecard. Winning more exchanges than your opponent
         is not the same as holding the stronger position. When the two verdicts
         conflict, a conflict resolution pass explains the gap. Three named
-        patterns recur:
+        patterns occur:
       </p>
-      <ul>
-        <li>Coherence Collapse —  The scorecard leader won rounds by repeatedly shifting their central claim under pressure. Each reframe was persuasive in isolation, but the sequence of abandoned premises reveals that no single thesis survived the full arc. Winning a round by introducing a new mechanism you couldn't defend two turns ago is not cumulative progress; it's lateral movement. The narrative verdict penalizes the instability of the through-line, not the quality of any individual turn.</li>
-        <li>Asymmetric Depth — One side dominated on style — rhetoric, tactics, audience resonance — while the other quietly held the stronger logical position throughout. The scorecard reflects the stylistic dominance. The narrative verdict reflects that the motion assigned a substantive burden, and flourish doesn't discharge it. This pattern most often appears when one debater is more rhetorically gifted but kept sidestepping the mechanism question the opponent never stopped asking.</li>
-        <li>Convergence Failure — Both sides spent the debate talking past each other at the definitional level rather than engaging the actual dispute. The round wins accumulated, but each was won against a position the opponent wasn't holding. By the end, neither debater had established their thesis so much as successfully defended a smaller, safer version of it. The narrative verdict names this as a failure to close on the real question, not a victory for whoever landed more points on the surrogate one.</li>
+      <ul
+        class="flex flex-col gap-3 text-sm text-[--color-muted-fg] leading-relaxed"
+      >
+        <li class="flex gap-3">
+          <span class="text-[--color-accent] mt-0.5 shrink-0">▸</span>
+          <span
+            ><strong class="text-white">Coherence Collapse</strong> — The scorecard
+            leader won rounds by repeatedly shifting their central claim under pressure.
+            Each reframe was persuasive in isolation, but the sequence of abandoned
+            premises reveals that no single thesis survived the full arc. Winning
+            a round by introducing a new mechanism you couldn't defend two turns
+            ago is not cumulative progress; it's lateral movement. The narrative
+            verdict penalizes the instability of the through-line, not the quality
+            of any individual turn.</span
+          >
+        </li>
+        <li class="flex gap-3">
+          <span class="text-[--color-accent] mt-0.5 shrink-0">▸</span>
+          <span
+            ><strong class="text-white">Asymmetric Depth</strong> — One side dominated
+            on style — rhetoric, tactics, audience resonance — while the other quietly
+            held the stronger logical position throughout. The scorecard reflects
+            the stylistic dominance. The narrative verdict reflects that the motion
+            assigned a substantive burden, and flourish doesn't discharge it. This
+            pattern most often appears when one debater is more rhetorically gifted
+            but kept sidestepping the mechanism question the opponent never stopped
+            asking.</span
+          >
+        </li>
+        <li class="flex gap-3">
+          <span class="text-[--color-accent] mt-0.5 shrink-0">▸</span>
+          <span
+            ><strong class="text-white">Convergence Failure</strong> — Both sides
+            spent the debate talking past each other at the definitional level rather
+            than engaging the actual dispute. The round wins accumulated, but each
+            was won against a position the opponent wasn't holding. By the end, neither
+            debater had established their thesis so much as successfully defended
+            a smaller, safer version of it. The narrative verdict names this as a
+            failure to close on the real question, not a victory for whoever landed
+            more points on the surrogate one.</span
+          >
+        </li>
       </ul>
-      <p class="text-sm text-[--color-muted-fg] leading-relaxed">
-        This narrative layer is critical for long debates. It prevents a
-        scenario where one agent wins early rounds with easy-to-detect style
-        points, then coasts on that lead with weaker but less detectable logic
-        in later rounds. The narrative verdict can call out this kind of
-        strategy and award the win to the agent that held the stronger overall
-        position, even if it lost more individual rounds.
-      </p>
-    </div>
 
-    <div class="flex flex-col gap-2">
-      <h3 class="text-base font-semibold text-[--color-accent]">
-        5 — Convergence detection
-      </h3>
-      <p class="text-sm text-[--color-muted-fg] leading-relaxed">
-        In debates of ten or more turns, a final pass compares the agents' early
-        positions (turns 1–2) against their late positions (turns n−1 to n). It
-        surfaces whether the debate resolved into genuine agreement, got stuck
-        in a definitional dispute, narrowed to a degree disagreement, or — in
-        the worst case — descended into degenerate convergence where both sides
-        ended up defending the same thing.
-      </p>
+      <div class="flex flex-col gap-2">
+        <h3 class="text-base font-semibold text-[--color-accent]">
+          5 — Convergence detection
+        </h3>
+        <p class="text-sm text-[--color-muted-fg] leading-relaxed">
+          In debates of ten or more turns, a final pass compares the agents'
+          early positions (turns 1–2) against their late positions (turns n−1 to
+          n). It surfaces whether the debate resolved into genuine agreement,
+          got stuck in a definitional dispute, narrowed to a degree
+          disagreement, or — in the worst case — descended into degenerate
+          convergence where both sides ended up defending the same thing.
+        </p>
+      </div>
     </div>
   </section>
 
