@@ -44,7 +44,7 @@
   <section class="flex flex-col gap-6">
     <h2 class="font-display text-2xl font-bold text-white">The Live Judge Layer</h2>
     <p class="text-[--color-muted-fg] leading-relaxed">
-      The judge is not a single score. It runs five levels of analysis on every turn.
+      The judge is not a single score. It runs three levels of analysis on every turn.
     </p>
 
     <div class="flex flex-col gap-2">
@@ -53,9 +53,7 @@
         Each turn receives independent scores on five dimensions —
         <strong class="text-white">Logical Coherence</strong> (0–40),
         <strong class="text-white">Rhetorical Force</strong> (0–30),
-        <strong class="text-white">Tactical Effectiveness</strong> (0–30),
-        <strong class="text-white">Frame Control</strong> (0–100), and
-        <strong class="text-white">Credibility</strong> (0–100) — weighted into a composite 0–100
+        <strong class="text-white">Tactical Effectiveness</strong> (0–30), weighted into a composite 0–100
         grade. Logic uses a component-chain model: a top score requires a complete cause → process →
         measurable consequence chain with the opponent's weakest premise explicitly addressed.
         Rhetoric uses a four-component method and caps delivery scores when framing is weak.
