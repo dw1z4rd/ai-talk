@@ -60,6 +60,28 @@ function detectSpaceDrops(text: string): number {
   return hits;
 }
 
+/**
+ * Repair space-drop artefacts in text by reinserting missing spaces between
+ * fused function-word pairs (e.g. "ofthe" → "of the", "itis" → "it is").
+ * Only complete lowercase words at word boundaries are touched; unknown words
+ * and already-valid function words are passed through unchanged.
+ * Safe to call on partial (streaming) text.
+ */
+export function repairSpaceDrops(text: string): string {
+  return text.replace(/\b[a-z]{4,20}\b/g, (word) => {
+    if (FUNCTION_WORDS.has(word)) return word;
+    for (let i = 1; i < word.length - 1; i++) {
+      if (
+        FUNCTION_WORDS.has(word.slice(0, i)) &&
+        FUNCTION_WORDS.has(word.slice(i))
+      ) {
+        return word.slice(0, i) + " " + word.slice(i);
+      }
+    }
+    return word;
+  });
+}
+
 // ── Debate domain classification ─────────────────────────────────────────────
 
 export type DebateDomain = "empirical" | "philosophical" | "policy" | "mixed";

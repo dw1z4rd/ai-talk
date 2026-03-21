@@ -11,6 +11,7 @@
   import ExportBar from "./ExportBar.svelte";
   import { flyInFromLeft, flyOutToRight } from "$lib/transitions";
   import { splitDocumentIntoChunks } from "$lib/doc-chunker";
+  import { repairSpaceDrops } from "$lib/live-judge/analysis";
 
   let topic = $state("");
   let turns = $state(4);
@@ -364,6 +365,11 @@
               // Mutate the property in-place on Svelte 5's reactive proxy—
               // avoids allocating a new object + copying 3 unchanged fields on every token
               streamingMessage.text += data.text;
+              // Repair fused function-word pairs (space-drop artefacts) eagerly
+              // whenever a word boundary just closed (space or newline in the new token).
+              if (data.text.includes(' ') || data.text.includes('\n')) {
+                streamingMessage.text = repairSpaceDrops(streamingMessage.text);
+              }
             }
             await tick();
             scheduleScroll();
@@ -381,7 +387,7 @@
                 agentId: data.agentId,
                 agentName: data.agentName,
                 color: data.color,
-                text: data.text,
+                text: repairSpaceDrops(data.text),
               },
             ];
             await tick();
