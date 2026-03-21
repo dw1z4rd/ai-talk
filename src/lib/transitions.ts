@@ -2,7 +2,17 @@ import { cubicOut, cubicIn, backOut, expoOut, expoIn } from "svelte/easing";
 
 export function flyInFromTop(
   node: Element,
-  { duration = 340, delay = 0, easing = expoOut } = {},
+  {
+    duration = 340,
+    delay = 0,
+    easing = expoOut,
+    distance,
+  }: {
+    duration?: number;
+    delay?: number;
+    easing?: (t: number) => number;
+    distance?: number;
+  } = {},
 ) {
   // 1. Grab the element's computed styles
   const style = getComputedStyle(node);
@@ -10,9 +20,9 @@ export function flyInFromTop(
   const targetOpacity = parsedOpacity === 0 ? 1 : parsedOpacity;
   const transform = style.transform === "none" ? "" : style.transform;
 
-  // 2. Calculate the distance to the viewport top
+  // 2. Calculate the distance to the viewport top (or use explicit short distance)
   const nodeRect = node.getBoundingClientRect();
-  const startY = -nodeRect.top;
+  const startY = distance !== undefined ? -distance : -nodeRect.top;
   return {
     delay,
     duration,
@@ -26,7 +36,17 @@ export function flyInFromTop(
 
 export function flyOutToBottom(
   node: Element,
-  { duration = 270, delay = 0, easing = expoIn } = {},
+  {
+    duration = 270,
+    delay = 0,
+    easing = expoIn,
+    distance,
+  }: {
+    duration?: number;
+    delay?: number;
+    easing?: (t: number) => number;
+    distance?: number;
+  } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -35,7 +55,8 @@ export function flyOutToBottom(
 
   // Capture the exact geometry before it leaves document flow
   const nodeRect = node.getBoundingClientRect();
-  const distanceToBottom = window.innerHeight - nodeRect.top;
+  const distanceToBottom =
+    distance !== undefined ? distance : window.innerHeight - nodeRect.top;
 
   return {
     delay,
@@ -56,7 +77,17 @@ export function flyOutToBottom(
 }
 export function flyInFromLeft(
   node: Element,
-  { duration = 280, delay = 0, easing = expoOut } = {},
+  {
+    duration = 280,
+    delay = 0,
+    easing = expoOut,
+    distance,
+  }: {
+    duration?: number;
+    delay?: number;
+    easing?: (t: number) => number;
+    distance?: number;
+  } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -64,8 +95,8 @@ export function flyInFromLeft(
   const transform = style.transform === "none" ? "" : style.transform;
 
   const nodeRect = node.getBoundingClientRect();
-  // Pushes the element left by exactly enough pixels to hide its rightmost edge
-  const startX = -nodeRect.right;
+  // Pushes the element left by exactly enough pixels to hide its rightmost edge (or use explicit short distance)
+  const startX = distance !== undefined ? -distance : -nodeRect.right;
 
   return {
     delay,
@@ -79,7 +110,17 @@ export function flyInFromLeft(
 }
 export function flyOutToRight(
   node: Element,
-  { duration = 220, delay = 0, easing = expoIn } = {},
+  {
+    duration = 220,
+    delay = 0,
+    easing = expoIn,
+    distance,
+  }: {
+    duration?: number;
+    delay?: number;
+    easing?: (t: number) => number;
+    distance?: number;
+  } = {},
 ) {
   const style = getComputedStyle(node);
   const parsedOpacity = parseFloat(style.opacity);
@@ -88,7 +129,8 @@ export function flyOutToRight(
 
   // Capture the exact geometry of the card right before death
   const nodeRect = node.getBoundingClientRect();
-  const distanceToRight = window.innerWidth - nodeRect.left;
+  const distanceToRight =
+    distance !== undefined ? distance : window.innerWidth - nodeRect.left;
 
   return {
     delay,

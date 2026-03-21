@@ -75,7 +75,7 @@
     ...(narrativeVerdict ? [{ id: 'verdict' }] : []),
     ...(liveJudgeResults.some((r) => r.absoluteScores) ? [{ id: 'scores' }] : []),
   ] as section (section.id)}
-    <div animate:flip={{ duration: 500, easing: cubicInOut }}>
+    <div animate:flip={{ duration: 320, easing: cubicInOut }}>
 
       {#if section.id === 'verdict'}
         <!-- Narrative verdict (shown after debate completes) -->
@@ -84,8 +84,8 @@
           style="border-color: {verdictAgreesWithScorecard
             ? '#7c6af740'
             : '#f59e0b40'}"
-          in:flyInFromTop={{ duration: 450 }}
-          out:flyOutToBottom={{ duration: 350 }}
+          in:flyInFromTop={{ duration: 300, distance: 14 }}
+          out:flyOutToBottom={{ duration: 220, distance: 24 }}
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
@@ -206,9 +206,9 @@
               {@const s = r.absoluteScores}
               <div
                 class="grid items-center px-3 py-2 border-b border-[--color-border] last:border-0 text-xs gap-1 judge-row turn-scores-grid"
-                style="animation-delay: {i * 100}ms"
-                in:flyInFromLeft
-                out:flyOutToRight
+                style="animation-delay: {i * 50}ms"
+                in:flyInFromLeft={{ duration: 240, distance: 18 }}
+                out:flyOutToRight={{ duration: 180, distance: 18 }}
               >
                 <span class="text-[--color-muted] text-[11px]">T{r.turnNumber}</span>
                 <span class="font-medium truncate" style="color: {info.color}"
@@ -266,8 +266,8 @@
       <div
         class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
         style="border-color: #7c6af740; animation-delay: 250ms"
-        in:flyInFromLeft
-        out:flyOutToRight
+        in:flyInFromLeft={{ duration: 260, distance: 16 }}
+        out:flyOutToRight={{ duration: 200, distance: 16 }}
       >
         <div
           class="flex items-center gap-3 px-4 py-3 border-b"
@@ -346,8 +346,8 @@
       <div
         class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
         style="border-color: #7c6af740; animation-delay: 350ms"
-        in:flyInFromLeft
-        out:flyOutToRight
+        in:flyInFromLeft={{ duration: 260, distance: 16 }}
+        out:flyOutToRight={{ duration: 200, distance: 16 }}
       >
         <div class="px-4 py-3 flex items-center gap-3">
           <div
@@ -376,8 +376,8 @@
       <div
         class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
         style="animation-delay: 0ms"
-        in:flyInFromLeft
-        out:flyOutToRight
+        in:flyInFromLeft={{ duration: 260, distance: 16 }}
+        out:flyOutToRight={{ duration: 200, distance: 16 }}
       >
         {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
       </div>
@@ -397,10 +397,10 @@
       {@const rhetoricWinnerInfo = resolveAgent(round.rhetoricWinner)}
       <div
         class="rounded-xl border bg-[--color-panel] p-3 judge-card"
-        style="border-color: #7c6af720; animation-delay: {i * 70}ms"
-        in:flyInFromTop={{ delay: i * 80 }}
-        out:flyOutToBottom
-        animate:flip={{ duration: 400, easing: cubicInOut }}
+        style="border-color: #7c6af720; animation-delay: {i * 45}ms"
+        in:flyInFromTop={{ duration: 280, delay: i * 50, distance: 12 }}
+        out:flyOutToBottom={{ duration: 200, distance: 20 }}
+        animate:flip={{ duration: 300, easing: cubicInOut }}
       >
         <!-- Round header -->
         <div class="flex items-center gap-2 mb-3 min-w-0">
@@ -488,35 +488,35 @@
   @keyframes judgeReveal {
     from {
       opacity: 0;
-      transform: translateY(12px) scale(0.96);
+      transform: translateY(6px);
     }
     to {
       opacity: 1;
-      transform: translateY(0) scale(1);
+      transform: translateY(0);
     }
   }
   @keyframes judgeHeaderReveal {
     from {
       opacity: 0;
-      transform: translateY(-6px) scale(0.97);
+      transform: translateY(-4px);
     }
     to {
       opacity: 1;
-      transform: translateY(0) scale(1);
+      transform: translateY(0);
     }
   }
   .judge-panel {
-    animation: judgeReveal 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
+    animation: judgeReveal 0.35s cubic-bezier(0.25, 1, 0.5, 1) both;
   }
   :global(.judge-card) {
-    animation: judgeReveal 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: judgeReveal 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
   }
   :global(.judge-row) {
-    animation: judgeReveal 0.35s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    animation: judgeReveal 0.3s cubic-bezier(0.25, 1, 0.5, 1) both;
   }
   .judge-header {
-    animation: judgeHeaderReveal 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
-    animation-delay: 250ms;
+    animation: judgeHeaderReveal 0.35s cubic-bezier(0.25, 1, 0.5, 1) both;
+    animation-delay: 150ms;
   }
 
   /* 3-col grid inside the judge panel — collapses to 1 col on mobile */
