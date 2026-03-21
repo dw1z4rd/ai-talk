@@ -10,7 +10,7 @@ import {
 } from "$lib/agents";
 import type { Message } from "$lib/agents";
 
-// Each SSE event is JSON: { type: 'token' | 'message' | 'judgeResult' | 'narrativeVerdict' | 'finalScorecard' | 'done' | 'error', ... }
+// Each SSE event is JSON: { type: 'turn_start' | 'token' | 'message' | 'judgeResult' | 'narrativeVerdict' | 'finalScorecard' | 'done' | 'error', ... }
 
 export const POST: RequestHandler = async ({ request }) => {
   const { topic, turns, context, agentA, agentB, messages, documentSegments } =
@@ -181,6 +181,11 @@ export const POST: RequestHandler = async ({ request }) => {
             }
             pendingJudges.delete(agent.id);
           }
+
+          // Tell the client which agent is about to speak before any tokens
+          // arrive. This lets the typing indicator show the correct model name
+          // regardless of turn-order swaps resolved server-side.
+          send({ type: "turn_start", agentId: agent.id, agentName: agent.name, color: agent.color });
 
           const { reply, judgePromise } = await generateAdaptiveReply(
             agent,

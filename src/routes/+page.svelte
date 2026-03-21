@@ -271,14 +271,8 @@
     }
 
     running = true;
-    {
-      const firstId = resume
-        ? (messages[messages.length - 1]?.agentId === agentA ? agentB : agentA)
-        : agentA;
-      const firstAgent = getModelInfo(firstId);
-      typingAgentName = firstAgent.name;
-      typingAgentColor = firstAgent.color;
-    }
+    typingAgentName = "";
+    typingAgentColor = "";
     streamingMessage = null;
     judgeStatus = null;
     abortController = new AbortController();
@@ -339,7 +333,10 @@
           if (!line.startsWith("data: ")) continue;
           const data = JSON.parse(line.slice(6));
 
-          if (data.type === "token") {
+          if (data.type === "turn_start") {
+            typingAgentName = data.agentName;
+            typingAgentColor = data.color;
+          } else if (data.type === "token") {
             if (!streamingMessage) {
               streamingMessage = {
                 agentId: data.agentId,
@@ -364,6 +361,10 @@
             }, 20);
           } else if (data.type === "message") {
             streamingMessage = null;
+            // Clear the indicator; the next turn_start will re-set it with the
+            // correct agent before any tokens arrive. This also ensures the
+            // indicator shows generic dots (no name) during the post-debate
+            // verdict phase when no turn_start is forthcoming.
             typingAgentName = "";
             typingAgentColor = "";
             messages = [
@@ -376,15 +377,6 @@
               },
             ];
             await tick();
-            const aiCount = messages.filter(
-              (m) => m.agentId !== "moderator",
-            ).length;
-            if (aiCount < turns * 2) {
-              const nextId = data.agentId === agentA ? agentB : agentA;
-              const next = getModelInfo(nextId);
-              typingAgentName = next.name;
-              typingAgentColor = next.color;
-            }
             setTimeout(() => {
               if (!userScrolled)
                 chatEl?.scrollTo({ top: chatEl.scrollHeight, behavior: "smooth" });
