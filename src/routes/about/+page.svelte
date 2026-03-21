@@ -120,11 +120,9 @@
         patterns recur:
       </p>
       <ul>
-      <p class="text-sm text-[--color-muted-fg] leading-relaxed">
         <li>Coherence Collapse —  The scorecard leader won rounds by repeatedly shifting their central claim under pressure. Each reframe was persuasive in isolation, but the sequence of abandoned premises reveals that no single thesis survived the full arc. Winning a round by introducing a new mechanism you couldn't defend two turns ago is not cumulative progress; it's lateral movement. The narrative verdict penalizes the instability of the through-line, not the quality of any individual turn.</li>
         <li>Asymmetric Depth — One side dominated on style — rhetoric, tactics, audience resonance — while the other quietly held the stronger logical position throughout. The scorecard reflects the stylistic dominance. The narrative verdict reflects that the motion assigned a substantive burden, and flourish doesn't discharge it. This pattern most often appears when one debater is more rhetorically gifted but kept sidestepping the mechanism question the opponent never stopped asking.</li>
         <li>Convergence Failure — Both sides spent the debate talking past each other at the definitional level rather than engaging the actual dispute. The round wins accumulated, but each was won against a position the opponent wasn't holding. By the end, neither debater had established their thesis so much as successfully defended a smaller, safer version of it. The narrative verdict names this as a failure to close on the real question, not a victory for whoever landed more points on the surrogate one.</li>
-      </p>
       </ul>
       <p class="text-sm text-[--color-muted-fg] leading-relaxed">
         This narrative layer is critical for long debates. It prevents a
