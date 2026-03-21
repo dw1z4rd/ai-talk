@@ -15,6 +15,15 @@ import {
 import type { Agent, Message } from "$lib/agents";
 import { MODEL_CATALOG } from "$lib/agents";
 import { withRetry } from "$lib/llm-agent/retry";
+import {
+  LOWERCASE_WORD_RE,
+  FUNCTION_WORDS,
+  SPACE_DROP_THRESHOLD,
+  detectSpaceDrops,
+  repairSpaceDrops,
+} from "./text-utils";
+
+export { repairSpaceDrops } from "./text-utils";
 
 const DEFAULT_JUDGE_MODEL = "kimi-k2-thinking:cloud";
 
@@ -26,7 +35,6 @@ const THINKING_BLOCK_RE =
   /<thinking>[\s\S]*?<\/thinking>|<think>[\s\S]*?<\/think>|<reasoning>[\s\S]*?<\/reasoning>/gi;
 const VERDICT_LINE_RE = /^VERDICT:\s*(.+?)$/gim;
 const VERDICT_DISPLAY_RE = /^VERDICT:\s*.+?$/gim;
-const LOWERCASE_WORD_RE = /\b[a-z]{4,20}\b/g;
 
 /** Strip model thinking/reasoning wrapper blocks from a response string. */
 function stripThinkingBlocks(text: string): string {
@@ -68,47 +76,6 @@ function tryParseJson(jsonString: string): unknown {
       return null;
     }
   }
-}
-
-/**
- * Count likely function-word fusions in text (e.g. "beits", "ofthe").
- * Defined at module level to avoid closure re-creation on every detectLanguageMismatch call.
- */
-function detectSpaceDrops(text: string): number {
-  const words = text.match(LOWERCASE_WORD_RE) ?? [];
-  let hits = 0;
-  for (const w of words) {
-    if (FUNCTION_WORDS.has(w)) continue;
-    for (let i = 1; i < w.length - 1; i++) {
-      if (FUNCTION_WORDS.has(w.slice(0, i)) && FUNCTION_WORDS.has(w.slice(i))) {
-        hits++;
-        break;
-      }
-    }
-  }
-  return hits;
-}
-
-/**
- * Repair space-drop artefacts in text by reinserting missing spaces between
- * fused function-word pairs (e.g. "ofthe" → "of the", "itis" → "it is").
- * Only complete lowercase words at word boundaries are touched; unknown words
- * and already-valid function words are passed through unchanged.
- * Safe to call on partial (streaming) text.
- */
-export function repairSpaceDrops(text: string): string {
-  return text.replace(LOWERCASE_WORD_RE, (word) => {
-    if (FUNCTION_WORDS.has(word)) return word;
-    for (let i = 1; i < word.length - 1; i++) {
-      if (
-        FUNCTION_WORDS.has(word.slice(0, i)) &&
-        FUNCTION_WORDS.has(word.slice(i))
-      ) {
-        return word.slice(0, i) + " " + word.slice(i);
-      }
-    }
-    return word;
-  });
 }
 
 // ── Debate domain classification ─────────────────────────────────────────────
@@ -245,103 +212,6 @@ function buildDomainNoteForTopic(topic: string): string {
 }
 
 // ── Language consistency check ────────────────────────────────────────────────
-
-// Module-level constants for space-drop artefact detection.
-// Defined here (not inside detectLanguageMismatch) so the Set is allocated once
-// rather than rebuilt on every pairwise call.
-const FUNCTION_WORDS = new Set([
-  "a",
-  "an",
-  "the",
-  "be",
-  "is",
-  "are",
-  "was",
-  "were",
-  "been",
-  "being",
-  "am",
-  "do",
-  "does",
-  "did",
-  "have",
-  "has",
-  "had",
-  "will",
-  "would",
-  "shall",
-  "should",
-  "may",
-  "might",
-  "can",
-  "could",
-  "must",
-  "need",
-  "dare",
-  "ought",
-  "i",
-  "you",
-  "he",
-  "she",
-  "it",
-  "we",
-  "they",
-  "me",
-  "him",
-  "her",
-  "us",
-  "them",
-  "my",
-  "your",
-  "his",
-  "its",
-  "our",
-  "their",
-  "mine",
-  "yours",
-  "ours",
-  "theirs",
-  "this",
-  "that",
-  "these",
-  "those",
-  "which",
-  "who",
-  "whom",
-  "whose",
-  "what",
-  "in",
-  "on",
-  "at",
-  "by",
-  "for",
-  "of",
-  "to",
-  "up",
-  "as",
-  "if",
-  "so",
-  "or",
-  "and",
-  "but",
-  "nor",
-  "yet",
-  "not",
-  "no",
-  "nor",
-  "than",
-  "then",
-  "when",
-  "while",
-  "with",
-  "from",
-  "into",
-  "onto",
-  "upon",
-  "out",
-  "off",
-]);
-const SPACE_DROP_THRESHOLD = 2; // ≥2 fused pairs per message
 
 /**
  * Detect if two turns appear to be written in different languages.

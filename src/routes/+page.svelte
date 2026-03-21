@@ -11,7 +11,7 @@
   import ExportBar from "./ExportBar.svelte";
   import { flyInFromLeft, flyOutToRight } from "$lib/transitions";
   import { splitDocumentIntoChunks } from "$lib/doc-chunker";
-  import { repairSpaceDrops } from "$lib/live-judge/analysis";
+  import { repairSpaceDrops } from "$lib/live-judge/text-utils";
 
   let topic = $state("");
   let turns = $state(4);
