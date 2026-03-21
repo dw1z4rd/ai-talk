@@ -41,3 +41,27 @@ select optgroup {
 	background-color: #101018;
 	color: #e4e4ef;
 }
+
+/* Themed scrollbars */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: #28283a #101018;
+}
+
+*::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+	background: #101018;
+}
+
+*::-webkit-scrollbar-thumb {
+	background-color: #28283a;
+	border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+	background-color: #3a3a52;
+}

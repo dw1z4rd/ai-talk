@@ -528,10 +528,10 @@
   {#if pairwiseRounds.length > 0}
     <div class="col-span-full flex flex-col gap-3">
       <h3 class="text-sm font-semibold text-[--color-muted-fg] px-1">
-        Recent Rounds
+        All Rounds
       </h3>
       <div class="judge-rounds-grid flex flex-col gap-3">
-      {#each pairwiseRounds.slice(-3).reverse() as round, i (round.roundNumber)}
+      {#each pairwiseRounds.slice().reverse() as round, i (round.roundNumber)}
       {@const logicWinnerInfo = resolveAgent(round.logicWinner)}
       {@const tacticsWinnerInfo = resolveAgent(round.tacticsWinner)}
       {@const rhetoricWinnerInfo = resolveAgent(round.rhetoricWinner)}
