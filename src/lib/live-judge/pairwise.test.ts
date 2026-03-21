@@ -667,14 +667,27 @@ describe("applyPairwiseFloors", () => {
     expect(result.logicalCoherence).toBe(40);
   });
 
-  it("WIN path: gap enforcement only affects Logic, not Tactics/Rhetoric", () => {
-    // Both Tactics and Rhetoric at 20 (WIN for both) — no gap enforcement there
-    const cur = makeScores(30, 20, 20);
-    const prev = makeScores(30, 20, 20);
+  it("WIN path: Tactics/Rhetoric gap enforcement is capped at scaleCeil (30)", () => {
+    // prevVal = 28 → prevVal + 6 = 34, must be capped at scaleCeil (30)
+    // bandApplied = max(18, min(30, 28)) = 28; gap lift: max(28, 34) = 34 → cap to 30
+    const cur = makeScores(36, 28, 28);
+    const prev = makeScores(36, 28, 28);
     const result = applyPairwiseFloors("b", "b", "b", "b", "a", cur, prev);
-    expect(result.logicalCoherence).toBe(34); // gap enforcement fired
-    expect(result.tacticalEffectiveness).toBe(20); // unchanged
-    expect(result.rhetoricalForce).toBe(20); // unchanged
+    expect(result.tacticalEffectiveness).toBe(30);
+    expect(result.rhetoricalForce).toBe(30);
+  });
+
+  it("WIN path: gap enforcement fires for Logic (minGap=4), Tactics (minGap=6), and Rhetoric (minGap=6)", () => {
+    // All three dimensions at 20 (WIN for all) with equal prevScores
+    // Logic:   max(24, min(40, 20)) = 24; then max(24, 20+4)=24 → 24
+    // Tactics: max(18, min(30, 20)) = 20; then max(20, 20+6)=26 → 26
+    // Rhetoric: max(18, min(30, 20)) = 20; then max(20, 20+6)=26 → 26
+    const cur = makeScores(20, 20, 20);
+    const prev = makeScores(20, 20, 20);
+    const result = applyPairwiseFloors("b", "b", "b", "b", "a", cur, prev);
+    expect(result.logicalCoherence).toBe(24); // WIN floor applied (20+4=24, same as floor)
+    expect(result.tacticalEffectiveness).toBe(26); // gap enforcement: 20+6=26
+    expect(result.rhetoricalForce).toBe(26); // gap enforcement: 20+6=26
   });
 
   it("WIN path: omitting prevScores disables gap enforcement (backward-compatible)", () => {
@@ -766,8 +779,8 @@ describe("computeHarmonizationFlags", () => {
     expect(flags.find((f) => f.dimension === "logic")).toBeUndefined();
   });
 
-  it("flags tactics divergence when gap meets threshold (3) and winner is wrong", () => {
-    // gap = 10 ≥ 3, pairwise gives 'a' but cur has higher tacticalEffectiveness
+  it("flags tactics divergence when gap meets threshold (6) and winner is wrong", () => {
+    // gap = 10 ≥ 6, pairwise gives 'a' but cur has higher tacticalEffectiveness
     const round = makeRound("a", "Agent A", "b", "Agent B", "b", "a", "b");
     const prev = makeAbsScores({ tacticalEffectiveness: 8 });
     const cur = makeAbsScores({ tacticalEffectiveness: 18 });
@@ -777,7 +790,7 @@ describe("computeHarmonizationFlags", () => {
     expect(tacticsFlag?.divergenceMagnitude).toBe(10);
   });
 
-  it("flags rhetoric divergence when gap meets threshold (3) and winner is wrong", () => {
+  it("flags rhetoric divergence when gap meets threshold (6) and winner is wrong", () => {
     const round = makeRound("a", "Agent A", "b", "Agent B", "b", "b", "a");
     const prev = makeAbsScores({ rhetoricalForce: 8 });
     const cur = makeAbsScores({ rhetoricalForce: 20 });
@@ -915,6 +928,26 @@ describe("computeHarmonizationFlags", () => {
     expect(
       postPenaltyFlags.find((f) => f.dimension === "logic"),
     ).toBeUndefined();
+  });
+
+  it("draw spread check uses rawPrevAbsolute to avoid false-positive at scaleCeil collision", () => {
+    // Scenario: both Tactics scores cap at scaleCeil (30) → reconcileRoundWinners forces
+    // "tie". contextualizeScoreForRound re-clamps prevHistScore into the DRAW band:
+    //   max(13, min(22, 30)) = 22. Without rawPrevAbsolute, spreadGap = |30-22| = 8 ≥ 4
+    //   → false flag fires. With rawPrevAbsolute=30 (true stored score),
+    //   spreadGap = |30-30| = 0 → no flag.
+    const round = makeRound("a", "A", "b", "B", "tie", "tie", "tie");
+    const cur = makeAbsScores({ tacticalEffectiveness: 30 });
+    const ctxPrev = makeAbsScores({ tacticalEffectiveness: 22 }); // DRAW-band contextualized
+    const rawPrev = makeAbsScores({ tacticalEffectiveness: 30 }); // true stored score
+
+    // Without rawPrev: gap = |30-22| = 8 ≥ drawThreshold(4) → flag fires (demonstrates the problem)
+    expect(computeHarmonizationFlags(round, cur, ctxPrev)).toHaveLength(1);
+
+    // With rawPrev: spreadGap = |30-30| = 0 < 4 → no flag (fix confirmed)
+    expect(
+      computeHarmonizationFlags(round, cur, ctxPrev, rawPrev),
+    ).toHaveLength(0);
   });
 });
 
