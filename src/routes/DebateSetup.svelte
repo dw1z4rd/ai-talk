@@ -94,8 +94,34 @@
 </script>
 
 <div
-  class="flex flex-col gap-6 bg-[--color-panel] border border-[--color-border] rounded-2xl p-4 sm:p-7"
+  class="flex flex-col bg-[--color-panel] border border-[--color-border] rounded-2xl {running ? 'gap-0 p-3 sm:p-4' : 'gap-6 p-4 sm:p-7'}"
 >
+  {#if running}
+    <!-- Compact running bar: topic summary + controls -->
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="text-[10px] font-bold uppercase tracking-widest text-[--color-muted] shrink-0">
+        {docAnalysisMode ? 'Analysing' : 'Debating'}
+      </span>
+      {#if topic}
+        <span class="text-sm text-[--color-muted-fg] truncate min-w-0">"{topic}"</span>
+      {/if}
+      <div class="ml-auto flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          onclick={onpause}
+          class="flex items-center gap-2 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/30 font-semibold text-sm px-4 py-1.5 rounded-xl transition-all cursor-pointer"
+        >Pause</button>
+        <button
+          type="button"
+          onclick={onstop}
+          class="flex items-center gap-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 font-semibold text-sm px-4 py-1.5 rounded-xl transition-all cursor-pointer"
+        >
+          <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"></span>
+          Stop
+        </button>
+      </div>
+    </div>
+  {:else}
   <!-- Topic -->
   <div class="flex flex-col gap-1.5">
     <label
@@ -285,24 +311,7 @@
       BS Detect
     </button>
 
-    {#if running}
-      <button
-        type="button"
-        onclick={onpause}
-        class="flex items-center gap-2 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 border border-yellow-500/30 font-semibold text-sm px-5 py-2.5 rounded-xl transition-all cursor-pointer"
-      >
-        Pause
-      </button>
-      <button
-        type="button"
-        onclick={onstop}
-        class="flex items-center gap-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 font-semibold text-sm px-5 py-2.5 rounded-xl transition-all cursor-pointer"
-      >
-        <span class="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse"
-        ></span>
-        Stop
-      </button>
-    {:else if isPaused}
+    {#if isPaused}
       <button
         type="button"
         onclick={onresume}
@@ -382,4 +391,5 @@
       <ContextFileUpload bind:contextFiles {running} />
     </div>
   {/if}
+  {/if}<!-- end {#if running} {:else} -->
 </div>
