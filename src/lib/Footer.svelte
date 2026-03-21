@@ -22,12 +22,17 @@
   }
 </script>
 
+<!-- Always-present trigger zone at the bottom edge -->
+<div
+  class="fixed bottom-0 left-0 right-0 z-50 h-4"
+  on:mouseenter={handleMouseEnter}
+></div>
+
 {#if visible}
   <footer
     transition:fade={{ duration: 500, easing: quintOut }}
     class="fixed bottom-0 left-0 right-0 z-50 backdrop-blur-md bg-[--color-surface]/80"
     style="border-top: 1px solid #0a0a12; box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);"
-    on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}
   >
     <div class="px-5 py-4 flex items-center justify-center text-xs text-[--color-muted]">
