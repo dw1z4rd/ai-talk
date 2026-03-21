@@ -800,10 +800,26 @@
   }
 
   @media (max-width: 1023px) {
-    .left-col,
+    .main-two-col {
+      gap: 1.5rem;
+    }
+
+    /* Setup + chat first, judge panel below */
     .right-col {
       width: 100%;
       max-width: 100%;
+      order: -1;
+      /* Let the page scroll naturally — no viewport clipping on mobile */
+      max-height: none;
+      overflow: visible;
+    }
+
+    .left-col {
+      width: 100%;
+      max-width: 100%;
+      order: 0;
+      max-height: none;
+      overflow-y: visible;
     }
   }
 </style>

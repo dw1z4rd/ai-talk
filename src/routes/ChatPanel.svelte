@@ -38,7 +38,7 @@
 </script>
 
 <div
-  class="flex-1 min-w-0 flex flex-col rounded-2xl border border-[--color-border] overflow-hidden bg-[--color-panel]"
+  class="chat-panel flex-1 min-w-0 flex flex-col rounded-2xl border border-[--color-border] overflow-hidden bg-[--color-panel]"
 >
   <!-- Sticky progress bar -->
   {#if running || (done && messages.length > 0)}
@@ -70,7 +70,7 @@
   <!-- Chat body -->
   <div
     bind:this={chatEl}
-    class="flex flex-col overflow-y-auto scroll-smooth flex-1"
+    class="chat-body flex flex-col overflow-y-auto scroll-smooth flex-1"
     style="min-height: 0"
   >
     <!-- Empty state -->
@@ -211,3 +211,16 @@
     {/if}
   </div>
 </div>
+
+<style>
+  @media (max-width: 1023px) {
+    /* Chat panel gets a real minimum height on mobile so it's always usably tall */
+    .chat-panel {
+      min-height: 55dvh;
+    }
+    /* Inner scroll area also needs a floor so it doesn't collapse */
+    .chat-body {
+      min-height: 40dvh;
+    }
+  }
+</style>
