@@ -45,12 +45,6 @@ Each debater has a personality archetype (engineer, philosopher, strategist, etc
 ### Document Audit Mode
 Upload or paste a document. One agent plays the document (reading out claims chunk-by-chunk), the other plays a fact-checker. The judge scores each exchange for logical validity and evidential support.
 
-### Assistant
-A single-agent chat mode for freeform conversation with any model in the catalog.
-
-### Stories / Escape Room
-Narrative game modes powered by the same LLM infrastructure.
-
 ## Stack
 
 | Layer     | Tech                                                                                            |
