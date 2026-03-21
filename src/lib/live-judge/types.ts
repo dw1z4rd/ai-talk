@@ -333,6 +333,7 @@ export interface NarrativeVerdict {
     targetTurn: number;
     agentId: string;
     deltaLogic: number;
+    roundNumber: number;
   }>;
 }
 

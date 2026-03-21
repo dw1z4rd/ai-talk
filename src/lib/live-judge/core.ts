@@ -1271,6 +1271,7 @@ export class LiveJudgeSystem {
     targetTurn: number;
     agentId: string;
     deltaLogic: number;
+    roundNumber: number;
   }> {
     const MIN_LOGIC_WIN_GAP = 6;
     const rounds = this.panel.scorecard.rounds;
@@ -1278,6 +1279,7 @@ export class LiveJudgeSystem {
       targetTurn: number;
       agentId: string;
       deltaLogic: number;
+      roundNumber: number;
     }> = [];
 
     // Reverse pass: last round first so shared turns cascade correctly.
@@ -1317,6 +1319,7 @@ export class LiveJudgeSystem {
             targetTurn: loserTurn,
             agentId: loserAgentId,
             deltaLogic: adjustedLoser - loserLogic, // negative (downward adjustment)
+            roundNumber: round.roundNumber,
           });
           console.log(
             `[Logic Gap Pass] R${round.roundNumber} ` +

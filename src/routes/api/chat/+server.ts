@@ -357,6 +357,7 @@ export const POST: RequestHandler = async ({ request }) => {
                   deltaLogic: adj.deltaLogic,
                   reason: `Logic gap enforced: winner separation adjusted by ${adj.deltaLogic > 0 ? "+" : ""}${adj.deltaLogic} to maintain 6-point minimum`,
                   updateType: "logicGapAdjustment",
+                  gapRoundNumber: adj.roundNumber,
                 });
               }
 

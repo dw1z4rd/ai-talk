@@ -181,6 +181,11 @@
               if (bd.pairwiseFloorApplied) content += `> ⚡ ${bd.pairwiseFloorNote}\n\n`;
               if (bd.evidenceEnforcementNote) content += `> ⚖ ${bd.evidenceEnforcementNote}\n\n`;
               if (bd.postPenaltyGapNote) content += `> 🔒 ${bd.postPenaltyGapNote}\n\n`;
+              if (r.gapEnforcementNotes?.length) {
+                for (const gn of r.gapEnforcementNotes) {
+                  content += `> 🔻 **Gap enforcement (Round ${gn.roundNumber}):** Logic adjusted ${gn.deltaLogic > 0 ? '+' : ''}${gn.deltaLogic} to maintain the minimum 6-point winner separation.\n\n`;
+                }
+              }
             }
 
             // Rhetoric components
@@ -321,6 +326,11 @@
               if (bd.pairwiseFloorApplied) content += `    ⚡ ${bd.pairwiseFloorNote}\n`;
               if (bd.evidenceEnforcementNote) content += `    ⚖ ${bd.evidenceEnforcementNote}\n`;
               if (bd.postPenaltyGapNote) content += `    🔒 ${bd.postPenaltyGapNote}\n`;
+              if (r.gapEnforcementNotes?.length) {
+                for (const gn of r.gapEnforcementNotes) {
+                  content += `    🔻 Gap enforcement (Round ${gn.roundNumber}): ${gn.deltaLogic > 0 ? '+' : ''}${gn.deltaLogic} — minimum 6-pt winner separation\n`;
+                }
+              }
             }
 
             if (bd.rhetoricalComponents) {

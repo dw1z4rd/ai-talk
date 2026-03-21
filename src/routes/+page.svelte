@@ -3,6 +3,7 @@
   import { getModelInfo } from "$lib/debate/models";
   import type { ChatMessage, ContextFile } from "$lib/debate/models";
   import WinnerModal from "./WinnerModal.svelte";
+  import AdjustingScoresModal from "./AdjustingScoresModal.svelte";
   import ScoreUpdateToast from "./ScoreUpdateToast.svelte";
   import DebateHeader from "./DebateHeader.svelte";
   import LiveJudgePanel from "./LiveJudgePanel.svelte";
@@ -146,6 +147,11 @@
   let winnerScore = $state(0);
   let showWinnerModal = $state(false);
 
+  // Gap enforcement modal
+  let showAdjustingModal = $state(false);
+  let adjustingModalCount = $state(0);
+  let _adjustingDismissTimer: ReturnType<typeof setTimeout> | null = null;
+
   // ── Live Judge logic ───────────────────────────────────────────────────────
   async function runLiveJudging() {
     try {
@@ -222,6 +228,8 @@
     winner = null;
     winnerScore = 0;
     showWinnerModal = false;
+    showAdjustingModal = false;
+    adjustingModalCount = 0;
     judgeStatus = null;
     _scoreTotals = {};
     _momentumTotals = {};
@@ -281,6 +289,8 @@
       winner = null;
       winnerScore = 0;
       showWinnerModal = false;
+      showAdjustingModal = false;
+      adjustingModalCount = 0;
       scoreDeltas = {};
       _scoreTotals = {};
       _momentumTotals = {};
@@ -480,6 +490,25 @@
               // Mutate deeply via $state proxy — no spread allocation needed.
               liveJudgeResults[idx].absoluteScores.logicalCoherence =
                 (liveJudgeResults[idx].absoluteScores.logicalCoherence ?? 0) + data.deltaLogic;
+              // When the adjustment comes from the end-of-debate gap enforcement
+              // pass, annotate the entry so the rubric breakdown can label it.
+              if (data.updateType === "logicGapAdjustment" && data.gapRoundNumber != null) {
+                if (!liveJudgeResults[idx].gapEnforcementNotes) {
+                  liveJudgeResults[idx].gapEnforcementNotes = [];
+                }
+                liveJudgeResults[idx].gapEnforcementNotes.push({
+                  roundNumber: data.gapRoundNumber,
+                  deltaLogic: data.deltaLogic,
+                });
+                // Show / refresh the adjusting-scores modal
+                adjustingModalCount += 1;
+                showAdjustingModal = true;
+                if (_adjustingDismissTimer) clearTimeout(_adjustingDismissTimer);
+                _adjustingDismissTimer = setTimeout(() => {
+                  showAdjustingModal = false;
+                  adjustingModalCount = 0;
+                }, 2500);
+              }
             }
             // Accumulate delta for the badge display in the score table
             scoreDeltas[data.targetTurn] = (scoreDeltas[data.targetTurn] ?? 0) + data.deltaLogic;
@@ -501,6 +530,12 @@
               if (i !== -1) scoreUpdateNotifications.splice(i, 1);
             }, 6000);
           } else if (data.type === "narrativeVerdict") {
+            // Wait for the adjusting-scores modal to finish dismissing (if it
+            // is still visible) before showing the verdict, so the score
+            // corrections are readable before the screen changes.
+            if (showAdjustingModal) {
+              await new Promise((r) => setTimeout(r, 2600));
+            }
             judgeStatus = null;
             narrativeVerdict = {
               text: data.text,
@@ -573,6 +608,8 @@
   {winnerScore}
   {finalScorecard}
 />
+
+<AdjustingScoresModal show={showAdjustingModal} count={adjustingModalCount} />
 
 <ScoreUpdateToast notifications={scoreUpdateNotifications} />
 

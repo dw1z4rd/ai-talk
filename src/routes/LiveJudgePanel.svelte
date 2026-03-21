@@ -7,7 +7,7 @@
     flyOutToBottom,
   } from "$lib/transitions";
   import { getModelInfo, getWinnerInfo } from "$lib/debate/models";
-  import { cubicInOut } from "svelte/easing";
+  import { quintOut } from "svelte/easing";
 
   interface Props {
     liveJudgeResults: any[];
@@ -87,7 +87,7 @@
     ...(narrativeVerdict ? [{ id: 'verdict' }] : []),
     ...(liveJudgeResults.some((r) => r.absoluteScores) ? [{ id: 'scores' }] : []),
   ] as section (section.id)}
-    <div animate:flip={{ duration: 320, easing: cubicInOut }}>
+    <div animate:flip={{ duration: 1000, easing: quintOut }}>
 
       {#if section.id === 'verdict'}
         <!-- Narrative verdict (shown after debate completes) -->
@@ -96,8 +96,8 @@
           style="border-color: {verdictAgreesWithScorecard
             ? '#7c6af740'
             : '#f59e0b40'}"
-          in:flyInFromTop={{ duration: 300, distance: 14 }}
-          out:flyOutToBottom={{ duration: 220, distance: 24 }}
+          in:flyInFromTop={{ duration: 1000, distance: 100 }}
+          out:flyOutToBottom={{ duration: 500, distance: 100 }}
         >
           <div
             class="flex items-center gap-3 px-4 py-3 border-b"
@@ -220,8 +220,8 @@
               {@const isExpanded = expandedBreakdowns.has(r.turnNumber)}
               <div
                 class="border-b border-[--color-border] last:border-0"
-                in:flyInFromLeft={{ duration: 240, distance: 18 }}
-                out:flyOutToRight={{ duration: 180, distance: 18 }}
+                in:flyInFromLeft={{ duration: 1000, distance: 100 }}
+                out:flyOutToRight={{ duration: 500, distance: 100 }}
               >
                 <!-- Score row -->
                 <div
@@ -360,6 +360,13 @@
                           <p class="text-[10px] text-[--color-muted-fg] leading-relaxed">{bd.postPenaltyGapNote}</p>
                         </div>
                       {/if}
+                      <!-- End-of-debate Logic gap enforcement -->
+                      {#each (r.gapEnforcementNotes ?? []) as gn}
+                        <div class="rounded-lg border border-violet-500/20 bg-violet-500/5 px-2.5 py-2">
+                          <p class="text-[10px] font-bold text-violet-400 mb-0.5">🔻 Gap enforcement (Round {gn.roundNumber})</p>
+                          <p class="text-[10px] text-[--color-muted-fg] leading-relaxed">Logic adjusted {gn.deltaLogic > 0 ? '+' : ''}{gn.deltaLogic} to maintain the minimum 6-point winner separation required by this round.</p>
+                        </div>
+                      {/each}
                       <!-- Artifact repair -->
                       {#if bd.artifactRepairApplied || bd.artifactSeverity === 'severe'}
                         <div class="rounded-lg border px-2.5 py-2"
@@ -396,8 +403,8 @@
       <div
         class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
         style="border-color: #7c6af740; animation-delay: 250ms"
-        in:flyInFromLeft={{ duration: 260, distance: 16 }}
-        out:flyOutToRight={{ duration: 200, distance: 16 }}
+        in:flyInFromLeft={{ duration: 1000, distance: 100 }}
+        out:flyOutToRight={{ duration: 500, distance: 100 }}
       >
         <div
           class="flex items-center gap-3 px-4 py-3 border-b"
@@ -476,8 +483,8 @@
       <div
         class="rounded-2xl border overflow-hidden bg-[--color-panel] judge-card"
         style="border-color: #7c6af740; animation-delay: 350ms"
-        in:flyInFromLeft={{ duration: 260, distance: 16 }}
-        out:flyOutToRight={{ duration: 200, distance: 16 }}
+        in:flyInFromLeft={{ duration: 1000, distance: 100 }}
+        out:flyOutToRight={{ duration: 500, distance: 100 }}
       >
         <div class="px-4 py-3 flex items-center gap-3">
           <div
@@ -506,8 +513,8 @@
       <div
         class="rounded-xl border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-xs text-yellow-400 judge-card"
         style="animation-delay: 0ms"
-        in:flyInFromLeft={{ duration: 260, distance: 16 }}
-        out:flyOutToRight={{ duration: 200, distance: 16 }}
+        in:flyInFromLeft={{ duration: 1000, distance: 100 }}
+        out:flyOutToRight={{ duration: 500, distance: 100 }}
       >
         {pairwiseRounds.find((r) => r.languageWarning)?.languageWarning}
       </div>
@@ -528,9 +535,9 @@
       <div
         class="rounded-xl border bg-[--color-panel] p-3 judge-card"
         style="border-color: #7c6af720; animation-delay: {i * 45}ms"
-        in:flyInFromTop={{ duration: 280, delay: i * 50, distance: 12 }}
-        out:flyOutToBottom={{ duration: 200, distance: 20 }}
-        animate:flip={{ duration: 300, easing: cubicInOut }}
+        in:flyInFromTop={{ duration: 1000, delay: i * 50, distance: 100 }}
+        out:flyOutToBottom={{ duration: 500, distance: 100 }}
+        animate:flip={{ duration: 1000, easing: quintOut }}
       >
         <!-- Round header -->
         <div class="flex items-center gap-2 mb-3 min-w-0">
