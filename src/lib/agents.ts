@@ -1160,15 +1160,33 @@ export async function generateAdaptiveReply(
       systemPrompt: effectiveSystemPrompt,
       temperature: 0.9,
       maxTokens: 10000,
-      ...(onToken ? { onToken } : {}),
+      ...(onToken
+        ? {
+            onToken: (token: string) =>
+              onToken(
+                token.replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, " "),
+              ),
+          }
+        : {}),
     }));
 
   if (!reply) {
     return { reply: reply ?? null, judgePromise: Promise.resolve(undefined) };
   }
+
+  // Strip all CJK/fullwidth characters that leak through from non-English models
+  // (e.g. Moonshot/Kimi code-switching) despite the LANGUAGE REQUIREMENT
+  // instruction. Space rather than empty-string preserves word boundaries.
+  // Matches the full CJK/fullwidth stripping already applied to narrative verdict
+  // text in core.ts.
+  const turnText = reply
+    .replace(/[\u3000-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/g, " ")
+    .replace(/ {2,}/g, " ")
+    .trim();
+
   if (!prebuiltReply) {
     console.log(
-      `[Turn ${turnNumber}] ${agent.name} done (${reply.length} chars)`,
+      `[Turn ${turnNumber}] ${agent.name} done (${turnText.length} chars)`,
     );
   }
 
@@ -1177,7 +1195,7 @@ export async function generateAdaptiveReply(
     history.length > 0 ? history[history.length - 1].text : "";
 
   // Notify caller that the reply is ready — judge runs concurrently with next turn
-  onReply?.(reply);
+  onReply?.(turnText);
 
   // Start judge processing as a background promise.
   // All side-effects (hiddenDirective, adaptiveState) are applied inside it so
@@ -1189,7 +1207,7 @@ export async function generateAdaptiveReply(
 
       const judgeResult = await liveJudgeSystem.processTurn(
         agent,
-        reply,
+        turnText,
         opponentAgent,
         opponentMessage,
         turnNumber,
@@ -1283,7 +1301,7 @@ export async function generateAdaptiveReply(
     }
   })();
 
-  return { reply, judgePromise };
+  return { reply: turnText, judgePromise };
 }
 
 /**
