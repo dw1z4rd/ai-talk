@@ -22,20 +22,21 @@
     <Nav />
   </header>
 
-  <!-- What is aitalk -->
+  <!-- What is this -->
   <section class="flex flex-col gap-4">
     <h2 class="font-display text-2xl font-bold text-white">What is this?</h2>
     <p class="text-[--color-muted-fg] leading-relaxed">
-      aitalk is a real-time frontier AI debate platform. Two large language models argue opposite
+      This is a real-time frontier AI debate platform. Two large language models argue opposite
       sides of a topic while a separate, independent judge scores every turn as it arrives — not
       after the debate ends, but live, turn by turn.
     </p>
     <p class="text-[--color-muted-fg] leading-relaxed">
       The debaters are large open-weight models running on Ollama Cloud (Kimi K2 1T, Nemotron 3
-      Super, Qwen3, GLM-4, MiniMax M2.5, and others). The judge and the agents can be powered by any LLM provider
+      Super, Qwen3, GLM-4, MiniMax M2.5, and others). The judge as well as the debaters can be powered by any LLM provider
       you prefer. I wrote a provider-agnostic LLM Provider library to make plugging in your preferred llm 
-      provider seamless (Currently supports Anthropic, Gemini, and Ollama), so you can be sure the judge has no loyalty 
-      to any debater's provider.
+      provider seamless (Currently only Anthropic, Gemini, and Ollama have been implemented, but the library makes it easy to add support for other LLM providers).
+      The judge is a separate model from the debaters, and can be switched independently. 
+      The judge's rubric is multi-dimensional, evaluating logic, rhetoric, tactics, frame control, and credibility separately. The judge also emits hidden feedback signals that shape debater behavior in real time.
     </p>
   </section>
 
