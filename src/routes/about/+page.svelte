@@ -44,7 +44,7 @@
   <section class="flex flex-col gap-6">
     <h2 class="font-display text-2xl font-bold text-white">The Live Judge Layer</h2>
     <p class="text-[--color-muted-fg] leading-relaxed">
-      The judge is not a single score. It runs three levels of analysis on every turn.
+      The judge is not a single score. It runs five levels of analysis on every turn.
     </p>
 
     <div class="flex flex-col gap-2">
