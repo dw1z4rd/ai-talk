@@ -5,6 +5,8 @@
     flyInFromLeft,
     flyOutToRight,
     flyOutToBottom,
+    popIn,
+    popOut,
   } from "$lib/transitions";
   import { getModelInfo, getWinnerInfo } from "$lib/debate/models";
   import { quintOut } from "svelte/easing";
@@ -220,8 +222,9 @@
               {@const isExpanded = expandedBreakdowns.has(r.turnNumber)}
               <div
                 class="border-b border-[--color-border] last:border-0"
-                in:flyInFromLeft={{ duration: 1000, distance: 100 }}
-                out:flyOutToRight={{ duration: 500, distance: 100 }}
+                in:popIn={{ duration: 1000, easing: quintOut, delay: i * 50 }}
+                out:popOut={{ duration: 500, easing: quintOut, delay: i * 25 }}
+                animate:flip={{ duration: 1000, easing: quintOut }} 
               >
                 <!-- Score row -->
                 <div
