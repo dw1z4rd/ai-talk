@@ -1,6 +1,78 @@
-# aitalk
+# Reasoning Quality Auditor
 
-Watch frontier AI models debate each other in real time, with a live judge that scores every turn.
+This project is not a debate engine.  
+It is a **reasoning‑quality auditor** that uses adversarial dialogue as a pressure‑testing substrate to reveal how well arguments hold up under structured scrutiny.
+
+The debaters are probes.  
+The judge is the system.
+
+## What This System Does
+
+The core of the project is a judge layer designed to evaluate the *structure* of reasoning, not the style of persuasion. It enforces mechanistic coherence, tracks arguments across turns, and produces detailed analyses of how each position evolves.
+
+### Key Features
+
+#### **Mechanistic Reasoning Enforcement**
+Arguments are evaluated using a strict **cause → process → consequence** framework.  
+Claims without mechanisms are flagged immediately.  
+Hand‑waving, metaphors, and moral gestures are penalized.
+
+#### **Cross‑Turn Epistemic Tracking**
+The judge maintains memory across the entire exchange:
+- detects contradictions  
+- flags dropped premises  
+- identifies ontology drift  
+- rewards stable causal spines  
+
+This allows the system to evaluate reasoning *dynamically*, not turn‑by‑turn in isolation.
+
+#### **Stable Multi‑Turn Reasoning**
+The architecture forces debates to:
+- remain coherent for many rounds  
+- escalate rather than loop  
+- refine arguments under pressure  
+- maintain persona and ontology consistency  
+
+This behavior emerges from the scaffolding, not the underlying models.
+
+#### **Arc‑Level Causal Analysis**
+Beyond per‑turn scoring, the judge produces a narrative verdict that:
+- reconstructs the entire causal arc  
+- identifies unresolved tensions  
+- explains why one model’s reasoning held together  
+- diagnoses where the other fractured  
+
+This is not summarization — it is **causal autopsy**.
+
+#### **Model‑Agnostic Architecture**
+The system works with off‑the‑shelf open‑source models.  
+The reasoning quality comes from the **structure**, not the model weights.
+
+## Why This Matters
+
+Most debate systems focus on generating arguments.  
+This system focuses on **evaluating reasoning**.
+
+It provides a way to:
+- test the robustness of arguments  
+- analyze causal coherence  
+- study emergent reasoning behavior  
+- benchmark models on structured epistemic tasks  
+
+The result is a synthetic environment that reveals how well (or poorly) arguments actually work when subjected to mechanistic pressure.
+
+## Intended Use
+
+This tool is useful for:
+- researchers studying reasoning in LLMs  
+- developers testing model robustness  
+- anyone exploring multi‑agent epistemic systems  
+- people interested in argument structure rather than persuasion  
+
+It is not designed for competitive debate simulation.  
+It is designed for **reasoning diagnostics**.
+
+---
 
 Built with [SvelteKit](https://kit.svelte.dev).
 
