@@ -118,9 +118,9 @@ Upload or paste a document. One agent plays the document (reading out claims chu
 
 ## Stack
 
-| Layer     | Tech                                                                                            |
-| --------- | ----------------------------------------------------------------------------------------------- |
-| Frontend  | SvelteKit 2 + Svelte 5                                                                          |
-| Models    | Kimi K2 1T, Nemotron 3 Super, Qwen3-VL 235B, MiniMax M2.5, GLM-4.6, and more (via Ollama Cloud) | Can easily swap out your preferred LLM providers and models using the provider-agnostic llm library I wrote. |
-| Judge     | Anthropic + Gemini                                                                              |
-| Streaming | Server-Sent Events                                                                              |
+| Layer     | Tech                                                                                                                                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frontend  | SvelteKit 2 + Svelte 5                                                                                                                                                                                        |
+| Models    | Kimi K2 1T, Nemotron 3 Super, Qwen3-VL 235B, MiniMax M2.5, GLM-4.6, and more (via Ollama Cloud) (can easily swap out your preferred LLM providers and models using the provider-agnostic llm library I wrote) |
+| Judge     | Anthropic + Gemini                                                                                                                                                                                            |
+| Streaming | Server-Sent Events                                                                                                                                                                                            |
