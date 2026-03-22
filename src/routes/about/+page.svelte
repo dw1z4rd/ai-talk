@@ -32,7 +32,7 @@
       This is a real-time frontier AI debate platform. Two large language models
       argue opposite sides of a topic while a separate, independent judge scores
       every turn as it arrives — not after the debate ends, but live, turn by
-      turn.
+      turn. The debate isn't the point of this demo. The real-time judge is.
     </p>
     <p class="text-[--color-muted-fg] leading-relaxed">
       The debaters are large open-weight models running on Ollama Cloud (Kimi K2
