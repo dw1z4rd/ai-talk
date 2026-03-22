@@ -21,8 +21,7 @@ OLLAMA_CLOUD_URL=...
 OLLAMA_CLOUD_API_KEY=...
 ```
 
-`ANTHROPIC_API_KEY` and `GEMINI_API_KEY` power the judge. `OLLAMA_CLOUD_URL` / `OLLAMA_CLOUD_API_KEY` are required for the debater models (Kimi K2, Nemotron, Qwen3, etc.).
-
+Currently Gemini, Ollama, and Anthropic are supported out of the box, but the llm-agent library I wrote makes it really simple and straightforward to add any providers you need or want.
 **3. Start the dev server**
 
 ```bash
