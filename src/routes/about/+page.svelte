@@ -35,17 +35,8 @@
       turn. The debate isn't the point of this demo. The real-time judge is.
     </p>
     <p class="text-[--color-muted-fg] leading-relaxed">
-      The debaters are large open-weight models running on Ollama Cloud (Kimi K2
-      1T, Nemotron 3 Super, Qwen3, GLM-4, MiniMax M2.5, and others). The judge
-      as well as the debaters can be powered by any LLM provider you prefer. I
-      wrote a provider-agnostic LLM Provider library to make plugging in your
-      preferred llm provider seamless (Currently only Anthropic, Gemini, and
-      Ollama have been implemented, but the library makes it easy to add support
-      for other LLM providers). The judge is a separate model from the debaters,
-      and can be switched independently. The judge's rubric is
-      multi-dimensional, evaluating logic, rhetoric, tactics, frame control, and
-      credibility separately. The judge also emits hidden feedback signals that
-      shape debater behavior in real time.
+      The debaters are large open-weight models running on Ollama Cloud — Kimi K2 1T, Nemotron 3 Super, Qwen3, GLM-4, MiniMax M2.5, and others. Both debaters and the judge can be swapped for any LLM provider you prefer. I built a provider-agnostic LLM library to make this seamless — Anthropic, Gemini, and Ollama are implemented out of the box, with the architecture designed to make adding new providers straightforward.
+The judge runs independently from the debaters and can be switched without touching the rest of the stack. Its rubric is multi-dimensional — logic, rhetoric, tactics, frame control, and credibility are scored separately. It also emits hidden feedback signals back into the debate in real time, shaping how each model argues as the exchange unfolds.
     </p>
   </section>
 
