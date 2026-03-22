@@ -27,16 +27,41 @@
 
   <!-- What is this -->
   <section class="flex flex-col gap-4">
-    <h2 class="font-display text-2xl font-bold text-white">What is this?</h2>
+    <h2 class="font-display text-2xl font-bold text-white">
+      What even is this?
+    </h2>
     <p class="text-[--color-muted-fg] leading-relaxed">
-      This is a real-time frontier AI debate platform. Two large language models
-      argue opposite sides of a topic while a separate, independent judge scores
-      every turn as it arrives — not after the debate ends, but live, turn by
-      turn. The debate isn't the point of this demo. The real-time judge is.
+      It might look like a debate engine — and it is, technically — but that’s
+      not the <em>point</em> of this demo. The point is really the judge.
     </p>
     <p class="text-[--color-muted-fg] leading-relaxed">
-      The debaters are large open-weight models running on Ollama Cloud — Kimi K2 1T, Nemotron 3 Super, Qwen3, GLM-4, MiniMax M2.5, and others. Both debaters and the judge can be swapped for any LLM provider you prefer. I built a provider-agnostic LLM library to make this seamless — Anthropic, Gemini, and Ollama are implemented out of the box, with the architecture designed to make adding new providers straightforward.
-The judge runs independently from the debaters and can be switched without touching the rest of the stack. Its rubric is multi-dimensional — logic, rhetoric, tactics, frame control, and credibility are scored separately. It also emits hidden feedback signals back into the debate in real time, shaping how each model argues as the exchange unfolds.
+      This system isn’t built to simulate debates — it’s built to evaluate
+      reasoning. At its core is a judge layer engineered to audit arguments the
+      way a scientist inspects a causal model. It enforces strict cause →
+      process → consequence structure, flags missing mechanisms, and penalizes
+      claims that rely on vibes, metaphors, or moral gestures without
+      explanatory substance. The auditor tracks contradictions across turns,
+      detects when an argument quietly drops a premise, and rewards positions
+      that maintain a stable causal spine throughout the entire exchange.
+      Instead of producing a “winner,” it generates arc‑level analyses that
+      reconstruct how each argument evolved, where it fractured, and why one
+      causal model held together while the other collapsed. This isn’t a debate
+      engine. It’s a structured reasoning environment that reveals how well
+      arguments actually work.
+    </p>
+   
+    <p class="text-[--color-muted-fg] leading-relaxed">
+      The debaters are large open-weight models running on Ollama Cloud — Kimi
+      K2 1T, Nemotron 3 Super, Qwen3, GLM-4, MiniMax M2.5, and others. Both
+      debaters and the judge can be swapped for any LLM provider you prefer. I
+      built a provider-agnostic LLM library to make this seamless — Anthropic,
+      Gemini, and Ollama are already implemented out of the box, with the architecture
+      designed to make adding new providers incredibly straightforward. The judge runs
+      independently from the debaters and can be switched without touching the
+      rest of the stack. Its rubric is multi-dimensional — logic, rhetoric,
+      tactics, frame control, and credibility are scored separately. It also
+      emits hidden feedback signals back into the debate in real time, shaping
+      how each model argues as the exchange unfolds.
     </p>
   </section>
 
@@ -202,8 +227,8 @@ The judge runs independently from the debaters and can be switched without touch
         <span class="text-[--color-accent] mt-0.5 shrink-0">→</span>
         <span>
           <strong class="text-white">Multi-dimensional scoring.</strong> There is
-          no single "who won" meter. Logic, rhetoric, and tactics are tracked separately, so a win on style that conceals weak
-          reasoning is visible in the scorecard.
+          no single "who won" meter. Logic, rhetoric, and tactics are tracked separately,
+          so a win on style that conceals weak reasoning is visible in the scorecard.
         </span>
       </li>
       <li class="flex gap-3">
